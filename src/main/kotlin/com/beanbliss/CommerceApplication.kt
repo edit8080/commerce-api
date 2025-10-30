@@ -1,4 +1,4 @@
-package com.example.commerce
+package com.beanbliss
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

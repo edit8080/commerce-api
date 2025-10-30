@@ -5,9 +5,9 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
-group = "com.example"
+group = "com.beanbliss"
 version = "0.0.1-SNAPSHOT"
-description = "Demo project for Spring Boot"
+description = "Bean Bliss Coffee E-commerce Platform"
 
 java {
 	toolchain {
