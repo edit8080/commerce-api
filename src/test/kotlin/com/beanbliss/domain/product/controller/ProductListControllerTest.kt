@@ -18,18 +18,21 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import java.time.LocalDateTime
 
 /**
- * ProductController의 HTTP 요청/응답을 검증하는 테스트
+ * 상품 목록 조회 Controller의 HTTP 요청/응답을 검증하는 테스트
  *
- * 검증 목표:
+ * [검증 목표]:
  * 1. API 엔드포인트가 올바른 경로와 메서드로 매핑되는가?
  * 2. 요청 파라미터가 올바르게 바인딩되는가?
  * 3. Service 결과가 올바른 JSON 형식으로 반환되는가?
  * 4. 파라미터 검증이 올바르게 수행되는가?
  * 5. 적절한 HTTP 상태 코드가 반환되는가?
+ *
+ * [관련 API]:
+ * - GET /api/products
  */
 @WebMvcTest(ProductController::class)
 @DisplayName("상품 목록 조회 Controller 테스트")
-class ProductControllerTest {
+class ProductListControllerTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc

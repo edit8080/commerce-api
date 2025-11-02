@@ -12,15 +12,18 @@ import org.junit.jupiter.api.DisplayName
 import java.time.LocalDateTime
 
 /**
- * ProductService의 비즈니스 로직을 검증하는 테스트
+ * 상품 목록 조회 Service의 비즈니스 로직을 검증하는 테스트
  *
- * 검증 목표:
+ * [검증 목표]:
  * 1. 가용 재고(availableStock)가 올바르게 계산되는가?
  * 2. 활성 옵션이 없는 상품은 목록에서 제외되는가?
  * 3. 페이지 정보를 올바르게 결합하는가?
+ *
+ * [관련 API]:
+ * - GET /api/products
  */
-@DisplayName("상품 목록 조회 서비스 테스트")
-class ProductServiceTest {
+@DisplayName("상품 목록 조회 Service 테스트")
+class ProductListServiceTest {
 
     // Mock 객체 (Repository Interface에 의존)
     private val productRepository: ProductRepository = mockk()

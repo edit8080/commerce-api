@@ -7,8 +7,9 @@
 
 1. **레이어드 아키텍처 준수**: `Controller`, `Service`, `Repository` 계층의 명확한 분리. Presentation Layer → Business Layer → Persistence Layer → Infrastructure Layer  계층 순으로 상위 계층은 하위 계층에만 의존하고, 하위 계층은 상위 계층을 알지 말아야 점에 유의합니다.
 2. **DIP 적용**: 모든 계층 간의 의존성은 **인터페이스**를 통해 역전됩니다.
-3. **TDD 접근**: 단위 테스트를 통해 비즈니스 로직과 책임 분산을 검증합니다. 기능 로직이 올바르게 구현되었는지를 검증하는 것보다 클래스의 책임이 올바르게 분산되고, 로직이 올바르게 추상화되었는지 설계를 검증하는 목적에 집중합니다. 
+3. **TDD 접근**: 단위 테스트를 통해 비즈니스 로직과 책임 분산을 검증합니다. 기능 로직이 올바르게 구현되었는지를 검증하는 것보다 클래스의 책임이 올바르게 분산되고, 로직이 올바르게 추상화되었는지 설계를 검증하는 목적에 집중합니다.
 4. **패키지 경로**: `com.beanbliss.domain`, `com.beanbliss.common` 을 사용합니다. 자세한 내용은 프로젝트 구조 내용을 참고하세요.
+5. **테스트 파일 네이밍 규칙**: 기능별로 명확한 네이밍을 사용하여 테스트의 목적과 범위를 명시합니다. 자세한 내용은 "테스트 네이밍 가이드" 섹션을 참고하세요.
 
 ## 1. 🍳 API 설계
 - 지정한 기능을 구성하기 전 PRD와 ERD 문서를 활용하여 해당 기능을 구성하기 위해 필요한 API 설계 문서를 작성합니다.
@@ -427,4 +428,50 @@ class GlobalExceptionHandler {
     }
 }
 
+```
+
+## 8. 📝 테스트 네이밍 가이드
+
+테스트 파일의 이름은 **테스트 대상의 도메인, 기능, 그리고 계층**을 명확하게 표현해야 합니다. 이를 통해 프로젝트가 성장하더라도 각 테스트의 목적과 범위를 즉시 파악할 수 있습니다.
+
+### **8.1 테스트 파일 네이밍 규칙**
+
+기본 패턴: **`{Domain}{Feature}{Layer}Test.kt`**
+
+- **Domain**: 도메인 이름 (예: `Product`, `Order`, `Inventory`)
+- **Feature**: 테스트하는 기능 (예: `List`, `Create`, `Update`, `Delete`, `Top`)
+- **Layer**: 계층 이름 (예: `Controller`, `Service`, `Repository`)
+
+### **8.2 네이밍 예시**
+
+#### **Controller, Service 계층 테스트**
+```
+ProductListControllerTest.kt          // 상품 목록 조회 API 테스트
+ProductCreateControllerTest.kt        // 상품 생성 API 테스트
+ProductListServiceTest.kt             // 상품 목록 조회 비즈니스 로직 테스트
+ProductCreateServiceTest.kt           // 상품 생성 비즈니스 로직 테스트
+```
+
+#### **Repository 계층 테스트**
+```
+ProductRepositoryTest.kt              // 상품 Repository 전반적인 기능 테스트
+```
+
+### **8.3 클래스명 및 DisplayName**
+
+테스트 파일명과 일치하도록 클래스명과 `@DisplayName`을 작성합니다.
+
+```kotlin
+// 파일명: ProductListControllerTest.kt
+@WebMvcTest(ProductController::class)
+@DisplayName("상품 목록 조회 Controller 테스트")
+class ProductListControllerTest {
+    // ...
+}
+
+// 파일명: ProductListServiceTest.kt
+@DisplayName("상품 목록 조회 Service 테스트")
+class ProductListServiceTest {
+    // ...
+}
 ```
