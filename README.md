@@ -39,7 +39,6 @@
 
 - **Language**: Java 17+ / Kotlin
 - **Framework**: Spring Boot 3.x
-- **Cache**: Redis (선택적)
 
 ## 시작하기
 
