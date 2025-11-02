@@ -31,8 +31,7 @@ class ProductServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // TODO: Green 단계에서 ProductServiceImpl 구현 후 주석 해제
-        // productService = ProductServiceImpl(productRepository, inventoryRepository)
+        productService = ProductServiceImpl(productRepository, inventoryRepository)
     }
 
     @Test
@@ -42,7 +41,7 @@ class ProductServiceTest {
         val page = 1
         val size = 10
         val mockProducts = listOf(
-            createMockProduct(1L, "에티오피아 예가체프", listOf(
+            createMockProductWithOptions(1L, "에티오피아 예가체프", listOf(
                 Triple(1L, "ETH-WB-200", 0),  // availableStock = 0 (초기값)
                 Triple(2L, "ETH-HD-200", 0)
             ))
@@ -51,9 +50,11 @@ class ProductServiceTest {
         every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns 1L
 
-        // 옵션별로 다른 재고 반환
-        every { inventoryRepository.calculateAvailableStock(1L) } returns 50
-        every { inventoryRepository.calculateAvailableStock(2L) } returns 8
+        // Batch 조회 Mocking: 한 번의 호출로 모든 재고 반환
+        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
+            1L to 50,
+            2L to 8
+        )
 
         // When
         val result = productService.getProducts(page, size)
@@ -63,6 +64,10 @@ class ProductServiceTest {
         assertEquals(2, result.content[0].options.size)
         assertEquals(50, result.content[0].options[0].availableStock, "옵션 1의 가용 재고가 50이어야 함")
         assertEquals(8, result.content[0].options[1].availableStock, "옵션 2의 가용 재고가 8이어야 함")
+
+        // [성능 최적화 검증]: Batch 조회가 정확히 한 번만 호출되어야 함 (N+1 문제 해결)
+        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) }
+        verify(exactly = 0) { inventoryRepository.calculateAvailableStock(any()) }
     }
 
 
@@ -79,7 +84,7 @@ class ProductServiceTest {
 
         every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns totalElements
-        every { inventoryRepository.calculateAvailableStock(any()) } returns 10
+        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L)) } returns mapOf(1L to 10)
 
         // When
         val result = productService.getProducts(page, size)
@@ -105,7 +110,7 @@ class ProductServiceTest {
 
         every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns 1L
-        every { inventoryRepository.calculateAvailableStock(1L) } returns 0  // 품절
+        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L)) } returns mapOf(1L to 0)  // 품절
 
         // When
         val result = productService.getProducts(page, size)
@@ -126,6 +131,7 @@ class ProductServiceTest {
 
         every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns emptyList()
         every { productRepository.countActiveProducts() } returns 0L
+        every { inventoryRepository.calculateAvailableStockBatch(emptyList()) } returns emptyMap()
 
         // When
         val result = productService.getProducts(page, size)
@@ -145,6 +151,7 @@ class ProductServiceTest {
 
         every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns emptyList()
         every { productRepository.countActiveProducts() } returns 0L
+        every { inventoryRepository.calculateAvailableStockBatch(emptyList()) } returns emptyMap()
 
         // When
         productService.getProducts(page, size)
@@ -153,6 +160,7 @@ class ProductServiceTest {
         // [Repository 호출 검증]: Service는 created_at DESC 정렬로 Repository를 호출해야 함
         verify(exactly = 1) { productRepository.findActiveProducts(page, size, "created_at", "DESC") }
         verify(exactly = 1) { productRepository.countActiveProducts() }
+        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(emptyList()) }
     }
 
     // === Helper Methods ===
@@ -202,7 +210,7 @@ class ProductServiceTest {
     /**
      * 테스트용 Mock 상품 생성 (옵션 상세 정보 포함)
      */
-    private fun createMockProduct(
+    private fun createMockProductWithOptions(
         productId: Long,
         name: String,
         options: List<Triple<Long, String, Int>> // (optionId, optionCode, availableStock)

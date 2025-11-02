@@ -19,21 +19,55 @@ import org.junit.jupiter.api.Test
 @DisplayName("상품 Repository 테스트")
 class ProductRepositoryTest {
 
-    private lateinit var productRepository: ProductRepository
+    private lateinit var productRepository: FakeProductRepository
 
     @BeforeEach
     fun setUp() {
-        // TODO: Green 단계에서 In-memory Repository 구현 후 주석 해제
-        // productRepository = InMemoryProductRepository()
+        productRepository = FakeProductRepository()
     }
 
     @Test
     @DisplayName("활성 옵션만 포함되어야 한다 (비활성 옵션 제외)")
     fun `활성 옵션만 포함되어야 한다`() {
         // Given: 상품 A (활성 옵션 2개, 비활성 옵션 1개)
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 활성 옵션: "OPT-001", "OPT-002"
-        // - 비활성 옵션: "OPT-003" (is_active = false)
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test Description",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        optionId = 1L,
+                        optionCode = "OPT-001",
+                        origin = "Test Origin",
+                        grindType = "WHOLE_BEANS",
+                        weightGrams = 200,
+                        price = 20000,
+                        isActive = true  // 활성
+                    ),
+                    FakeProductRepository.ProductOption(
+                        optionId = 2L,
+                        optionCode = "OPT-002",
+                        origin = "Test Origin",
+                        grindType = "HAND_DRIP",
+                        weightGrams = 200,
+                        price = 21000,
+                        isActive = true  // 활성
+                    ),
+                    FakeProductRepository.ProductOption(
+                        optionId = 3L,
+                        optionCode = "OPT-003",
+                        origin = "Test Origin",
+                        grindType = "ESPRESSO",
+                        weightGrams = 200,
+                        price = 22000,
+                        isActive = false  // 비활성
+                    )
+                )
+            )
+        )
 
         // When
         val result = productRepository.findActiveProducts(
@@ -56,10 +90,48 @@ class ProductRepositoryTest {
     @DisplayName("created_at DESC 순으로 정렬되어야 한다")
     fun `created_at DESC 순으로 정렬되어야 한다`() {
         // Given: 3개의 활성 상품
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 상품 A: 2025-01-01 등록
-        // - 상품 B: 2025-01-15 등록 (최신)
-        // - 상품 C: 2025-01-10 등록
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 1, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 2L,
+                name = "상품 B",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 15, 10, 0), // 최신
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        2L, "OPT-002", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 3L,
+                name = "상품 C",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 10, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        3L, "OPT-003", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
 
         // When
         val result = productRepository.findActiveProducts(
@@ -90,10 +162,48 @@ class ProductRepositoryTest {
     @DisplayName("created_at ASC 순으로 정렬되어야 한다")
     fun `created_at ASC 순으로 정렬되어야 한다`() {
         // Given: 3개의 활성 상품
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 상품 A: 2025-01-01 등록
-        // - 상품 B: 2025-01-15 등록 (최신)
-        // - 상품 C: 2025-01-10 등록
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 1, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 2L,
+                name = "상품 B",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 15, 10, 0), // 최신
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        2L, "OPT-002", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 3L,
+                name = "상품 C",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 10, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        3L, "OPT-003", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
 
         // When
         val result = productRepository.findActiveProducts(
@@ -124,7 +234,22 @@ class ProductRepositoryTest {
     @DisplayName("페이징이 올바르게 적용되어야 한다 - 첫 번째 페이지")
     fun `페이징이 올바르게 적용되어야 한다 - 첫 번째 페이지`() {
         // Given: 총 12개의 활성 상품
-        // TODO: Green 단계에서 테스트 데이터 설정
+        for (i in 1..12) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now().plusDays(i.toLong()),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, true
+                        )
+                    )
+                )
+            )
+        }
 
         // When: 페이지 크기 5로 첫 번째 페이지 조회
         val result = productRepository.findActiveProducts(
@@ -142,7 +267,22 @@ class ProductRepositoryTest {
     @DisplayName("페이징이 올바르게 적용되어야 한다 - 두 번째 페이지")
     fun `페이징이 올바르게 적용되어야 한다 - 두 번째 페이지`() {
         // Given: 총 12개의 활성 상품
-        // TODO: Green 단계에서 테스트 데이터 설정
+        for (i in 1..12) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now().plusDays(i.toLong()),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, true
+                        )
+                    )
+                )
+            )
+        }
 
         // When: 페이지 크기 5로 두 번째 페이지 조회
         val result = productRepository.findActiveProducts(
@@ -160,7 +300,22 @@ class ProductRepositoryTest {
     @DisplayName("페이징이 올바르게 적용되어야 한다 - 마지막 페이지")
     fun `페이징이 올바르게 적용되어야 한다 - 마지막 페이지`() {
         // Given: 총 12개의 활성 상품
-        // TODO: Green 단계에서 테스트 데이터 설정
+        for (i in 1..12) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now().plusDays(i.toLong()),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, true
+                        )
+                    )
+                )
+            )
+        }
 
         // When: 페이지 크기 5로 세 번째 페이지 조회
         val result = productRepository.findActiveProducts(
@@ -178,10 +333,54 @@ class ProductRepositoryTest {
     @DisplayName("활성 옵션이 있는 상품만 반환되어야 한다 (활성 옵션이 없으면 상품 제외)")
     fun `활성 옵션이 있는 상품만 반환되어야 한다`() {
         // Given: 상품 3개
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 상품 A: 활성 옵션 2개
-        // - 상품 B: 모든 옵션이 비활성 (활성 옵션 없음)
-        // - 상품 C: 활성 옵션 1개
+        // 상품 A: 활성 옵션 2개
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 3, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "OPT-002", "Origin", "HAND_DRIP", 200, 21000, true
+                    )
+                )
+            )
+        )
+        // 상품 B: 모든 옵션이 비활성
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 2L,
+                name = "상품 B",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 2, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        3L, "OPT-003", "Origin", "WHOLE_BEANS", 200, 20000, false // 비활성
+                    )
+                )
+            )
+        )
+        // 상품 C: 활성 옵션 1개
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 3L,
+                name = "상품 C",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 1, 10, 0),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        4L, "OPT-004", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
 
         // When
         val result = productRepository.findActiveProducts(
@@ -208,9 +407,34 @@ class ProductRepositoryTest {
     @DisplayName("모든 상품이 활성 옵션이 없으면 빈 리스트를 반환해야 한다")
     fun `모든 상품이 활성 옵션이 없으면 빈 리스트를 반환해야 한다`() {
         // Given: 모든 상품이 활성 옵션 없음
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 상품 A: 모든 옵션이 비활성
-        // - 상품 B: 모든 옵션이 비활성
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, false // 비활성
+                    )
+                )
+            )
+        )
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 2L,
+                name = "상품 B",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        2L, "OPT-002", "Origin", "WHOLE_BEANS", 200, 20000, false // 비활성
+                    )
+                )
+            )
+        )
 
         // When
         val result = productRepository.findActiveProducts(
@@ -228,9 +452,40 @@ class ProductRepositoryTest {
     @DisplayName("countActiveProducts는 활성 옵션이 있는 상품만 카운트해야 한다")
     fun `countActiveProducts는 활성 옵션이 있는 상품만 카운트해야 한다`() {
         // Given: 상품 5개 중 활성 옵션이 있는 상품 3개
-        // TODO: Green 단계에서 테스트 데이터 설정
-        // - 활성 옵션 있는 상품: 3개
-        // - 활성 옵션 없는 상품: 2개
+        // 활성 옵션 있는 상품 3개
+        for (i in 1..3) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "활성 상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now(),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, true
+                        )
+                    )
+                )
+            )
+        }
+        // 활성 옵션 없는 상품 2개
+        for (i in 4..5) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "비활성 상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now(),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, false // 비활성
+                        )
+                    )
+                )
+            )
+        }
 
         // When
         val count = productRepository.countActiveProducts()
