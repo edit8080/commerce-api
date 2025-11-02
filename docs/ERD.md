@@ -70,7 +70,6 @@ erDiagram
         varchar status
         datetime reserved_at
         datetime expires_at
-        datetime created_at
         datetime updated_at
     }
 
