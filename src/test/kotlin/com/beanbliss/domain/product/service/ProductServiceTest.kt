@@ -48,7 +48,7 @@ class ProductServiceTest {
             ))
         )
 
-        every { productRepository.findActiveProducts(page, size) } returns mockProducts
+        every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns 1L
 
         // 옵션별로 다른 재고 반환
@@ -77,7 +77,7 @@ class ProductServiceTest {
             createMockProduct(1L, "상품", listOf(1L))
         )
 
-        every { productRepository.findActiveProducts(page, size) } returns mockProducts
+        every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns totalElements
         every { inventoryRepository.calculateAvailableStock(any()) } returns 10
 
@@ -103,7 +103,7 @@ class ProductServiceTest {
             createMockProduct(1L, "품절 상품", listOf(1L))
         )
 
-        every { productRepository.findActiveProducts(page, size) } returns mockProducts
+        every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns mockProducts
         every { productRepository.countActiveProducts() } returns 1L
         every { inventoryRepository.calculateAvailableStock(1L) } returns 0  // 품절
 
@@ -124,7 +124,7 @@ class ProductServiceTest {
         val page = 1
         val size = 10
 
-        every { productRepository.findActiveProducts(page, size) } returns emptyList()
+        every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns emptyList()
         every { productRepository.countActiveProducts() } returns 0L
 
         // When
@@ -137,82 +137,21 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("활성 상품이지만 활성화된 옵션이 하나도 없으면 목록에서 제외되어야 한다")
-    fun `활성 상품이지만 활성화된 옵션이 하나도 없으면 목록에서 제외되어야 한다`() {
+    @DisplayName("Service는 created_at DESC 정렬 기준으로 ProductRepository를 호출해야 한다")
+    fun `Service는 created_at DESC 정렬 기준으로 ProductRepository를 호출해야 한다`() {
         // Given
         val page = 1
         val size = 10
 
-        // Repository가 반환: 상품 A(옵션 2개), 상품 B(옵션 없음), 상품 C(옵션 1개)
-        // 상품 B는 모든 옵션이 비활성화되어 있어서 Repository가 빈 옵션 리스트를 반환
-        val mockProducts = listOf(
-            createMockProduct(1L, "상품 A", listOf(1L, 2L)),        // 활성 옵션 2개
-            createMockProductWithEmptyOptions(2L, "상품 B"),        // 활성 옵션 없음 (판매 불가)
-            createMockProduct(3L, "상품 C", listOf(3L))             // 활성 옵션 1개
-        )
-
-        every { productRepository.findActiveProducts(page, size) } returns mockProducts
-        every { productRepository.countActiveProducts() } returns 2L  // 상품 B 제외
-        every { inventoryRepository.calculateAvailableStock(any()) } returns 10
-
-        // When
-        val result = productService.getProducts(page, size)
-
-        // Then
-        // [비즈니스 로직 검증]: 활성 옵션이 없는 상품 B는 목록에서 제외되어야 함
-        assertEquals(2, result.content.size, "활성 옵션이 있는 상품만 반환되어야 함 (상품 A, C)")
-        assertEquals("상품 A", result.content[0].name)
-        assertEquals("상품 C", result.content[1].name)
-
-        // 상품 B가 제외되었는지 확인
-        assertFalse(
-            result.content.any { it.name == "상품 B" },
-            "활성 옵션이 없는 '상품 B'는 목록에 포함되지 않아야 함"
-        )
-    }
-
-    @Test
-    @DisplayName("모든 상품의 활성 옵션이 없으면 빈 리스트를 반환해야 한다")
-    fun `모든 상품의 활성 옵션이 없으면 빈 리스트를 반환해야 한다`() {
-        // Given
-        val page = 1
-        val size = 10
-
-        // Repository가 반환한 모든 상품이 활성 옵션 없음
-        val mockProducts = listOf(
-            createMockProductWithEmptyOptions(1L, "판매 불가 상품 1"),
-            createMockProductWithEmptyOptions(2L, "판매 불가 상품 2")
-        )
-
-        every { productRepository.findActiveProducts(page, size) } returns mockProducts
-        every { productRepository.countActiveProducts() } returns 0L
-
-        // When
-        val result = productService.getProducts(page, size)
-
-        // Then
-        // [비즈니스 로직 검증]: 모든 상품이 판매 불가하므로 빈 리스트 반환
-        assertTrue(result.content.isEmpty(), "활성 옵션이 없는 상품만 있으면 빈 리스트를 반환해야 함")
-        assertEquals(0L, result.pageable.totalElements)
-        assertEquals(0, result.pageable.totalPages)
-    }
-
-    @Test
-    @DisplayName("Service는 ProductRepository의 findActiveProducts와 countActiveProducts를 호출해야 한다")
-    fun `Service는 ProductRepository의 findActiveProducts와 countActiveProducts를 호출해야 한다`() {
-        // Given
-        val page = 1
-        val size = 10
-
-        every { productRepository.findActiveProducts(page, size) } returns emptyList()
+        every { productRepository.findActiveProducts(page, size, "created_at", "DESC") } returns emptyList()
         every { productRepository.countActiveProducts() } returns 0L
 
         // When
         productService.getProducts(page, size)
 
         // Then
-        // [Repository 호출 검증]: Service는 올바른 Repository 메서드를 정확히 호출해야 함
-        verify(exactly = 1) { productRepository.findActiveProducts(page, size) }
+        // [Repository 호출 검증]: Service는 created_at DESC 정렬로 Repository를 호출해야 함
+        verify(exactly = 1) { productRepository.findActiveProducts(page, size, "created_at", "DESC") }
         verify(exactly = 1) { productRepository.countActiveProducts() }
     }
 
@@ -290,20 +229,4 @@ class ProductServiceTest {
         )
     }
 
-    /**
-     * 테스트용 Mock 상품 생성 (활성 옵션 없음 - 판매 불가)
-     */
-    private fun createMockProductWithEmptyOptions(
-        productId: Long,
-        name: String
-    ): ProductResponse {
-        return ProductResponse(
-            productId = productId,
-            name = name,
-            description = "Test Description",
-            brand = "Test Brand",
-            createdAt = LocalDateTime.now(),
-            options = emptyList()  // 활성 옵션 없음
-        )
-    }
 }

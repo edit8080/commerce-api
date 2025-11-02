@@ -155,7 +155,6 @@ GET /api/products?page=1&size=10
 - 기본 정렬: `created_at DESC` (최신 등록 상품이 먼저 노출)
 
 ### 3.3 필터링 조건
-- **상품 레벨**: `PRODUCT`의 `is_active = true`인 상품만 조회
 - **옵션 레벨**: `PRODUCT_OPTION`의 `is_active = true`인 옵션만 포함
 - **활성 옵션 존재 여부**: 최소 1개 이상의 활성 옵션이 있는 상품만 포함
   - 모든 옵션이 비활성(`is_active = false`)인 상품은 구매 불가능하므로 목록에서 제외
