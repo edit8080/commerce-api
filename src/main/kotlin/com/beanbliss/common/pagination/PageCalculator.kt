@@ -1,5 +1,6 @@
 package com.beanbliss.common.pagination
 
+import com.beanbliss.common.exception.InvalidParameterException
 import kotlin.math.ceil
 
 /**
@@ -54,5 +55,25 @@ object PageCalculator {
      */
     fun isValidPageSize(size: Int, maxSize: Int = 100): Boolean {
         return size in 1..maxSize
+    }
+
+    /**
+     * 페이징 파라미터 검증 (예외 발생)
+     *
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지 크기
+     * @param maxSize 최대 페이지 크기 (기본값: 100)
+     * @throws InvalidParameterException 파라미터가 유효하지 않을 경우
+     */
+    fun validatePageParameters(page: Int, size: Int, maxSize: Int = 100) {
+        if (!isValidPage(page)) {
+            throw InvalidParameterException("페이지 번호는 1 이상이어야 합니다. 입력값: $page")
+        }
+        if (size < 1) {
+            throw InvalidParameterException("페이지 크기는 1 이상이어야 합니다. 입력값: $size")
+        }
+        if (size > maxSize) {
+            throw InvalidParameterException("페이지 크기는 $maxSize 이하여야 합니다. 입력값: $size")
+        }
     }
 }

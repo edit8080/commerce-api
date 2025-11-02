@@ -38,7 +38,7 @@ class ProductServiceImpl(
         // 2-2. 한 번의 쿼리로 모든 재고 조회
         val stockMap = inventoryRepository.calculateAvailableStockBatch(allOptionIds)
 
-        // 2-3. Map 기반 매칭 (O(1) 시간 복잡도)
+        // 2-3. Map 기반 매칭
         val productsWithStock = products.map { product ->
             val optionsWithStock = product.options.map { option ->
                 option.copy(availableStock = stockMap[option.optionId] ?: 0)

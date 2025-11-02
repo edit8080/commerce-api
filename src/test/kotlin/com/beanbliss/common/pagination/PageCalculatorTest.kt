@@ -1,5 +1,6 @@
 package com.beanbliss.common.pagination
 
+import com.beanbliss.common.exception.InvalidParameterException
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
@@ -166,5 +167,94 @@ class PageCalculatorTest {
         // 최대 크기를 50으로 설정
         assertTrue(PageCalculator.isValidPageSize(50, maxSize = 50), "최대값이 50이면 50은 유효해야 함")
         assertFalse(PageCalculator.isValidPageSize(51, maxSize = 50), "최대값이 50이면 51은 무효해야 함")
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: 유효한 파라미터는 예외를 발생시키지 않음")
+    fun `페이징 파라미터 검증 - 유효한 파라미터`() {
+        // Given
+        val page = 1
+        val size = 20
+
+        // When & Then: 예외가 발생하지 않아야 함
+        assertDoesNotThrow {
+            PageCalculator.validatePageParameters(page, size)
+        }
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: page가 1 미만이면 InvalidParameterException 발생")
+    fun `페이징 파라미터 검증 - page가 1 미만`() {
+        // Given
+        val invalidPage = 0
+        val size = 20
+
+        // When & Then
+        val exception = assertThrows<InvalidParameterException> {
+            PageCalculator.validatePageParameters(invalidPage, size)
+        }
+        assertTrue(exception.message!!.contains("페이지 번호는 1 이상이어야 합니다"))
+        assertTrue(exception.message!!.contains("입력값: 0"))
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: page가 음수이면 InvalidParameterException 발생")
+    fun `페이징 파라미터 검증 - page가 음수`() {
+        // Given
+        val invalidPage = -1
+        val size = 20
+
+        // When & Then
+        val exception = assertThrows<InvalidParameterException> {
+            PageCalculator.validatePageParameters(invalidPage, size)
+        }
+        assertTrue(exception.message!!.contains("페이지 번호는 1 이상이어야 합니다"))
+        assertTrue(exception.message!!.contains("입력값: -1"))
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: size가 1 미만이면 InvalidParameterException 발생")
+    fun `페이징 파라미터 검증 - size가 1 미만`() {
+        // Given
+        val page = 1
+        val invalidSize = 0
+
+        // When & Then
+        val exception = assertThrows<InvalidParameterException> {
+            PageCalculator.validatePageParameters(page, invalidSize)
+        }
+        assertTrue(exception.message!!.contains("페이지 크기는 1 이상이어야 합니다"))
+        assertTrue(exception.message!!.contains("입력값: 0"))
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: size가 최대값 초과이면 InvalidParameterException 발생")
+    fun `페이징 파라미터 검증 - size가 최대값 초과`() {
+        // Given
+        val page = 1
+        val invalidSize = 101
+
+        // When & Then
+        val exception = assertThrows<InvalidParameterException> {
+            PageCalculator.validatePageParameters(page, invalidSize)
+        }
+        assertTrue(exception.message!!.contains("페이지 크기는 100 이하여야 합니다"))
+        assertTrue(exception.message!!.contains("입력값: 101"))
+    }
+
+    @Test
+    @DisplayName("페이징 파라미터 검증: 커스텀 최대값 적용")
+    fun `페이징 파라미터 검증 - 커스텀 최대값`() {
+        // Given
+        val page = 1
+        val size = 51
+        val maxSize = 50
+
+        // When & Then
+        val exception = assertThrows<InvalidParameterException> {
+            PageCalculator.validatePageParameters(page, size, maxSize)
+        }
+        assertTrue(exception.message!!.contains("페이지 크기는 50 이하여야 합니다"))
+        assertTrue(exception.message!!.contains("입력값: 51"))
     }
 }
