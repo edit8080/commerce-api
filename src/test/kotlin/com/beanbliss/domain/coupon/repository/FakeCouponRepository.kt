@@ -1,5 +1,6 @@
 package com.beanbliss.domain.coupon.repository
 
+import com.beanbliss.domain.coupon.entity.CouponEntity
 import java.time.LocalDateTime
 
 /**
@@ -76,6 +77,24 @@ class FakeCouponRepository : CouponRepository {
 
     override fun countAllCoupons(): Long {
         return coupons.size.toLong()
+    }
+
+    override fun findById(couponId: Long): CouponEntity? {
+        val coupon = coupons.find { it.id == couponId } ?: return null
+
+        return CouponEntity(
+            id = coupon.id,
+            name = coupon.name,
+            discountType = coupon.discountType,
+            discountValue = coupon.discountValue,
+            minOrderAmount = coupon.minOrderAmount,
+            maxDiscountAmount = coupon.maxDiscountAmount,
+            totalQuantity = coupon.totalQuantity,
+            validFrom = coupon.validFrom,
+            validUntil = coupon.validUntil,
+            createdAt = coupon.createdAt,
+            updatedAt = coupon.updatedAt
+        )
     }
 
     // === Test Helper Methods ===

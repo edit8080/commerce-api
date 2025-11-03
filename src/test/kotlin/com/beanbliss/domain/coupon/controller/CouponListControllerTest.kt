@@ -4,6 +4,7 @@ import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.coupon.dto.CouponListData
 import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponResponse
+import com.beanbliss.domain.coupon.service.CouponIssueUseCase
 import com.beanbliss.domain.coupon.service.CouponService
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -31,6 +32,9 @@ class CouponListControllerTest {
 
     @MockkBean
     private lateinit var couponService: CouponService
+
+    @MockkBean
+    private lateinit var couponIssueUseCase: CouponIssueUseCase
 
     @Test
     @DisplayName("GET /api/coupons 요청 시 200 OK와 쿠폰 목록을 반환해야 한다")

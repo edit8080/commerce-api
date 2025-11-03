@@ -5,6 +5,7 @@ import com.beanbliss.domain.coupon.dto.IssueCouponResponse
 import com.beanbliss.domain.coupon.entity.CouponEntity
 import com.beanbliss.domain.coupon.entity.CouponTicketEntity
 import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.coupon.exception.*
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponTicketRepository
 import com.beanbliss.domain.coupon.repository.UserCouponRepository
@@ -143,7 +144,7 @@ class CouponIssueUseCaseTest {
         every { couponRepository.findById(couponId) } returns expiredCoupon
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<CouponExpiredException> {
             couponIssueUseCase.issueCoupon(couponId, userId)
         }
 
@@ -175,7 +176,7 @@ class CouponIssueUseCaseTest {
         every { couponRepository.findById(couponId) } returns notStartedCoupon
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<CouponNotStartedException> {
             couponIssueUseCase.issueCoupon(couponId, userId)
         }
 
@@ -208,7 +209,7 @@ class CouponIssueUseCaseTest {
         every { userCouponRepository.existsByUserIdAndCouponId(userId, couponId) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<CouponAlreadyIssuedException> {
             couponIssueUseCase.issueCoupon(couponId, userId)
         }
 
@@ -243,7 +244,7 @@ class CouponIssueUseCaseTest {
         every { couponTicketRepository.findAvailableTicketWithLock(couponId) } returns null
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<CouponOutOfStockException> {
             couponIssueUseCase.issueCoupon(couponId, userId)
         }
 

@@ -2,16 +2,16 @@ package com.beanbliss.domain.coupon.controller
 
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.domain.coupon.dto.IssueCouponResponse
+import com.beanbliss.domain.coupon.exception.*
 import com.beanbliss.domain.coupon.service.CouponIssueUseCase
+import com.beanbliss.domain.coupon.service.CouponService
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
-import io.mockk.mockk
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -25,17 +25,14 @@ class CouponIssueControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
 
-    @Autowired
+    @MockkBean
     private lateinit var couponIssueUseCase: CouponIssueUseCase
+
+    @MockkBean
+    private lateinit var couponService: CouponService
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
-
-    @TestConfiguration
-    class TestConfig {
-        @Bean
-        fun couponIssueUseCase(): CouponIssueUseCase = mockk(relaxed = true)
-    }
 
     @Test
     fun `POST 쿠폰 발급 성공 시_200 OK 응답과 발급된 쿠폰 정보를 반환해야 한다`() {
@@ -133,7 +130,7 @@ class CouponIssueControllerTest {
         val userId = 100L
         val requestBody = """{"userId": $userId}"""
 
-        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws IllegalStateException("유효기간이 만료된 쿠폰입니다.")
+        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws CouponExpiredException("유효기간이 만료된 쿠폰입니다.")
 
         // When & Then
         mockMvc.perform(
@@ -152,7 +149,7 @@ class CouponIssueControllerTest {
         val userId = 100L
         val requestBody = """{"userId": $userId}"""
 
-        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws IllegalStateException("이미 발급받은 쿠폰입니다.")
+        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws CouponAlreadyIssuedException("이미 발급받은 쿠폰입니다.")
 
         // When & Then
         mockMvc.perform(
@@ -171,7 +168,7 @@ class CouponIssueControllerTest {
         val userId = 100L
         val requestBody = """{"userId": $userId}"""
 
-        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws IllegalStateException("쿠폰 재고가 부족합니다.")
+        every { couponIssueUseCase.issueCoupon(couponId, userId) } throws CouponOutOfStockException("쿠폰 재고가 부족합니다.")
 
         // When & Then
         mockMvc.perform(
