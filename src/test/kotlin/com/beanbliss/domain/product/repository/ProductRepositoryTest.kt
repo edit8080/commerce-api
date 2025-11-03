@@ -493,4 +493,164 @@ class ProductRepositoryTest {
         // Then
         assertEquals(3L, count, "활성 옵션이 있는 상품만 카운트되어야 함")
     }
+
+    // ============================================
+    // 상품 상세 조회 테스트 (findByIdWithOptions)
+    // ============================================
+
+    @Test
+    @DisplayName("findByIdWithOptions - 상품 ID로 상품을 조회할 수 있어야 한다")
+    fun `findByIdWithOptions - 상품 ID로 상품을 조회할 수 있어야 한다`() {
+        // Given
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "에티오피아 예가체프 G1",
+                description = "플로럴한 향과 밝은 산미가 특징",
+                brand = "Bean Bliss",
+                createdAt = java.time.LocalDateTime.of(2025, 1, 15, 10, 30),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "ETH-WB-200", "Ethiopia", "WHOLE_BEANS", 200, 18000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "ETH-HD-200", "Ethiopia", "HAND_DRIP", 200, 21000, true
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNotNull(result, "상품이 조회되어야 함")
+        assertEquals(1L, result!!.productId)
+        assertEquals("에티오피아 예가체프 G1", result.name)
+        assertEquals("플로럴한 향과 밝은 산미가 특징", result.description)
+        assertEquals("Bean Bliss", result.brand)
+        assertEquals(2, result.options.size, "활성 옵션 2개가 포함되어야 함")
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 활성 옵션만 포함되어야 한다 (비활성 옵션 제외)")
+    fun `findByIdWithOptions - 활성 옵션만 포함되어야 한다`() {
+        // Given: 활성 옵션 2개, 비활성 옵션 1개
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "에티오피아 예가체프 G1",
+                description = "Test Description",
+                brand = "Bean Bliss",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "ETH-WB-200", "Ethiopia", "WHOLE_BEANS", 200, 18000, true  // 활성
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "ETH-HD-200", "Ethiopia", "HAND_DRIP", 200, 21000, true  // 활성
+                    ),
+                    FakeProductRepository.ProductOption(
+                        3L, "ETH-ES-200", "Ethiopia", "ESPRESSO", 200, 22000, false  // 비활성
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNotNull(result)
+        assertEquals(2, result!!.options.size, "활성 옵션만 2개 포함되어야 함")
+        assertTrue(
+            result.options.none { it.optionCode == "ETH-ES-200" },
+            "비활성 옵션 ETH-ES-200은 포함되지 않아야 함"
+        )
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 존재하지 않는 상품 ID 조회 시 null을 반환해야 한다")
+    fun `findByIdWithOptions - 존재하지 않는 상품 ID 조회 시 null을 반환해야 한다`() {
+        // Given: 상품 ID 1만 존재
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "상품 A",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, true
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(999L)
+
+        // Then
+        assertNull(result, "존재하지 않는 상품 ID 조회 시 null을 반환해야 함")
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 null을 반환해야 한다")
+    fun `findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 null을 반환해야 한다`() {
+        // Given: 모든 옵션이 비활성
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "비활성 상품",
+                description = "Test",
+                brand = "Test Brand",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "OPT-001", "Origin", "WHOLE_BEANS", 200, 20000, false  // 비활성
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "OPT-002", "Origin", "HAND_DRIP", 200, 21000, false  // 비활성
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNull(result, "모든 옵션이 비활성인 상품 조회 시 null을 반환해야 함")
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 여러 상품 중 특정 상품만 조회되어야 한다")
+    fun `findByIdWithOptions - 여러 상품 중 특정 상품만 조회되어야 한다`() {
+        // Given: 상품 3개 등록
+        for (i in 1..3) {
+            productRepository.addProduct(
+                FakeProductRepository.Product(
+                    productId = i.toLong(),
+                    name = "상품 $i",
+                    description = "Test",
+                    brand = "Test Brand",
+                    createdAt = java.time.LocalDateTime.now(),
+                    options = listOf(
+                        FakeProductRepository.ProductOption(
+                            i.toLong(), "OPT-$i", "Origin", "WHOLE_BEANS", 200, 20000, true
+                        )
+                    )
+                )
+            )
+        }
+
+        // When: 상품 ID 2 조회
+        val result = productRepository.findByIdWithOptions(2L)
+
+        // Then
+        assertNotNull(result)
+        assertEquals(2L, result!!.productId, "상품 ID 2만 조회되어야 함")
+        assertEquals("상품 2", result.name)
+    }
 }

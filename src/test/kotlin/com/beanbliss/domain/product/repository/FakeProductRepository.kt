@@ -90,6 +90,22 @@ class FakeProductRepository : ProductRepository {
         return productsWithActiveOptions.count { it.options.isNotEmpty() }.toLong()
     }
 
+    override fun findByIdWithOptions(productId: Long): ProductResponse? {
+        // 1. 상품 ID로 조회
+        val product = products.firstOrNull { it.productId == productId } ?: return null
+
+        // 2. 활성 옵션만 필터링
+        val activeOptions = product.options.filter { it.isActive }
+
+        // 3. 활성 옵션이 없으면 null 반환 (활성 옵션이 없는 상품은 조회 불가)
+        if (activeOptions.isEmpty()) {
+            return null
+        }
+
+        // 4. ProductResponse로 변환
+        return product.copy(options = activeOptions).toResponse()
+    }
+
     /**
      * 테스트용 내부 데이터 모델
      */
