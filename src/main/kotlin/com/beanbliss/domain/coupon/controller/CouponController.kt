@@ -2,7 +2,11 @@ package com.beanbliss.domain.coupon.controller
 
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.coupon.dto.CouponListResponse
+import com.beanbliss.domain.coupon.dto.IssueCouponRequest
+import com.beanbliss.domain.coupon.dto.IssueCouponResponse
+import com.beanbliss.domain.coupon.service.CouponIssueUseCase
 import com.beanbliss.domain.coupon.service.CouponService
+import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -19,7 +23,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/coupons")
 class CouponController(
-    private val couponService: CouponService
+    private val couponService: CouponService,
+    private val couponIssueUseCase: CouponIssueUseCase
 ) {
 
     /**
@@ -40,5 +45,22 @@ class CouponController(
 
         // Service 호출 및 응답 반환
         return couponService.getCoupons(page, size)
+    }
+
+    /**
+     * 쿠폰 발급 API
+     *
+     * @param couponId 발급할 쿠폰 ID
+     * @param request 발급 요청 (userId 포함)
+     * @return 발급된 쿠폰 정보
+     * @throws ResourceNotFoundException 쿠폰을 찾을 수 없는 경우
+     * @throws IllegalStateException 유효기간 만료, 재고 부족, 중복 발급 등의 경우
+     */
+    @PostMapping("/{couponId}/issue")
+    fun issueCoupon(
+        @PathVariable couponId: Long,
+        @Valid @RequestBody request: IssueCouponRequest
+    ): IssueCouponResponse {
+        return couponIssueUseCase.issueCoupon(couponId, request.userId)
     }
 }

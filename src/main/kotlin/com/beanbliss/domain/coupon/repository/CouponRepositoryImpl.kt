@@ -92,6 +92,10 @@ class CouponRepositoryImpl : CouponRepository {
         return coupons.size.toLong()
     }
 
+    override fun findById(couponId: Long): CouponEntity? {
+        return coupons[couponId]
+    }
+
     // === Private Helper Methods ===
 
     /**
