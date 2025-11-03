@@ -27,8 +27,7 @@ class CouponListServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // TODO: CouponServiceImpl 구현 후 초기화
-        // couponService = CouponServiceImpl(couponRepository)
+        couponService = CouponServiceImpl(couponRepository)
     }
 
     @Test

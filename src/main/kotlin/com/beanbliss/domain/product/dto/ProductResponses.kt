@@ -1,5 +1,6 @@
 package com.beanbliss.domain.product.dto
 
+import com.beanbliss.common.dto.PageableResponse
 import java.time.LocalDateTime
 
 /**
@@ -33,14 +34,4 @@ data class ProductOptionResponse(
     val weightGrams: Int,
     val price: Int,
     val availableStock: Int
-)
-
-/**
- * 페이징 정보 응답
- */
-data class PageableResponse(
-    val pageNumber: Int,
-    val pageSize: Int,
-    val totalElements: Long,
-    val totalPages: Int
 )

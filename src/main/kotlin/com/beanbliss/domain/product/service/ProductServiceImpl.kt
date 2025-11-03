@@ -1,9 +1,9 @@
 package com.beanbliss.domain.product.service
 
+import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.repository.InventoryRepository
-import com.beanbliss.domain.product.dto.PageableResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.repository.ProductRepository

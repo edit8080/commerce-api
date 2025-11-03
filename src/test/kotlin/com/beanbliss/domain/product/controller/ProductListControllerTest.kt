@@ -1,6 +1,6 @@
 package com.beanbliss.domain.product.controller
 
-import com.beanbliss.domain.product.dto.PageableResponse
+import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse

@@ -1,7 +1,5 @@
 package com.beanbliss.domain.coupon.repository
 
-import java.time.LocalDateTime
-
 /**
  * [책임]: 쿠폰 영속성 계층의 계약 정의
  * Service는 이 인터페이스에만 의존합니다 (DIP 준수)
@@ -23,21 +21,3 @@ interface CouponRepository {
      */
     fun countAllCoupons(): Long
 }
-
-/**
- * 남은 수량 정보를 포함한 쿠폰 데이터
- */
-data class CouponWithQuantity(
-    val id: Long,
-    val name: String,
-    val discountType: String,
-    val discountValue: Int,
-    val minOrderAmount: Int,
-    val maxDiscountAmount: Int,
-    val totalQuantity: Int,
-    val validFrom: LocalDateTime,
-    val validUntil: LocalDateTime,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
-    val remainingQuantity: Int // COUPON_TICKET에서 계산된 값
-)

@@ -1,9 +1,9 @@
 package com.beanbliss.domain.coupon.controller
 
+import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.coupon.dto.CouponListData
 import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponResponse
-import com.beanbliss.domain.coupon.dto.PageableResponse
 import com.beanbliss.domain.coupon.service.CouponService
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
