@@ -105,10 +105,11 @@ class ProductDetailServiceTest {
     fun `옵션이 용량 오름차순, 분쇄 타입 오름차순으로 정렬되어야 한다`() {
         // Given
         val productId = 1L
-        val unsortedOptions = listOf(
-            createMockOption(1L, "ETH-HD-500", 500, "HAND_DRIP"),      // 500g, 핸드드립
-            createMockOption(2L, "ETH-WB-200", 200, "WHOLE_BEANS"),    // 200g, 홀빈
+        // Repository는 이미 정렬된 옵션을 반환함 (Repository의 책임)
+        val sortedOptions = listOf(
             createMockOption(3L, "ETH-HD-200", 200, "HAND_DRIP"),      // 200g, 핸드드립
+            createMockOption(2L, "ETH-WB-200", 200, "WHOLE_BEANS"),    // 200g, 홀빈
+            createMockOption(1L, "ETH-HD-500", 500, "HAND_DRIP"),      // 500g, 핸드드립
             createMockOption(4L, "ETH-WB-500", 500, "WHOLE_BEANS")     // 500g, 홀빈
         )
 
@@ -118,11 +119,12 @@ class ProductDetailServiceTest {
             description = "Test Description",
             brand = "Bean Bliss",
             createdAt = LocalDateTime.now(),
-            options = unsortedOptions
+            options = sortedOptions
         )
 
         every { productRepository.findByIdWithOptions(productId) } returns mockProduct
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L, 3L, 4L)) } returns mapOf(
+        // Repository가 정렬된 순서로 반환하므로: 3L, 2L, 1L, 4L 순서로 optionId 수집됨
+        every { inventoryRepository.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) } returns mapOf(
             1L to 10, 2L to 10, 3L to 10, 4L to 10
         )
 
@@ -130,26 +132,29 @@ class ProductDetailServiceTest {
         val result = productService.getProductDetail(productId)
 
         // Then
-        // [비즈니스 로직 검증]: 옵션이 용량 → 분쇄 순으로 정렬되었는가?
-        val sortedOptions = result.options
-        assertEquals(4, sortedOptions.size)
+        // [비즈니스 로직 검증]: Service가 Repository의 정렬 순서를 유지하는가?
+        val resultOptions = result.options
+        assertEquals(4, resultOptions.size)
+
+        // [Repository 호출 검증]: 정렬된 순서대로 optionId를 수집하여 Batch 조회를 호출했는가?
+        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) }
 
         // 정렬 순서: 200g-핸드드립, 200g-홀빈, 500g-핸드드립, 500g-홀빈
-        assertEquals(3L, sortedOptions[0].optionId, "1번째는 200g 핸드드립이어야 함")
-        assertEquals(200, sortedOptions[0].weightGrams)
-        assertEquals("HAND_DRIP", sortedOptions[0].grindType)
+        assertEquals(3L, resultOptions[0].optionId, "1번째는 200g 핸드드립이어야 함")
+        assertEquals(200, resultOptions[0].weightGrams)
+        assertEquals("HAND_DRIP", resultOptions[0].grindType)
 
-        assertEquals(2L, sortedOptions[1].optionId, "2번째는 200g 홀빈이어야 함")
-        assertEquals(200, sortedOptions[1].weightGrams)
-        assertEquals("WHOLE_BEANS", sortedOptions[1].grindType)
+        assertEquals(2L, resultOptions[1].optionId, "2번째는 200g 홀빈이어야 함")
+        assertEquals(200, resultOptions[1].weightGrams)
+        assertEquals("WHOLE_BEANS", resultOptions[1].grindType)
 
-        assertEquals(1L, sortedOptions[2].optionId, "3번째는 500g 핸드드립이어야 함")
-        assertEquals(500, sortedOptions[2].weightGrams)
-        assertEquals("HAND_DRIP", sortedOptions[2].grindType)
+        assertEquals(1L, resultOptions[2].optionId, "3번째는 500g 핸드드립이어야 함")
+        assertEquals(500, resultOptions[2].weightGrams)
+        assertEquals("HAND_DRIP", resultOptions[2].grindType)
 
-        assertEquals(4L, sortedOptions[3].optionId, "4번째는 500g 홀빈이어야 함")
-        assertEquals(500, sortedOptions[3].weightGrams)
-        assertEquals("WHOLE_BEANS", sortedOptions[3].grindType)
+        assertEquals(4L, resultOptions[3].optionId, "4번째는 500g 홀빈이어야 함")
+        assertEquals(500, resultOptions[3].weightGrams)
+        assertEquals("WHOLE_BEANS", resultOptions[3].grindType)
     }
 
     @Test

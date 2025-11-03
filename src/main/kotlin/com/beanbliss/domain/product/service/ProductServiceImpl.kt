@@ -1,5 +1,6 @@
 package com.beanbliss.domain.product.service
 
+import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import com.beanbliss.domain.product.dto.PageableResponse
@@ -61,5 +62,31 @@ class ProductServiceImpl(
             content = productsWithStock,
             pageable = pageable
         )
+    }
+
+    override fun getProductDetail(productId: Long): ProductResponse {
+        // 1. Repository에서 상품 상세 조회 (활성 옵션 포함, Repository에서 정렬됨)
+        val product = productRepository.findByIdWithOptions(productId)
+            ?: throw ResourceNotFoundException("상품 ID: $productId 의 상품을 찾을 수 없습니다.")
+
+        // 2. 활성 옵션이 없는 경우 예외 처리
+        if (product.options.isEmpty()) {
+            throw ResourceNotFoundException("상품 ID: $productId 의 활성 옵션이 없습니다.")
+        }
+
+        // 3. 각 옵션의 가용 재고 계산 (Batch 조회로 N+1 문제 해결)
+        // 3-1. 모든 optionId 수집
+        val optionIds = product.options.map { it.optionId }
+
+        // 3-2. 한 번의 쿼리로 모든 재고 조회
+        val stockMap = inventoryRepository.calculateAvailableStockBatch(optionIds)
+
+        // 3-3. Map 기반 매칭 (Repository의 정렬 순서 유지)
+        val optionsWithStock = product.options.map { option ->
+            option.copy(availableStock = stockMap[option.optionId] ?: 0)
+        }
+
+        // 4. 응답 조립
+        return product.copy(options = optionsWithStock)
     }
 }

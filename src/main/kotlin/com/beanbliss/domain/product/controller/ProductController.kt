@@ -3,6 +3,7 @@ package com.beanbliss.domain.product.controller
 import com.beanbliss.common.dto.ApiResponse
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.product.dto.ProductListResponse
+import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import org.springframework.web.bind.annotation.*
 
@@ -40,6 +41,24 @@ class ProductController(
 
         // Service 호출
         val result = productService.getProducts(page, size)
+
+        // 응답 반환
+        return ApiResponse(data = result)
+    }
+
+    /**
+     * 상품 상세 조회 API
+     *
+     * @param productId 상품 ID
+     * @return 상품 상세 정보 (옵션 포함, 가용 재고 계산됨)
+     * @throws ResourceNotFoundException 상품이 존재하지 않거나 활성 옵션이 없는 경우
+     */
+    @GetMapping("/{productId}")
+    fun getProductDetail(
+        @PathVariable productId: Long
+    ): ApiResponse<ProductResponse> {
+        // Service 호출
+        val result = productService.getProductDetail(productId)
 
         // 응답 반환
         return ApiResponse(data = result)

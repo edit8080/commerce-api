@@ -596,8 +596,8 @@ class ProductRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 null을 반환해야 한다")
-    fun `findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 null을 반환해야 한다`() {
+    @DisplayName("findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 빈 옵션 리스트를 반환해야 한다")
+    fun `findByIdWithOptions - 모든 옵션이 비활성인 상품 조회 시 빈 옵션 리스트를 반환해야 한다`() {
         // Given: 모든 옵션이 비활성
         productRepository.addProduct(
             FakeProductRepository.Product(
@@ -621,7 +621,9 @@ class ProductRepositoryTest {
         val result = productRepository.findByIdWithOptions(1L)
 
         // Then
-        assertNull(result, "모든 옵션이 비활성인 상품 조회 시 null을 반환해야 함")
+        assertNotNull(result, "상품이 존재하므로 ProductResponse를 반환해야 함")
+        assertEquals(0, result!!.options.size, "모든 옵션이 비활성이므로 빈 리스트를 반환해야 함")
+        assertEquals("비활성 상품", result.name)
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 
 /**
  * 공통 예외 처리 핸들러
@@ -53,6 +54,16 @@ class CommonExceptionHandler {
             status = HttpStatus.BAD_REQUEST.value(),
             code = "INVALID_INPUT",
             message = errorMessage
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatch(ex: MethodArgumentTypeMismatchException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVALID_INPUT",
+            message = "잘못된 형식의 파라미터입니다: ${ex.name}"
         )
         return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
     }

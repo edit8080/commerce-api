@@ -97,17 +97,12 @@ class FakeProductRepository : ProductRepository {
         // 2. 활성 옵션만 필터링
         val activeOptions = product.options.filter { it.isActive }
 
-        // 3. 활성 옵션이 없으면 null 반환 (활성 옵션이 없는 상품은 조회 불가)
-        if (activeOptions.isEmpty()) {
-            return null
-        }
-
-        // 4. 옵션 정렬: 용량(weightGrams) 오름차순 → 분쇄 타입(grindType) 오름차순
+        // 3. 옵션 정렬: 용량(weightGrams) 오름차순 → 분쇄 타입(grindType) 오름차순
         val sortedOptions = activeOptions.sortedWith(
             compareBy<ProductOption> { it.weightGrams }.thenBy { it.grindType }
         )
 
-        // 5. ProductResponse로 변환
+        // 4. ProductResponse로 변환 (활성 옵션이 없어도 빈 리스트로 반환)
         return product.copy(options = sortedOptions).toResponse()
     }
 

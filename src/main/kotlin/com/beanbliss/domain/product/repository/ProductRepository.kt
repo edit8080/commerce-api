@@ -36,4 +36,17 @@ interface ProductRepository {
      * @return 활성 옵션이 있는 상품 수
      */
     fun countActiveProducts(): Long
+
+    /**
+     * 상품 ID로 상품 상세 조회 (활성 옵션 포함)
+     *
+     * - PRODUCT_OPTION.is_active = true인 옵션만 포함
+     * - 옵션은 용량(weightGrams) 오름차순 → 분쇄 타입(grindType) 오름차순으로 정렬
+     * - 상품이 존재하지 않으면 null 반환
+     * - 상품이 존재하지만 활성 옵션이 없으면 빈 options 리스트를 가진 ProductResponse 반환
+     *
+     * @param productId 상품 ID
+     * @return 상품 정보 (옵션 포함) 또는 null (상품이 존재하지 않는 경우)
+     */
+    fun findByIdWithOptions(productId: Long): ProductResponse?
 }
