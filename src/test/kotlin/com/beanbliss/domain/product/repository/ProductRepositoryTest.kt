@@ -653,4 +653,139 @@ class ProductRepositoryTest {
         assertEquals(2L, result!!.productId, "상품 ID 2만 조회되어야 함")
         assertEquals("상품 2", result.name)
     }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 옵션 목록이 용량(weightGrams) 오름차순, 분쇄 타입(grindType) 오름차순으로 정렬되어야 한다")
+    fun `findByIdWithOptions - 옵션이 용량 오름차순, 분쇄 타입 오름차순으로 정렬되어야 한다`() {
+        // Given: 정렬되지 않은 순서로 옵션 등록
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "에티오피아 예가체프 G1",
+                description = "Test",
+                brand = "Bean Bliss",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    // 의도적으로 정렬되지 않은 순서로 등록
+                    FakeProductRepository.ProductOption(
+                        1L, "ETH-HD-500", "Ethiopia", "HAND_DRIP", 500, 48000, true      // 500g, 핸드드립
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "ETH-WB-200", "Ethiopia", "WHOLE_BEANS", 200, 18000, true    // 200g, 홀빈
+                    ),
+                    FakeProductRepository.ProductOption(
+                        3L, "ETH-HD-200", "Ethiopia", "HAND_DRIP", 200, 21000, true      // 200g, 핸드드립
+                    ),
+                    FakeProductRepository.ProductOption(
+                        4L, "ETH-WB-500", "Ethiopia", "WHOLE_BEANS", 500, 42000, true    // 500g, 홀빈
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNotNull(result)
+        val options = result!!.options
+        assertEquals(4, options.size)
+
+        // [Repository 책임]: 옵션이 용량 → 분쇄 순으로 정렬되었는가?
+        // 정렬 순서: 200g-핸드드립, 200g-홀빈, 500g-핸드드립, 500g-홀빈
+        assertEquals("ETH-HD-200", options[0].optionCode, "1번째: 200g 핸드드립")
+        assertEquals(200, options[0].weightGrams)
+        assertEquals("HAND_DRIP", options[0].grindType)
+
+        assertEquals("ETH-WB-200", options[1].optionCode, "2번째: 200g 홀빈")
+        assertEquals(200, options[1].weightGrams)
+        assertEquals("WHOLE_BEANS", options[1].grindType)
+
+        assertEquals("ETH-HD-500", options[2].optionCode, "3번째: 500g 핸드드립")
+        assertEquals(500, options[2].weightGrams)
+        assertEquals("HAND_DRIP", options[2].grindType)
+
+        assertEquals("ETH-WB-500", options[3].optionCode, "4번째: 500g 홀빈")
+        assertEquals(500, options[3].weightGrams)
+        assertEquals("WHOLE_BEANS", options[3].grindType)
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 동일한 용량의 옵션은 분쇄 타입 순으로 정렬되어야 한다")
+    fun `findByIdWithOptions - 동일한 용량의 옵션은 분쇄 타입 순으로 정렬되어야 한다`() {
+        // Given: 모두 200g이지만 분쇄 타입이 다른 옵션들
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "에티오피아 예가체프 G1",
+                description = "Test",
+                brand = "Bean Bliss",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    // 의도적으로 역순으로 등록
+                    FakeProductRepository.ProductOption(
+                        1L, "ETH-WB-200", "Ethiopia", "WHOLE_BEANS", 200, 18000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "ETH-HD-200", "Ethiopia", "HAND_DRIP", 200, 21000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        3L, "ETH-ES-200", "Ethiopia", "ESPRESSO", 200, 22000, true
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNotNull(result)
+        val options = result!!.options
+        assertEquals(3, options.size)
+
+        // 분쇄 타입 알파벳 순으로 정렬: ESPRESSO, HAND_DRIP, WHOLE_BEANS
+        assertEquals("ESPRESSO", options[0].grindType, "1번째: ESPRESSO")
+        assertEquals("HAND_DRIP", options[1].grindType, "2번째: HAND_DRIP")
+        assertEquals("WHOLE_BEANS", options[2].grindType, "3번째: WHOLE_BEANS")
+    }
+
+    @Test
+    @DisplayName("findByIdWithOptions - 다양한 용량의 옵션은 용량 순으로 먼저 정렬되어야 한다")
+    fun `findByIdWithOptions - 다양한 용량의 옵션은 용량 순으로 먼저 정렬되어야 한다`() {
+        // Given: 다양한 용량 (1000g, 200g, 500g)
+        productRepository.addProduct(
+            FakeProductRepository.Product(
+                productId = 1L,
+                name = "에티오피아 예가체프 G1",
+                description = "Test",
+                brand = "Bean Bliss",
+                createdAt = java.time.LocalDateTime.now(),
+                options = listOf(
+                    FakeProductRepository.ProductOption(
+                        1L, "ETH-WB-1000", "Ethiopia", "WHOLE_BEANS", 1000, 80000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        2L, "ETH-WB-200", "Ethiopia", "WHOLE_BEANS", 200, 18000, true
+                    ),
+                    FakeProductRepository.ProductOption(
+                        3L, "ETH-WB-500", "Ethiopia", "WHOLE_BEANS", 500, 42000, true
+                    )
+                )
+            )
+        )
+
+        // When
+        val result = productRepository.findByIdWithOptions(1L)
+
+        // Then
+        assertNotNull(result)
+        val options = result!!.options
+        assertEquals(3, options.size)
+
+        // 용량 순으로 정렬: 200g, 500g, 1000g
+        assertEquals(200, options[0].weightGrams, "1번째: 200g")
+        assertEquals(500, options[1].weightGrams, "2번째: 500g")
+        assertEquals(1000, options[2].weightGrams, "3번째: 1000g")
+    }
 }

@@ -102,8 +102,13 @@ class FakeProductRepository : ProductRepository {
             return null
         }
 
-        // 4. ProductResponse로 변환
-        return product.copy(options = activeOptions).toResponse()
+        // 4. 옵션 정렬: 용량(weightGrams) 오름차순 → 분쇄 타입(grindType) 오름차순
+        val sortedOptions = activeOptions.sortedWith(
+            compareBy<ProductOption> { it.weightGrams }.thenBy { it.grindType }
+        )
+
+        // 5. ProductResponse로 변환
+        return product.copy(options = sortedOptions).toResponse()
     }
 
     /**

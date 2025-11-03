@@ -18,7 +18,7 @@ import java.time.LocalDateTime
  * [검증 목표]:
  * 1. ProductRepository를 통해 상품 ID로 상품을 조회할 수 있는가?
  * 2. 각 옵션의 가용 재고가 InventoryRepository를 통해 올바르게 계산되는가?
- * 3. 옵션이 용량(weightGrams) → 분쇄 타입(grindType) 순으로 정렬되는가?
+ * 3. 옵션 목록이 용량(weightGrams) → 분쇄 타입(grindType) 순으로 정렬되는가?
  * 4. 존재하지 않는 상품 ID 조회 시 적절한 예외가 발생하는가?
  * 5. 활성 옵션이 없는 상품 조회 시 적절한 예외가 발생하는가?
  *
