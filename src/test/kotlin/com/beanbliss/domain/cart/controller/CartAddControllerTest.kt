@@ -1,20 +1,20 @@
 package com.beanbliss.domain.cart.controller
 
 import com.beanbliss.domain.cart.service.CartService
+import com.beanbliss.domain.cart.service.AddToCartResult
 import com.beanbliss.domain.cart.dto.AddToCartRequest
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.exception.InvalidParameterException
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
-import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -34,7 +34,8 @@ import java.time.LocalDateTime
  * [관련 API]:
  * - POST /api/cart/items
  */
-@WebMvcTest(CartController::class)
+@WebMvcTest(controllers = [CartController::class])
+@Import(com.beanbliss.common.exception.CommonExceptionHandler::class)
 @DisplayName("장바구니 추가 Controller 테스트")
 class CartAddControllerTest {
 
@@ -44,14 +45,8 @@ class CartAddControllerTest {
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
-    @Autowired
+    @MockkBean
     private lateinit var cartService: CartService
-
-    @TestConfiguration
-    class TestConfig {
-        @Bean
-        fun cartService(): CartService = mockk()
-    }
 
     @Test
     @DisplayName("신규 장바구니 추가 요청 시 201 Created와 함께 장바구니 아이템 정보를 반환해야 한다")
@@ -63,7 +58,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        val mockResponse = CartItemResponse(
+        val mockCartItem = CartItemResponse(
             cartItemId = 100L,
             productOptionId = 1L,
             productName = "에티오피아 예가체프 G1",
@@ -76,6 +71,11 @@ class CartAddControllerTest {
             totalPrice = 42000,
             createdAt = LocalDateTime.of(2025, 11, 3, 14, 30),
             updatedAt = LocalDateTime.of(2025, 11, 3, 14, 30)
+        )
+
+        val mockResponse = AddToCartResult(
+            cartItem = mockCartItem,
+            isNewItem = true
         )
 
         every { cartService.addToCart(any()) } returns mockResponse
@@ -112,7 +112,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        val mockResponse = CartItemResponse(
+        val mockCartItem = CartItemResponse(
             cartItemId = 100L,
             productOptionId = 1L,
             productName = "에티오피아 예가체프 G1",
@@ -125,6 +125,11 @@ class CartAddControllerTest {
             totalPrice = 105000,
             createdAt = LocalDateTime.of(2025, 11, 3, 14, 20),
             updatedAt = LocalDateTime.of(2025, 11, 3, 14, 30)
+        )
+
+        val mockResponse = AddToCartResult(
+            cartItem = mockCartItem,
+            isNewItem = false // 기존 아이템 수량 증가
         )
 
         every { cartService.addToCart(any()) } returns mockResponse

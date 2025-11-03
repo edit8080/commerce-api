@@ -60,7 +60,7 @@ class CartAddServiceTest {
         every { userRepository.existsById(1L) } returns true
         every { productOptionRepository.findActiveOptionWithProduct(1L) } returns mockProductOption
         every { cartItemRepository.findByUserIdAndProductOptionId(1L, 1L) } returns null
-        every { cartItemRepository.save(any()) } returns mockCartItem
+        every { cartItemRepository.save(any(), 1L) } returns mockCartItem
 
         // When
         val result = cartService.addToCart(request)
@@ -68,15 +68,16 @@ class CartAddServiceTest {
         // Then
         // [비즈니스 로직 검증]: 신규 장바구니 아이템이 생성되었는가?
         assertNotNull(result)
-        assertEquals(100L, result.cartItemId)
-        assertEquals(1L, result.productOptionId)
-        assertEquals(2, result.quantity)
+        assertTrue(result.isNewItem, "신규 아이템이므로 isNewItem은 true여야 함")
+        assertEquals(100L, result.cartItem.cartItemId)
+        assertEquals(1L, result.cartItem.productOptionId)
+        assertEquals(2, result.cartItem.quantity)
 
         // [Repository 호출 검증]: 각 Repository가 정확히 한 번씩 호출되어야 함
         verify(exactly = 1) { userRepository.existsById(1L) }
         verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(1L) }
         verify(exactly = 1) { cartItemRepository.findByUserIdAndProductOptionId(1L, 1L) }
-        verify(exactly = 1) { cartItemRepository.save(any()) }
+        verify(exactly = 1) { cartItemRepository.save(any(), 1L) }
     }
 
     @Test
@@ -103,11 +104,12 @@ class CartAddServiceTest {
 
         // Then
         // [비즈니스 로직 검증]: 기존 수량에 새 수량이 합산되었는가?
-        assertEquals(5, result.quantity, "기존 수량 3 + 추가 수량 2 = 5")
+        assertFalse(result.isNewItem, "기존 아이템 수량 증가이므로 isNewItem은 false여야 함")
+        assertEquals(5, result.cartItem.quantity, "기존 수량 3 + 추가 수량 2 = 5")
 
         // [Repository 호출 검증]: save가 아닌 updateQuantity가 호출되어야 함
         verify(exactly = 1) { cartItemRepository.updateQuantity(100L, 5) }
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     @Test
@@ -133,7 +135,7 @@ class CartAddServiceTest {
         // [Repository 호출 검증]: 사용자 검증 실패 시, 다른 Repository는 호출되지 않아야 함
         verify(exactly = 1) { userRepository.existsById(999L) }
         verify(exactly = 0) { productOptionRepository.findActiveOptionWithProduct(any()) }
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     @Test
@@ -159,7 +161,7 @@ class CartAddServiceTest {
 
         // [Repository 호출 검증]: 상품 옵션 검증 실패 시, 장바구니 Repository는 호출되지 않아야 함
         verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(999L) }
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     @Test
@@ -185,7 +187,7 @@ class CartAddServiceTest {
         assertEquals("상품 옵션 ID: 1를 찾을 수 없습니다.", exception.message)
 
         // [Repository 호출 검증]: 비활성 옵션 검증 실패 시, 장바구니 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     @Test
@@ -215,7 +217,7 @@ class CartAddServiceTest {
 
         // [Repository 호출 검증]: 수량 검증 실패 시, updateQuantity는 호출되지 않아야 함
         verify(exactly = 0) { cartItemRepository.updateQuantity(any(), any()) }
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     @Test
@@ -243,7 +245,7 @@ class CartAddServiceTest {
         assertEquals("장바구니 내 동일 옵션의 최대 수량은 999개입니다.", exception.message)
 
         // [Repository 호출 검증]: 수량 검증 실패 시, save는 호출되지 않아야 함
-        verify(exactly = 0) { cartItemRepository.save(any()) }
+        verify(exactly = 0) { cartItemRepository.save(any(), any()) }
     }
 
     // === Helper Methods ===

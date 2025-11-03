@@ -31,7 +31,7 @@ class CartItemRepositoryTest {
     fun `사용자 ID와 상품 옵션 ID로 장바구니 아이템을 조회할 수 있어야 한다`() {
         // Given
         val cartItem = createMockCartItem(productOptionId = 1L, quantity = 2)
-        cartItemRepository.saveWithUserId(cartItem, userId = 1L)
+        cartItemRepository.save(cartItem, userId = 1L)
 
         // When
         val result = cartItemRepository.findByUserIdAndProductOptionId(userId = 1L, productOptionId = 1L)
@@ -47,7 +47,7 @@ class CartItemRepositoryTest {
     fun `존재하지 않는 사용자 ID와 상품 옵션 ID로 조회 시 null을 반환해야 한다`() {
         // Given
         val cartItem = createMockCartItem(productOptionId = 1L, quantity = 2)
-        cartItemRepository.saveWithUserId(cartItem, userId = 1L)
+        cartItemRepository.save(cartItem, userId = 1L)
 
         // When
         val result = cartItemRepository.findByUserIdAndProductOptionId(
@@ -66,7 +66,7 @@ class CartItemRepositoryTest {
         val newCartItem = createMockCartItem(productOptionId = 2L, quantity = 3)
 
         // When
-        val savedItem = cartItemRepository.save(newCartItem)
+        val savedItem = cartItemRepository.save(newCartItem, userId = 1L)
 
         // Then
         assertTrue(savedItem.cartItemId > 0, "저장 후 ID가 자동 생성되어야 함")
@@ -79,7 +79,7 @@ class CartItemRepositoryTest {
     fun `기존 장바구니 아이템의 수량을 업데이트할 수 있어야 한다`() {
         // Given
         val cartItem = createMockCartItem(productOptionId = 1L, quantity = 2)
-        val saved = cartItemRepository.saveWithUserId(cartItem, userId = 1L)
+        val saved = cartItemRepository.save(cartItem, userId = 1L)
         val newQuantity = 5
 
         // When
@@ -98,8 +98,8 @@ class CartItemRepositoryTest {
         val cartItem2 = createMockCartItem(productOptionId = 4L, quantity = 2)
 
         // When
-        val saved1 = cartItemRepository.saveWithUserId(cartItem1, userId)
-        val saved2 = cartItemRepository.saveWithUserId(cartItem2, userId)
+        val saved1 = cartItemRepository.save(cartItem1, userId)
+        val saved2 = cartItemRepository.save(cartItem2, userId)
 
         // Then
         assertNotEquals(saved1.cartItemId, saved2.cartItemId, "각 아이템은 별도의 ID를 가져야 함")
@@ -122,8 +122,8 @@ class CartItemRepositoryTest {
         val user2Item = createMockCartItem(productOptionId = productOptionId, quantity = 3)
 
         // When
-        val saved1 = cartItemRepository.saveWithUserId(user1Item, userId = 1L)
-        val saved2 = cartItemRepository.saveWithUserId(user2Item, userId = 2L)
+        val saved1 = cartItemRepository.save(user1Item, userId = 1L)
+        val saved2 = cartItemRepository.save(user2Item, userId = 2L)
 
         // Then
         assertNotEquals(saved1.cartItemId, saved2.cartItemId, "사용자별로 별도 아이템이어야 함")
@@ -142,7 +142,7 @@ class CartItemRepositoryTest {
     fun `updateQuantity 호출 시 updated_at 필드가 갱신되어야 한다`() {
         // Given
         val cartItem = createMockCartItem(productOptionId = 1L, quantity = 2)
-        val saved = cartItemRepository.saveWithUserId(cartItem, userId = 1L)
+        val saved = cartItemRepository.save(cartItem, userId = 1L)
         val originalUpdatedAt = saved.updatedAt
 
         // 시간 차이를 만들기 위해 잠시 대기

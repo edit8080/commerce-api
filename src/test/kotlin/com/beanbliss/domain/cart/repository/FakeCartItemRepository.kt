@@ -22,13 +22,13 @@ class FakeCartItemRepository : CartItemRepository {
             ?.toResponse()
     }
 
-    override fun save(cartItem: CartItemResponse): CartItemResponse {
+    override fun save(cartItem: CartItemResponse, userId: Long): CartItemResponse {
         val id = if (cartItem.cartItemId == 0L) nextId++ else cartItem.cartItemId
         val now = LocalDateTime.now()
 
         val data = CartItemData(
             id = id,
-            userId = 1L, // 테스트에서는 기본 userId 1로 가정
+            userId = userId,
             productOptionId = cartItem.productOptionId,
             productName = cartItem.productName,
             optionCode = cartItem.optionCode,
@@ -59,32 +59,6 @@ class FakeCartItemRepository : CartItemRepository {
     }
 
     // === Test Helper Methods ===
-
-    /**
-     * 테스트용: 특정 userId를 가진 CartItem 저장
-     */
-    fun saveWithUserId(cartItem: CartItemResponse, userId: Long): CartItemResponse {
-        val id = if (cartItem.cartItemId == 0L) nextId++ else cartItem.cartItemId
-        val now = LocalDateTime.now()
-
-        val data = CartItemData(
-            id = id,
-            userId = userId,
-            productOptionId = cartItem.productOptionId,
-            productName = cartItem.productName,
-            optionCode = cartItem.optionCode,
-            origin = cartItem.origin,
-            grindType = cartItem.grindType,
-            weightGrams = cartItem.weightGrams,
-            price = cartItem.price,
-            quantity = cartItem.quantity,
-            createdAt = if (cartItem.cartItemId == 0L) now else cartItem.createdAt,
-            updatedAt = now
-        )
-
-        cartItems[id] = data
-        return data.toResponse()
-    }
 
     /**
      * 테스트용: 모든 데이터 삭제
