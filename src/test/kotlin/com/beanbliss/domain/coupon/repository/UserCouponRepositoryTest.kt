@@ -1,6 +1,7 @@
 package com.beanbliss.domain.coupon.repository
 
 import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -41,7 +42,7 @@ class UserCouponRepositoryTest {
             id = 1L,
             userId = userId,
             couponId = couponId,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
@@ -69,7 +70,7 @@ class UserCouponRepositoryTest {
             id = 1L,
             userId = userId1,
             couponId = couponId,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
@@ -99,7 +100,7 @@ class UserCouponRepositoryTest {
         assertTrue(savedUserCoupon.id > 0) // ID가 생성되어야 함
         assertEquals(userId, savedUserCoupon.userId)
         assertEquals(couponId, savedUserCoupon.couponId)
-        assertEquals("ISSUED", savedUserCoupon.status)
+        assertEquals(UserCouponStatus.ISSUED, savedUserCoupon.status)
         assertNull(savedUserCoupon.usedOrderId)
         assertNull(savedUserCoupon.usedAt)
         assertNotNull(savedUserCoupon.createdAt)
@@ -132,7 +133,7 @@ class UserCouponRepositoryTest {
             id = 1L,
             userId = userId,
             couponId = couponId,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
@@ -173,7 +174,7 @@ class UserCouponRepositoryTest {
             id = 1L,
             userId = userId,
             couponId = 1L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now.minusDays(2),
@@ -184,7 +185,7 @@ class UserCouponRepositoryTest {
             id = 2L,
             userId = userId,
             couponId = 2L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now.minusDays(1),
@@ -195,7 +196,7 @@ class UserCouponRepositoryTest {
             id = 3L,
             userId = 200L, // 다른 사용자
             couponId = 3L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
@@ -224,7 +225,7 @@ class UserCouponRepositoryTest {
             id = 1L,
             userId = userId,
             couponId = 1L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now.minusDays(3), // 3일 전
@@ -235,7 +236,7 @@ class UserCouponRepositoryTest {
             id = 2L,
             userId = userId,
             couponId = 2L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now.minusDays(1), // 1일 전 (최신)
@@ -246,7 +247,7 @@ class UserCouponRepositoryTest {
             id = 3L,
             userId = userId,
             couponId = 3L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now.minusDays(2), // 2일 전

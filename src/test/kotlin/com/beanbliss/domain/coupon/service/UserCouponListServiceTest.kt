@@ -1,5 +1,6 @@
 package com.beanbliss.domain.coupon.service
 
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import com.beanbliss.domain.coupon.repository.UserCouponRepository
 import com.beanbliss.domain.coupon.repository.UserCouponWithCoupon
 import io.mockk.*
@@ -12,9 +13,9 @@ import java.time.LocalDateTime
 /**
  * [책임]: UserCouponService의 비즈니스 로직 검증
  * - Repository 호출 검증
- * - isAvailable 계산 로직 검증
- * - 정렬 및 페이징 검증
+ * - isAvailable은 Repository에서 계산되므로 Service는 전달만 확인
  * - DTO 변환 검증
+ * - 페이징 정보 계산 검증
  */
 @DisplayName("사용자 쿠폰 목록 조회 Service 테스트")
 class UserCouponListServiceTest {
@@ -41,7 +42,7 @@ class UserCouponListServiceTest {
                 userCouponId = 1L,
                 userId = userId,
                 couponId = 1L,
-                status = "ISSUED",
+                status = UserCouponStatus.ISSUED,
                 usedOrderId = null,
                 usedAt = null,
                 issuedAt = now.minusHours(2),
@@ -51,18 +52,19 @@ class UserCouponListServiceTest {
                 minOrderAmount = 10000,
                 maxDiscountAmount = 5000,
                 validFrom = now.minusDays(1),
-                validUntil = now.plusDays(30)
+                validUntil = now.plusDays(30),
+                isAvailable = true  // Repository에서 계산된 값
             )
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, page, size) } returns mockUserCoupons
+        every { userCouponRepository.findByUserIdWithPaging(userId, page, size, any()) } returns mockUserCoupons
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
         val response = userCouponService.getUserCoupons(userId, page, size)
 
         // Then
-        verify(exactly = 1) { userCouponRepository.findByUserIdWithPaging(userId, page, size) }
+        verify(exactly = 1) { userCouponRepository.findByUserIdWithPaging(userId, page, size, any()) }
         verify(exactly = 1) { userCouponRepository.countByUserId(userId) }
 
         assertNotNull(response)
@@ -80,7 +82,7 @@ class UserCouponListServiceTest {
             userCouponId = 1L,
             userId = userId,
             couponId = 1L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             issuedAt = now.minusHours(2),
@@ -90,10 +92,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
             validFrom = now.minusDays(1),
-            validUntil = now.plusDays(30)
+            validUntil = now.plusDays(30),
+            isAvailable = true  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -114,7 +117,7 @@ class UserCouponListServiceTest {
             userCouponId = 1L,
             userId = userId,
             couponId = 1L,
-            status = "USED",
+            status = UserCouponStatus.USED,
             usedOrderId = 789L,
             usedAt = now.minusDays(1),
             issuedAt = now.minusDays(5),
@@ -124,10 +127,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
             validFrom = now.minusDays(10),
-            validUntil = now.plusDays(20)
+            validUntil = now.plusDays(20),
+            isAvailable = false  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -148,7 +152,7 @@ class UserCouponListServiceTest {
             userCouponId = 1L,
             userId = userId,
             couponId = 1L,
-            status = "EXPIRED",
+            status = UserCouponStatus.EXPIRED,
             usedOrderId = null,
             usedAt = null,
             issuedAt = now.minusDays(100),
@@ -158,10 +162,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
             validFrom = now.minusDays(100),
-            validUntil = now.minusDays(10)
+            validUntil = now.minusDays(10),
+            isAvailable = false  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -182,7 +187,7 @@ class UserCouponListServiceTest {
             userCouponId = 1L,
             userId = userId,
             couponId = 1L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             issuedAt = now.minusHours(1),
@@ -192,10 +197,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
             validFrom = now.plusDays(1),  // 내일부터
-            validUntil = now.plusDays(30)
+            validUntil = now.plusDays(30),
+            isAvailable = false  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -216,7 +222,7 @@ class UserCouponListServiceTest {
             userCouponId = 1L,
             userId = userId,
             couponId = 1L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             issuedAt = now.minusDays(100),
@@ -226,10 +232,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
             validFrom = now.minusDays(100),
-            validUntil = now.minusDays(1)  // 어제 만료
+            validUntil = now.minusDays(1),  // 어제 만료
+            isAvailable = false  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -245,7 +252,7 @@ class UserCouponListServiceTest {
         // Given
         val userId = 123L
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns emptyList()
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns emptyList()
         every { userCouponRepository.countByUserId(userId) } returns 0L
 
         // When
@@ -267,7 +274,7 @@ class UserCouponListServiceTest {
             userCouponId = 456L,
             userId = userId,
             couponId = 789L,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             issuedAt = now.minusHours(2),
@@ -277,10 +284,11 @@ class UserCouponListServiceTest {
             minOrderAmount = 30000,
             maxDiscountAmount = 5000,
             validFrom = now.minusDays(1),
-            validUntil = now.plusDays(30)
+            validUntil = now.plusDays(30),
+            isAvailable = true  // Repository에서 계산된 값
         )
 
-        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10) } returns listOf(mockUserCoupon)
+        every { userCouponRepository.findByUserIdWithPaging(userId, 1, 10, any()) } returns listOf(mockUserCoupon)
         every { userCouponRepository.countByUserId(userId) } returns 1L
 
         // When
@@ -295,7 +303,7 @@ class UserCouponListServiceTest {
         assertEquals(5000, coupon.discountValue)
         assertEquals(30000, coupon.minOrderAmount)
         assertEquals(5000, coupon.maxDiscountAmount)
-        assertEquals("ISSUED", coupon.status)
+        assertEquals(UserCouponStatus.ISSUED, coupon.status)
         assertNull(coupon.usedOrderId)
         assertNull(coupon.usedAt)
         assertNotNull(coupon.issuedAt)

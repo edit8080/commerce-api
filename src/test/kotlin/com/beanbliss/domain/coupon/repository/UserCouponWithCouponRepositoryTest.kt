@@ -52,7 +52,7 @@ class UserCouponWithCouponRepositoryTest {
         val savedUserCoupon = userCouponRepository.save(userId, 1L)
 
         // When
-        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10)
+        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10, now)
 
         // Then
         assertEquals(1, result.size)
@@ -62,6 +62,7 @@ class UserCouponWithCouponRepositoryTest {
         assertEquals("테스트 쿠폰", userCouponWithCoupon.couponName)
         assertEquals("PERCENTAGE", userCouponWithCoupon.discountType)
         assertEquals(10, userCouponWithCoupon.discountValue)
+        assertTrue(userCouponWithCoupon.isAvailable, "status가 ISSUED이고 유효기간 내이므로 isAvailable은 true여야 합니다")
     }
 
     @Test
@@ -95,13 +96,13 @@ class UserCouponWithCouponRepositoryTest {
         }
 
         // When - 첫 페이지, size=2
-        val page1 = userCouponRepository.findByUserIdWithPaging(userId, 1, 2)
+        val page1 = userCouponRepository.findByUserIdWithPaging(userId, 1, 2, now)
 
         // Then
         assertEquals(2, page1.size, "첫 페이지는 2개만 반환되어야 합니다")
 
         // When - 두 번째 페이지, size=2
-        val page2 = userCouponRepository.findByUserIdWithPaging(userId, 2, 2)
+        val page2 = userCouponRepository.findByUserIdWithPaging(userId, 2, 2, now)
 
         // Then
         assertEquals(1, page2.size, "두 번째 페이지는 1개만 반환되어야 합니다")
@@ -139,10 +140,11 @@ class UserCouponWithCouponRepositoryTest {
         val userCoupon3 = userCouponRepository.save(userId, 3L)
 
         // When
-        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10)
+        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10, now)
 
         // Then
         assertEquals(3, result.size)
+        // 모든 쿠폰이 isAvailable=true이므로, issuedAt DESC로 정렬됨
         assertTrue(result[0].issuedAt.isAfter(result[1].issuedAt), "최신 발급 순으로 정렬되어야 합니다")
         assertTrue(result[1].issuedAt.isAfter(result[2].issuedAt), "최신 발급 순으로 정렬되어야 합니다")
     }
@@ -211,10 +213,10 @@ class UserCouponWithCouponRepositoryTest {
         userCouponRepository.save(userId2, 1L)
 
         // When
-        val user1Coupons = userCouponRepository.findByUserIdWithPaging(userId1, 1, 10)
+        val user1Coupons = userCouponRepository.findByUserIdWithPaging(userId1, 1, 10, now)
         val user1Count = userCouponRepository.countByUserId(userId1)
 
-        val user2Coupons = userCouponRepository.findByUserIdWithPaging(userId2, 1, 10)
+        val user2Coupons = userCouponRepository.findByUserIdWithPaging(userId2, 1, 10, now)
         val user2Count = userCouponRepository.countByUserId(userId2)
 
         // Then
@@ -231,9 +233,10 @@ class UserCouponWithCouponRepositoryTest {
     fun `빈 결과 조회 시_빈 리스트와 0을 반환해야 한다`() {
         // Given
         val userId = 999L
+        val now = LocalDateTime.now()
 
         // When
-        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10)
+        val result = userCouponRepository.findByUserIdWithPaging(userId, 1, 10, now)
         val count = userCouponRepository.countByUserId(userId)
 
         // Then

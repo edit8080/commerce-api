@@ -5,6 +5,7 @@ import com.beanbliss.domain.coupon.dto.IssueCouponResponse
 import com.beanbliss.domain.coupon.entity.CouponEntity
 import com.beanbliss.domain.coupon.entity.CouponTicketEntity
 import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import com.beanbliss.domain.coupon.exception.*
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponTicketRepository
@@ -69,7 +70,7 @@ class CouponIssueUseCaseTest {
             id = 1L,
             userId = userId,
             couponId = couponId,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
@@ -98,7 +99,7 @@ class CouponIssueUseCaseTest {
         assertEquals(couponId, response.couponId)
         assertEquals(userId, response.userId)
         assertEquals("테스트 쿠폰", response.couponName)
-        assertEquals("ISSUED", response.status)
+        assertEquals(UserCouponStatus.ISSUED, response.status)
     }
 
     @Test
@@ -288,7 +289,7 @@ class CouponIssueUseCaseTest {
             id = 1L,
             userId = userId,
             couponId = couponId,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             usedOrderId = null,
             usedAt = null,
             createdAt = now,
