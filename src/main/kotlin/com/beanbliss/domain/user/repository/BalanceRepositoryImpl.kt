@@ -33,6 +33,19 @@ class BalanceRepositoryImpl : BalanceRepository {
         return balances[userId]
     }
 
+    override fun findByUserIdWithLock(userId: Long): BalanceEntity? {
+        // In-memory 구현에서는 락이 불필요하지만
+        // 인터페이스 계약을 준수하기 위해 findByUserId와 동일하게 동작
+        // 실제 JPA 구현 시 @Lock(LockModeType.PESSIMISTIC_WRITE) 사용
+        return balances[userId]
+    }
+
+    override fun save(balance: BalanceEntity): BalanceEntity {
+        // userId를 키로 사용하여 저장 또는 업데이트 (1:1 관계)
+        balances[balance.userId] = balance
+        return balance
+    }
+
     /**
      * 초기 테스트 데이터 세팅
      * 테스트 용도로 3개의 샘플 데이터를 생성합니다.

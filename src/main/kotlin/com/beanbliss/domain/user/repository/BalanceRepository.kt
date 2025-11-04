@@ -15,4 +15,23 @@ interface BalanceRepository {
      * @return BalanceEntity (없으면 null)
      */
     fun findByUserId(userId: Long): BalanceEntity?
+
+    /**
+     * 사용자 ID로 잔액 조회 (비관적 락)
+     * - FOR UPDATE 쿼리 사용
+     * - 동시성 제어를 위한 락 획득
+     *
+     * @param userId 사용자 ID
+     * @return BalanceEntity (없으면 null)
+     */
+    fun findByUserIdWithLock(userId: Long): BalanceEntity?
+
+    /**
+     * 잔액 정보 저장/업데이트
+     * - userId가 같으면 업데이트, 없으면 생성
+     *
+     * @param balance 저장할 잔액 정보
+     * @return 저장된 BalanceEntity
+     */
+    fun save(balance: BalanceEntity): BalanceEntity
 }

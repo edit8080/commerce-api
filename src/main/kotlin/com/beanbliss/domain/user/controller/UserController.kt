@@ -46,7 +46,10 @@ class UserController(
         @PathVariable userId: Long,
         @Valid @RequestBody request: ChargeBalanceRequest
     ): ResponseEntity<Map<String, ChargeBalanceResponse>> {
-        // TODO: Red Test - 아직 구현되지 않음
-        throw NotImplementedError("아직 구현되지 않았습니다")
+        // Service 계층에 위임
+        val result = balanceService.chargeBalance(userId, request.chargeAmount)
+
+        // data envelope 형태로 응답 반환
+        return ResponseEntity.ok(mapOf("data" to result))
     }
 }
