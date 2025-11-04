@@ -1,7 +1,10 @@
 package com.beanbliss.domain.order.controller
 
+import com.beanbliss.domain.order.dto.CreateOrderRequest
+import com.beanbliss.domain.order.dto.CreateOrderResponse
 import com.beanbliss.domain.order.dto.ReserveOrderRequest
 import com.beanbliss.domain.order.dto.ReserveOrderResponse
+import com.beanbliss.domain.order.usecase.CreateOrderUseCase
 import com.beanbliss.domain.order.usecase.ReserveOrderUseCase
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
@@ -10,11 +13,13 @@ import org.springframework.web.bind.annotation.*
 /**
  * [책임]: 주문 관련 API 엔드포인트
  * - 주문 예약 (재고 예약)
+ * - 주문 생성 (결제 처리)
  */
 @RestController
 @RequestMapping("/api/order")
 class OrderController(
-    private val reserveOrderUseCase: ReserveOrderUseCase
+    private val reserveOrderUseCase: ReserveOrderUseCase,
+    private val createOrderUseCase: CreateOrderUseCase
 ) {
 
     /**
@@ -29,6 +34,27 @@ class OrderController(
     ): ResponseEntity<Map<String, ReserveOrderResponse>> {
         // UseCase에 위임
         val result = reserveOrderUseCase.reserveOrder(request.userId)
+
+        // data envelope 형태로 응답 반환
+        return ResponseEntity.ok(mapOf("data" to result))
+    }
+
+    /**
+     * 주문 생성 및 결제 API
+     *
+     * @param request 주문 생성 요청 (사용자 ID, 쿠폰 ID, 배송지 주소)
+     * @return 주문 생성 결과 (data envelope 형태)
+     */
+    @PostMapping("/create")
+    fun createOrder(
+        @Valid @RequestBody request: CreateOrderRequest
+    ): ResponseEntity<Map<String, CreateOrderResponse>> {
+        // UseCase에 위임
+        val result = createOrderUseCase.createOrder(
+            userId = request.userId,
+            userCouponId = request.userCouponId,
+            shippingAddress = request.shippingAddress
+        )
 
         // data envelope 형태로 응답 반환
         return ResponseEntity.ok(mapOf("data" to result))

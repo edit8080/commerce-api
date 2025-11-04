@@ -80,6 +80,10 @@ class CartItemRepositoryImpl : CartItemRepository {
         return entity.toResponse()
     }
 
+    override fun deleteByUserId(userId: Long) {
+        cartItems.values.removeIf { it.userId == userId }
+    }
+
     /**
      * 테스트용 헬퍼 메서드: 모든 데이터 삭제
      */

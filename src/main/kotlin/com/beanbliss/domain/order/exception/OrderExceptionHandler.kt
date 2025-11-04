@@ -61,4 +61,74 @@ class OrderExceptionHandler {
         )
         return ResponseEntity(response, HttpStatus.CONFLICT) // 409
     }
+
+    @ExceptionHandler(UserCouponNotFoundException::class)
+    fun handleUserCouponNotFound(ex: UserCouponNotFoundException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.NOT_FOUND.value(),
+            code = "USER_COUPON_NOT_FOUND",
+            message = ex.message ?: "사용자 쿠폰을 찾을 수 없습니다."
+        )
+        return ResponseEntity(response, HttpStatus.NOT_FOUND) // 404
+    }
+
+    @ExceptionHandler(UserCouponExpiredException::class)
+    fun handleUserCouponExpired(ex: UserCouponExpiredException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "USER_COUPON_EXPIRED",
+            message = ex.message ?: "쿠폰이 만료되었습니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(UserCouponAlreadyUsedException::class)
+    fun handleUserCouponAlreadyUsed(ex: UserCouponAlreadyUsedException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "USER_COUPON_ALREADY_USED",
+            message = ex.message ?: "이미 사용된 쿠폰입니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(InvalidCouponOrderAmountException::class)
+    fun handleInvalidCouponOrderAmount(ex: InvalidCouponOrderAmountException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVALID_COUPON_ORDER_AMOUNT",
+            message = ex.message ?: "최소 주문 금액 미달로 쿠폰을 사용할 수 없습니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(InsufficientBalanceException::class)
+    fun handleInsufficientBalance(ex: InsufficientBalanceException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.CONFLICT.value(),
+            code = "INSUFFICIENT_BALANCE",
+            message = ex.message ?: "사용자 잔액이 부족합니다."
+        )
+        return ResponseEntity(response, HttpStatus.CONFLICT) // 409
+    }
+
+    @ExceptionHandler(InventoryReservationNotFoundException::class)
+    fun handleInventoryReservationNotFound(ex: InventoryReservationNotFoundException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.NOT_FOUND.value(),
+            code = "INVENTORY_RESERVATION_NOT_FOUND",
+            message = ex.message ?: "재고 예약을 찾을 수 없습니다."
+        )
+        return ResponseEntity(response, HttpStatus.NOT_FOUND) // 404
+    }
+
+    @ExceptionHandler(InventoryReservationExpiredException::class)
+    fun handleInventoryReservationExpired(ex: InventoryReservationExpiredException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVENTORY_RESERVATION_EXPIRED",
+            message = ex.message ?: "재고 예약이 만료되었습니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
 }

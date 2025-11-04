@@ -46,4 +46,11 @@ interface CartItemRepository {
      * @return 업데이트된 장바구니 아이템
      */
     fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItemResponse
+
+    /**
+     * 사용자의 모든 장바구니 아이템 삭제
+     *
+     * @param userId 사용자 ID
+     */
+    fun deleteByUserId(userId: Long)
 }
