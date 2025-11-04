@@ -64,6 +64,10 @@ class FakeCartItemRepository : CartItemRepository {
         return updatedItem.toResponse()
     }
 
+    override fun deleteByUserId(userId: Long) {
+        cartItems.values.removeIf { it.userId == userId }
+    }
+
     // === Test Helper Methods ===
 
     /**
