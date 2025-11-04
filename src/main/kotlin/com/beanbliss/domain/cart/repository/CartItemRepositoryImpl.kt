@@ -25,6 +25,12 @@ class CartItemRepositoryImpl : CartItemRepository {
     // 자동 증가 ID 생성기
     private val idGenerator = AtomicLong(1L)
 
+    override fun findByUserId(userId: Long): List<CartItemResponse> {
+        return cartItems.values
+            .filter { it.userId == userId }
+            .map { it.toResponse() }
+    }
+
     override fun findByUserIdAndProductOptionId(
         userId: Long,
         productOptionId: Long

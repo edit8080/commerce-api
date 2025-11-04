@@ -13,6 +13,14 @@ import com.beanbliss.domain.cart.dto.CartItemResponse
  */
 interface CartItemRepository {
     /**
+     * 사용자 ID로 장바구니 아이템 목록 조회
+     *
+     * @param userId 사용자 ID
+     * @return 장바구니 아이템 목록 (비어있을 수 있음)
+     */
+    fun findByUserId(userId: Long): List<CartItemResponse>
+
+    /**
      * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회
      *
      * @param userId 사용자 ID
