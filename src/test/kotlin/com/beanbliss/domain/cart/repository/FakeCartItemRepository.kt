@@ -16,6 +16,12 @@ class FakeCartItemRepository : CartItemRepository {
     private val cartItems = mutableMapOf<Long, CartItemData>()
     private var nextId = 1L
 
+    override fun findByUserId(userId: Long): List<CartItemResponse> {
+        return cartItems.values
+            .filter { it.userId == userId }
+            .map { it.toResponse() }
+    }
+
     override fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemResponse? {
         return cartItems.values
             .firstOrNull { it.userId == userId && it.productOptionId == productOptionId }
