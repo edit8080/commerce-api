@@ -4,6 +4,7 @@ import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.coupon.dto.UserCouponListData
 import com.beanbliss.domain.coupon.dto.UserCouponListResponse
 import com.beanbliss.domain.coupon.dto.UserCouponResponse
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import com.beanbliss.domain.coupon.service.UserCouponService
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -50,7 +51,7 @@ class UserCouponListControllerTest {
                         discountValue = 10,
                         minOrderAmount = 10000,
                         maxDiscountAmount = 5000,
-                        status = "ISSUED",
+                        status = UserCouponStatus.ISSUED,
                         validFrom = now.minusDays(1),
                         validUntil = now.plusDays(30),
                         issuedAt = now.minusHours(2),
@@ -66,7 +67,7 @@ class UserCouponListControllerTest {
                         discountValue = 5000,
                         minOrderAmount = 30000,
                         maxDiscountAmount = 5000,
-                        status = "USED",
+                        status = UserCouponStatus.USED,
                         validFrom = now.minusDays(10),
                         validUntil = now.plusDays(20),
                         issuedAt = now.minusDays(5),

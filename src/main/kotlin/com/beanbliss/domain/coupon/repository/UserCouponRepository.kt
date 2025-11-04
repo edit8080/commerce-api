@@ -43,4 +43,27 @@ interface UserCouponRepository {
      * @return 사용자 쿠폰 목록
      */
     fun findAllByUserId(userId: Long): List<UserCouponEntity>
+
+    /**
+     * 사용자 쿠폰 목록 조회 (Coupon 정보 포함, 페이징, 정렬)
+     * - USER_COUPON과 COUPON을 JOIN
+     * - isAvailable 계산: (status == 'ISSUED') AND (validFrom <= now <= validUntil)
+     * - 정렬: isAvailable DESC, issuedAt DESC (쿼리 레벨에서 수행)
+     * - 페이징: LIMIT, OFFSET
+     *
+     * @param userId 사용자 ID
+     * @param page 페이지 번호 (1부터 시작)
+     * @param size 페이지 크기
+     * @param now 현재 시간 (isAvailable 계산용)
+     * @return 사용자 쿠폰 목록 (Coupon 정보 + isAvailable 포함, 정렬 및 페이징 적용)
+     */
+    fun findByUserIdWithPaging(userId: Long, page: Int, size: Int, now: java.time.LocalDateTime): List<UserCouponWithCoupon>
+
+    /**
+     * 특정 사용자의 전체 쿠폰 개수 조회
+     *
+     * @param userId 사용자 ID
+     * @return 전체 쿠폰 개수
+     */
+    fun countByUserId(userId: Long): Long
 }

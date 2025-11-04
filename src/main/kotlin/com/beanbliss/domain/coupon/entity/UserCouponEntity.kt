@@ -1,5 +1,6 @@
 package com.beanbliss.domain.coupon.entity
 
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import java.time.LocalDateTime
 
 /**
@@ -10,7 +11,7 @@ data class UserCouponEntity(
     val id: Long,
     val userId: Long,
     val couponId: Long,
-    val status: String, // ISSUED, USED, EXPIRED
+    val status: UserCouponStatus,
     val usedOrderId: Long?,
     val usedAt: LocalDateTime?,
     val createdAt: LocalDateTime,

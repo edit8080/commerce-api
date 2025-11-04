@@ -2,6 +2,7 @@ package com.beanbliss.domain.coupon.controller
 
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.domain.coupon.dto.IssueCouponResponse
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import com.beanbliss.domain.coupon.exception.*
 import com.beanbliss.domain.coupon.service.CouponIssueUseCase
 import com.beanbliss.domain.coupon.service.CouponService
@@ -50,7 +51,7 @@ class CouponIssueControllerTest {
             discountValue = 10,
             minOrderAmount = 10000,
             maxDiscountAmount = 5000,
-            status = "ISSUED",
+            status = UserCouponStatus.ISSUED,
             validFrom = LocalDateTime.now(),
             validUntil = LocalDateTime.now().plusDays(7),
             issuedAt = LocalDateTime.now()
