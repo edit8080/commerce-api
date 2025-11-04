@@ -34,6 +34,9 @@ class ReserveOrderControllerTest {
     @MockkBean
     private lateinit var reserveOrderUseCase: ReserveOrderUseCase
 
+    @MockkBean
+    private lateinit var createOrderUseCase: com.beanbliss.domain.order.usecase.CreateOrderUseCase
+
     @Test
     @DisplayName("POST /api/order/reserve 요청 시 200 OK와 예약 결과를 반환해야 한다")
     fun `POST 요청 시_200 OK와 예약 결과를 반환해야 한다`() {
