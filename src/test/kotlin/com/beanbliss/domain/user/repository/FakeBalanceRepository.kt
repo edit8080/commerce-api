@@ -26,4 +26,16 @@ class FakeBalanceRepository : BalanceRepository {
     override fun findByUserId(userId: Long): BalanceEntity? {
         return balances[userId]
     }
+
+    override fun findByUserIdWithLock(userId: Long): BalanceEntity? {
+        // In-memory 구현에서는 락이 불필요하지만
+        // 인터페이스 계약을 준수하기 위해 findByUserId와 동일하게 동작
+        return balances[userId]
+    }
+
+    override fun save(balance: BalanceEntity): BalanceEntity {
+        // userId를 키로 사용하여 저장 또는 업데이트 (1:1 관계)
+        balances[balance.userId] = balance
+        return balance
+    }
 }

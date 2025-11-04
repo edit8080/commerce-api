@@ -153,4 +153,100 @@ class BalanceRepositoryTest {
         assertEquals(10000, result1!!.amount)
         assertEquals(20000, result2!!.amount)
     }
+
+    @Test
+    fun `findByUserIdWithLock으로 잔액 조회 시_해당 사용자의 잔액이 반환되어야 한다`() {
+        // Given
+        val userId = 123L
+        val now = LocalDateTime.now()
+
+        val balance = BalanceEntity(
+            id = 1L,
+            userId = userId,
+            amount = 50000,
+            createdAt = now.minusDays(10),
+            updatedAt = now
+        )
+
+        repository.addBalance(balance)
+
+        // When
+        val result = repository.findByUserIdWithLock(userId)
+
+        // Then
+        assertNotNull(result)
+        assertEquals(userId, result!!.userId)
+        assertEquals(50000, result.amount)
+    }
+
+    @Test
+    fun `findByUserIdWithLock으로 존재하지 않는 userId 조회 시_null을 반환해야 한다`() {
+        // Given
+        val userId = 999L
+
+        // When
+        val result = repository.findByUserIdWithLock(userId)
+
+        // Then
+        assertNull(result)
+    }
+
+    @Test
+    fun `save로 잔액 업데이트 시_금액이 정상적으로 변경되어야 한다`() {
+        // Given
+        val userId = 123L
+        val now = LocalDateTime.now()
+
+        val balance = BalanceEntity(
+            id = 1L,
+            userId = userId,
+            amount = 30000,
+            createdAt = now.minusDays(10),
+            updatedAt = now.minusDays(1)
+        )
+
+        repository.addBalance(balance)
+
+        // When
+        val updatedBalance = balance.copy(
+            amount = 80000,
+            updatedAt = now
+        )
+        val result = repository.save(updatedBalance)
+
+        // Then
+        assertEquals(80000, result.amount)
+        assertEquals(now, result.updatedAt)
+
+        // 저장소에서 다시 조회하여 검증
+        val retrieved = repository.findByUserId(userId)
+        assertEquals(80000, retrieved!!.amount)
+    }
+
+    @Test
+    fun `save로 새로운 잔액 생성 시_정상적으로 저장되어야 한다`() {
+        // Given
+        val userId = 456L
+        val now = LocalDateTime.now()
+
+        val newBalance = BalanceEntity(
+            id = 10L,
+            userId = userId,
+            amount = 100000,
+            createdAt = now,
+            updatedAt = now
+        )
+
+        // When
+        val result = repository.save(newBalance)
+
+        // Then
+        assertEquals(100000, result.amount)
+        assertEquals(userId, result.userId)
+
+        // 저장소에서 조회하여 검증
+        val retrieved = repository.findByUserId(userId)
+        assertNotNull(retrieved)
+        assertEquals(100000, retrieved!!.amount)
+    }
 }
