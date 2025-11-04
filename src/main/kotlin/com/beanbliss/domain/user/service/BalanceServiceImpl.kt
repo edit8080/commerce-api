@@ -1,6 +1,7 @@
 package com.beanbliss.domain.user.service
 
 import com.beanbliss.domain.user.dto.BalanceResponse
+import com.beanbliss.domain.user.exception.BalanceNotFoundException
 import com.beanbliss.domain.user.repository.BalanceRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,7 +17,15 @@ class BalanceServiceImpl(
 ) : BalanceService {
 
     override fun getBalance(userId: Long): BalanceResponse {
-        // TODO: Red Test - 아직 구현되지 않음
-        throw NotImplementedError("아직 구현되지 않았습니다")
+        // 1. Repository에서 잔액 조회
+        val balance = balanceRepository.findByUserId(userId)
+            ?: throw BalanceNotFoundException("사용자 ID: $userId 의 잔액 정보를 찾을 수 없습니다.")
+
+        // 2. Entity를 DTO(Response)로 변환
+        return BalanceResponse(
+            userId = balance.userId,
+            amount = balance.amount,
+            lastUpdatedAt = balance.updatedAt
+        )
     }
 }
