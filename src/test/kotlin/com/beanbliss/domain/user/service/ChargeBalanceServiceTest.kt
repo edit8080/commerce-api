@@ -1,7 +1,6 @@
 package com.beanbliss.domain.user.service
 
 import com.beanbliss.domain.user.entity.BalanceEntity
-import com.beanbliss.domain.user.exception.BalanceNotFoundException
 import com.beanbliss.domain.user.repository.BalanceRepository
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
@@ -12,12 +11,20 @@ import org.junit.jupiter.api.assertThrows
 import java.time.LocalDateTime
 
 /**
- * [책임]: BalanceService의 잔액 충전 비즈니스 로직 검증
- * - Repository 호출 검증
- * - 충전 금액 유효성 검증
+ * BalanceService의 잔액 충전 비즈니스 로직 검증
+ *
+ * [검증 목표]:
+ * - 충전 금액 유효성 검증 (1,000 ~ 1,000,000원)
  * - 잔액 계산 로직 검증
- * - DTO 변환 검증
- * - 예외 처리 검증
+ * - UPSERT 로직 검증 (INSERT vs UPDATE)
+ *
+ * [비즈니스 로직]:
+ * 1. 충전 금액 범위 검증 (최소 1,000원, 최대 1,000,000원)
+ * 2. UPSERT: 레코드 없으면 INSERT, 있으면 UPDATE
+ * 3. UPDATE 시 잔액 계산: currentBalance + chargeAmount
+ *
+ * [관련 API]:
+ * - POST /api/users/{userId}/balance/charge
  */
 @DisplayName("사용자 잔액 충전 Service 테스트")
 class ChargeBalanceServiceTest {
@@ -32,7 +39,8 @@ class ChargeBalanceServiceTest {
     }
 
     @Test
-    fun `잔액 충전 성공 시_Repository의 findByUserIdWithLock과 save가 호출되어야 한다`() {
+    @DisplayName("잔액 충전 성공 시 UPDATE가 수행되고 정확한 금액 계산이 이루어져야 한다")
+    fun `잔액 충전 성공 시_UPDATE가 수행되고 정확한 금액 계산이 이루어져야 한다`() {
         // Given
         val userId = 123L
         val chargeAmount = 50000
@@ -58,26 +66,25 @@ class ChargeBalanceServiceTest {
         val response = balanceService.chargeBalance(userId, chargeAmount)
 
         // Then
-        // [TDD 검증 목표 1]: Service는 Repository의 계약(Interface)을 올바르게 사용했는가?
+        // [비즈니스 로직 검증 1]: Repository 호출 확인
         verify(exactly = 1) { balanceRepository.findByUserIdWithLock(userId) }
         verify(exactly = 1) { balanceRepository.save(any()) }
 
-        // [TDD 검증 목표 2]: 잔액 계산이 올바르게 수행되었는가?
+        // [비즈니스 로직 검증 2]: 잔액 계산이 올바르게 수행되었는가? (30000 + 50000 = 80000)
         assertEquals(userId, response.userId)
-        assertEquals(30000, response.previousBalance)
-        assertEquals(50000, response.chargeAmount)
         assertEquals(80000, response.currentBalance)
         assertNotNull(response.chargedAt)
     }
 
     @Test
+    @DisplayName("충전 금액이 최소 금액(1,000원) 미만일 경우 IllegalArgumentException이 발생해야 한다")
     fun `충전 금액이 최소 금액(1,000원) 미만일 경우_IllegalArgumentException이 발생해야 한다`() {
         // Given
         val userId = 123L
         val invalidChargeAmount = 500 // 1,000원 미만
 
         // When & Then
-        // [TDD 검증 목표 3]: 유효성 검증이 올바르게 수행되었는가?
+        // [비즈니스 로직 검증]: 유효성 검증이 올바르게 수행되었는가?
         val exception = assertThrows<IllegalArgumentException> {
             balanceService.chargeBalance(userId, invalidChargeAmount)
         }
@@ -90,6 +97,7 @@ class ChargeBalanceServiceTest {
     }
 
     @Test
+    @DisplayName("충전 금액이 최대 금액(1,000,000원)을 초과할 경우 IllegalArgumentException이 발생해야 한다")
     fun `충전 금액이 최대 금액(1,000,000원)을 초과할 경우_IllegalArgumentException이 발생해야 한다`() {
         // Given
         val userId = 123L
@@ -108,25 +116,39 @@ class ChargeBalanceServiceTest {
     }
 
     @Test
-    fun `잔액 정보가 없을 경우_BalanceNotFoundException이 발생해야 한다`() {
+    @DisplayName("잔액 레코드가 없을 경우 INSERT가 수행되어야 한다 (UPSERT)")
+    fun `잔액 레코드가 없을 경우_INSERT가 수행되어야 한다`() {
         // Given
         val userId = 999L
         val chargeAmount = 50000
+        val now = LocalDateTime.now()
+
+        val newBalance = BalanceEntity(
+            id = 1L,
+            userId = userId,
+            amount = chargeAmount,
+            createdAt = now,
+            updatedAt = now
+        )
 
         every { balanceRepository.findByUserIdWithLock(userId) } returns null
+        every { balanceRepository.save(any()) } returns newBalance
 
-        // When & Then
-        // [TDD 검증 목표 4]: 예외 처리가 올바르게 수행되었는가?
-        assertThrows<BalanceNotFoundException> {
-            balanceService.chargeBalance(userId, chargeAmount)
-        }
+        // When
+        val response = balanceService.chargeBalance(userId, chargeAmount)
 
-        // findByUserIdWithLock은 호출되었지만 save는 호출되지 않아야 함
+        // Then
+        // [비즈니스 로직 검증]: UPSERT - INSERT 케이스 (0 + 50000 = 50000)
         verify(exactly = 1) { balanceRepository.findByUserIdWithLock(userId) }
-        verify(exactly = 0) { balanceRepository.save(any()) }
+        verify(exactly = 1) { balanceRepository.save(any()) }
+
+        assertEquals(userId, response.userId)
+        assertEquals(chargeAmount, response.currentBalance)
+        assertNotNull(response.chargedAt)
     }
 
     @Test
+    @DisplayName("최소 금액(1,000원) 충전 시 정상적으로 처리되어야 한다")
     fun `최소 금액(1,000원) 충전 시_정상적으로 처리되어야 한다`() {
         // Given
         val userId = 123L
@@ -153,12 +175,12 @@ class ChargeBalanceServiceTest {
         val response = balanceService.chargeBalance(userId, minChargeAmount)
 
         // Then
-        assertEquals(0, response.previousBalance)
-        assertEquals(minChargeAmount, response.chargeAmount)
+        // [비즈니스 로직 검증]: 경계값 테스트 (최소값) - 0 + 1000 = 1000
         assertEquals(minChargeAmount, response.currentBalance)
     }
 
     @Test
+    @DisplayName("최대 금액(1,000,000원) 충전 시 정상적으로 처리되어야 한다")
     fun `최대 금액(1,000,000원) 충전 시_정상적으로 처리되어야 한다`() {
         // Given
         val userId = 123L
@@ -185,42 +207,7 @@ class ChargeBalanceServiceTest {
         val response = balanceService.chargeBalance(userId, maxChargeAmount)
 
         // Then
-        assertEquals(500000, response.previousBalance)
-        assertEquals(maxChargeAmount, response.chargeAmount)
+        // [비즈니스 로직 검증]: 경계값 테스트 (최대값) - 500000 + 1000000 = 1500000
         assertEquals(1500000, response.currentBalance)
-    }
-
-    @Test
-    fun `DTO 변환_모든 필드가 올바르게 매핑되어야 한다`() {
-        // Given
-        val userId = 456L
-        val chargeAmount = 100000
-        val now = LocalDateTime.now()
-
-        val mockBalance = BalanceEntity(
-            id = 10L,
-            userId = userId,
-            amount = 200000,
-            createdAt = now.minusDays(20),
-            updatedAt = now.minusDays(5)
-        )
-
-        val updatedBalance = mockBalance.copy(
-            amount = 300000,
-            updatedAt = now
-        )
-
-        every { balanceRepository.findByUserIdWithLock(userId) } returns mockBalance
-        every { balanceRepository.save(any()) } returns updatedBalance
-
-        // When
-        val response = balanceService.chargeBalance(userId, chargeAmount)
-
-        // Then
-        assertEquals(userId, response.userId)
-        assertEquals(200000, response.previousBalance)
-        assertEquals(100000, response.chargeAmount)
-        assertEquals(300000, response.currentBalance)
-        assertNotNull(response.chargedAt)
     }
 }

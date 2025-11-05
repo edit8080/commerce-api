@@ -56,8 +56,6 @@ POST /api/users/123/balance/charge
 {
   "data": {
     "userId": 123,
-    "previousBalance": 30000,
-    "chargeAmount": 50000,
     "currentBalance": 80000,
     "chargedAt": "2025-11-04T14:30:00"
   }
@@ -70,8 +68,6 @@ POST /api/users/123/balance/charge
 {
   "data": {
     "userId": "long",              // 사용자 ID
-    "previousBalance": "int",      // 충전 전 잔액
-    "chargeAmount": "int",         // 충전 금액
     "currentBalance": "int",       // 충전 후 현재 잔액
     "chargedAt": "datetime"        // 충전 시각
   }
@@ -92,7 +88,6 @@ POST /api/users/123/balance/charge
 | Error Code                  | HTTP Status | Message                                                |
 |-----------------------------|-------------|--------------------------------------------------------|
 | USER_NOT_FOUND              | 404         | 사용자를 찾을 수 없습니다.                             |
-| BALANCE_NOT_FOUND           | 404         | 사용자 잔액 정보를 찾을 수 없습니다.                   |
 | INVALID_CHARGE_AMOUNT_MIN   | 400         | 충전 금액은 1,000원 이상이어야 합니다.                 |
 | INVALID_CHARGE_AMOUNT_MAX   | 400         | 1회 최대 충전 금액은 1,000,000원입니다.                |
 | INVALID_INPUT               | 400         | 입력값이 올바르지 않습니다.                            |
@@ -117,7 +112,7 @@ POST /api/users/123/balance/charge
 - **검증**: `USER` 테이블에서 `userId`로 사용자 조회
 - **실패 시**: `USER_NOT_FOUND` 예외 발생 (404)
 
-#### 3. 잔액 조회 (비관적 락)
+#### 3. 잔액 조회 또는 초기화 (비관적 락)
 - **목적**: 동시 충전 요청 시 데이터 정합성 보장
 - **방식**:
   ```sql
@@ -129,23 +124,31 @@ POST /api/users/123/balance/charge
   - `FOR UPDATE`: 해당 행에 비관적 락 설정
   - 다른 트랜잭션은 락이 해제될 때까지 대기
   - 동시에 여러 충전 요청이 들어와도 순차적으로 처리
-- **실패 시**: `BALANCE_NOT_FOUND` 예외 발생 (404)
+- **결과**:
+  - **레코드 존재**: 기존 잔액 반환
+  - **레코드 없음**: 0원으로 간주 (다음 단계에서 INSERT)
 
-#### 4. 잔액 업데이트
+#### 4. 잔액 업데이트 (UPSERT)
 - **계산식**: `new_balance = current_balance + charge_amount`
-- **업데이트**:
-  ```sql
-  UPDATE BALANCE
-  SET amount = :newBalance,
-      updated_at = :now
-  WHERE user_id = :userId;
-  ```
-- **결과**: 업데이트된 잔액 정보 반환
+- **UPSERT 처리**:
+  - **레코드 존재 시 (UPDATE)**:
+    ```sql
+    UPDATE BALANCE
+    SET amount = :newBalance,
+        updated_at = :now
+    WHERE user_id = :userId;
+    ```
+  - **레코드 없을 시 (INSERT)**:
+    ```sql
+    INSERT INTO BALANCE (user_id, amount, created_at, updated_at)
+    VALUES (:userId, :chargeAmount, :now, :now);
+    ```
+- **결과**: 업데이트 또는 생성된 잔액 정보 반환
 
 #### 5. 트랜잭션 커밋 및 응답
 - **트랜잭션 범위**: 1~4단계 전체
 - **커밋 시점**: 모든 단계 성공 시
-- **응답**: 충전 전/후 잔액, 충전 금액, 충전 시각 반환
+- **응답**: 충전 후 현재 잔액, 충전 시각 반환
 
 ### 유효성 검사
 
@@ -155,7 +158,6 @@ POST /api/users/123/balance/charge
 | 충전 금액 최대값       | `chargeAmount <= 1000000`                          | `INVALID_CHARGE_AMOUNT_MAX`      |
 | 충전 금액 양수         | `chargeAmount > 0`                                 | `INVALID_CHARGE_AMOUNT_MIN`      |
 | 사용자 존재 여부       | `USER.id = userId`                                 | `USER_NOT_FOUND`                 |
-| 잔액 정보 존재 여부    | `BALANCE.user_id = userId`                         | `BALANCE_NOT_FOUND`              |
 
 ---
 
@@ -209,75 +211,108 @@ ON BALANCE(user_id);
 
 ```mermaid
 sequenceDiagram
-    participant Controller as BalanceController
-    participant Service as BalanceService
+    participant Client as Client
+    participant Controller as UserController
+    participant UseCase as ChargeBalanceUseCase
+    participant UserService as UserService
+    participant BalanceService as BalanceService
     participant UserRepo as UserRepository
     participant BalanceRepo as BalanceRepository
 
-    Controller->>Service: chargeBalance(userId, chargeAmount)
-    activate Service
+    Client->>Controller: POST /api/users/{userId}/balance/charge
+    activate Controller
 
-    Note over Service: 1. 충전 금액 유효성 검증 (트랜잭션 밖)
+    Controller->>UseCase: chargeBalance(userId, chargeAmount)
+    activate UseCase
+
+    Note over UseCase: 1. 충전 금액 유효성 검증 (트랜잭션 밖)
 
     alt 충전 금액이 1,000원 미만 또는 음수
-        Service-->>Controller: INVALID_CHARGE_AMOUNT_MIN (400)
+        UseCase-->>Controller: INVALID_CHARGE_AMOUNT_MIN (400)
+        Controller-->>Client: 400 Bad Request
     end
 
     alt 충전 금액이 1,000,000원 초과
-        Service-->>Controller: INVALID_CHARGE_AMOUNT_MAX (400)
+        UseCase-->>Controller: INVALID_CHARGE_AMOUNT_MAX (400)
+        Controller-->>Client: 400 Bad Request
     end
 
-    Note over Service: 2. 사용자 존재 여부 확인
+    Note over UseCase: 2. 사용자 존재 여부 확인
 
-    Service->>UserRepo: existsById(userId)
+    UseCase->>UserService: validateUserExists(userId)
+    activate UserService
+
+    UserService->>UserRepo: existsById(userId)
     activate UserRepo
-    Note over UserRepo: 사용자 존재 여부 확인
-    UserRepo-->>Service: exists
+    Note over UserRepo: USER 테이블에서<br/>PK로 존재 확인
+    UserRepo-->>UserService: Boolean (true/false)
     deactivate UserRepo
 
     alt 사용자가 존재하지 않음
-        Service-->>Controller: USER_NOT_FOUND (404)
+        UserService-->>UseCase: USER_NOT_FOUND 예외
+        UseCase-->>Controller: USER_NOT_FOUND 예외
+        Controller-->>Client: 404 Not Found
+    else 사용자 존재
+        UserService-->>UseCase: void (정상)
+        deactivate UserService
+
+        Note over UseCase: 3. BalanceService 호출 (트랜잭션 처리)
+
+    UseCase->>BalanceService: chargeBalance(userId, chargeAmount)
+    activate BalanceService
+
+    Note over BalanceService: 트랜잭션 시작 (READ_COMMITTED)
+
+    Note over BalanceService: 4. 잔액 조회 (비관적 락)<br/>(FOR UPDATE)
+
+        BalanceService->>BalanceRepo: findByUserIdWithLock(userId)
+        activate BalanceRepo
+        Note over BalanceRepo: 비관적 락 획득<br/>(다른 트랜잭션은 대기)
+        BalanceRepo-->>BalanceService: Optional<Balance>
+        deactivate BalanceRepo
+
+        Note over BalanceService: 5. 잔액 계산<br/>newBalance = currentBalance + chargeAmount<br/>(없으면 0 + chargeAmount)
+
+        Note over BalanceService: 6. UPSERT 처리
+
+        alt 잔액 레코드 존재 (UPDATE)
+            BalanceService->>BalanceRepo: save(balance)
+            activate BalanceRepo
+            Note over BalanceRepo: UPDATE BALANCE<br/>SET amount = newBalance<br/>WHERE user_id = userId
+            BalanceRepo-->>BalanceService: updatedBalance
+            deactivate BalanceRepo
+        else 잔액 레코드 없음 (INSERT)
+            BalanceService->>BalanceRepo: save(newBalance)
+            activate BalanceRepo
+            Note over BalanceRepo: INSERT INTO BALANCE<br/>(user_id, amount, created_at, updated_at)<br/>VALUES (userId, chargeAmount, now, now)
+            BalanceRepo-->>BalanceService: createdBalance
+            deactivate BalanceRepo
+        end
+
+        Note over BalanceService: 트랜잭션 커밋<br/>(비관적 락 해제)
+
+        BalanceService-->>UseCase: ChargeBalanceResponse
+        deactivate BalanceService
+
+        Note over UseCase: 7. DTO 변환 완료
+
+        UseCase-->>Controller: ChargeBalanceResponse
+        deactivate UseCase
+
+        Controller-->>Client: 200 OK + Response Body
     end
-
-    Note over Service: 3. 트랜잭션 시작 (READ_COMMITTED)
-
-    Note over Service: 4. 잔액 조회 (비관적 락)<br/>(FOR UPDATE)
-
-    Service->>BalanceRepo: findByUserIdWithLock(userId)
-    activate BalanceRepo
-    Note over BalanceRepo: 비관적 락 획득<br/>(다른 트랜잭션은 대기)
-    BalanceRepo-->>Service: Balance (or NULL)
-    deactivate BalanceRepo
-
-    alt 잔액 정보가 없음
-        Note over Service: 트랜잭션 롤백
-        Service-->>Controller: BALANCE_NOT_FOUND (404)
-    end
-
-    Note over Service: 5. 잔액 계산<br/>newBalance = currentBalance + chargeAmount
-
-    Note over Service: 6. 잔액 업데이트
-
-    Service->>BalanceRepo: updateBalance(userId, newBalance)
-    activate BalanceRepo
-    Note over BalanceRepo: UPDATE BALANCE<br/>SET amount = newBalance<br/>WHERE user_id = userId
-    BalanceRepo-->>Service: updatedBalance
-    deactivate BalanceRepo
-
-    Note over Service: 7. 트랜잭션 커밋<br/>(비관적 락 해제)
-
-    Note over Service: DTO 변환<br/>Balance → ChargeBalanceResponse
-
-    Service-->>Controller: ChargeBalanceResponse
-    deactivate Service
+    deactivate Controller
 ```
 
 ### 트랜잭션 범위 및 격리 수준
 
 #### 트랜잭션 범위
-- **시작**: 잔액 조회 (4단계)
+- **관리 계층**: BalanceService
+- **시작**: BalanceService.chargeBalance() 진입 시 (잔액 조회 전)
 - **종료**: 잔액 업데이트 완료 (6단계)
-- **이유**: 유효성 검증과 사용자 확인은 트랜잭션 밖에서 수행하여 빠른 실패 처리
+- **이유**:
+  - UseCase는 유효성 검증과 사용자 확인을 트랜잭션 밖에서 수행 (빠른 실패 처리)
+  - BalanceService는 잔액 조회부터 업데이트까지 원자적으로 처리
 
 #### 격리 수준
 - **레벨**: `READ_COMMITTED`
@@ -294,34 +329,29 @@ sequenceDiagram
 - **예외**: `IllegalArgumentException` ("충전 금액은 1,000원 이상이어야 합니다")
 - **Error Code**: `INVALID_CHARGE_AMOUNT_MIN`
 - **HTTP Status**: 400 Bad Request
-- **처리**: Service에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **처리**: ChargeBalanceUseCase에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
 - **트랜잭션**: 시작 전이므로 롤백 불필요
 
 ##### 1-2. 최대 금액 초과 (1,000,000원 초과)
 - **예외**: `IllegalArgumentException` ("1회 최대 충전 금액은 1,000,000원입니다")
 - **Error Code**: `INVALID_CHARGE_AMOUNT_MAX`
 - **HTTP Status**: 400 Bad Request
-- **처리**: Service에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **처리**: ChargeBalanceUseCase에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
 - **트랜잭션**: 시작 전이므로 롤백 불필요
 
 #### 2. 사용자 존재 여부 확인 실패
 - **예외**: `ResourceNotFoundException` ("사용자를 찾을 수 없습니다")
 - **HTTP Status**: 404 Not Found
-- **처리**: Service에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **처리**: ChargeBalanceUseCase에서 UserService 호출 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
 - **트랜잭션**: 시작 전이므로 롤백 불필요
 
-#### 3. 잔액 정보 조회 실패
-- **예외**: `ResourceNotFoundException` ("사용자 잔액 정보를 찾을 수 없습니다")
-- **HTTP Status**: 404 Not Found
-- **처리**: Service에서 트랜잭션 롤백 후 예외 반환
-
-#### 4. 락 타임아웃
+#### 3. 락 타임아웃
 - **예외**: `LockTimeoutException`
 - **HTTP Status**: 503 Service Unavailable
 - **처리**: 트랜잭션 자동 롤백, GlobalExceptionHandler에서 일괄 처리
 - **권장**: 클라이언트에게 재시도 요청
 
-#### 5. DB 오류
+#### 4. DB 오류
 - **예외**: `DataAccessException`
 - **HTTP Status**: 500 Internal Server Error
 - **처리**: 트랜잭션 자동 롤백, GlobalExceptionHandler에서 일괄 처리

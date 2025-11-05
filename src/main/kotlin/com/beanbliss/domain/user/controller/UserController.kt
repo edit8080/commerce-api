@@ -3,7 +3,8 @@ package com.beanbliss.domain.user.controller
 import com.beanbliss.domain.user.dto.BalanceResponse
 import com.beanbliss.domain.user.dto.ChargeBalanceRequest
 import com.beanbliss.domain.user.dto.ChargeBalanceResponse
-import com.beanbliss.domain.user.service.BalanceService
+import com.beanbliss.domain.user.usecase.ChargeBalanceUseCase
+import com.beanbliss.domain.user.usecase.GetBalanceUseCase
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -12,11 +13,15 @@ import org.springframework.web.bind.annotation.*
  * [책임]: 사용자 관련 API 엔드포인트
  * - 잔액 조회
  * - 잔액 충전
+ *
+ * [아키텍처]:
+ * - Controller → UseCase (멀티 도메인 오케스트레이션)
  */
 @RestController
 @RequestMapping("/api/users")
 class UserController(
-    private val balanceService: BalanceService
+    private val getBalanceUseCase: GetBalanceUseCase,
+    private val chargeBalanceUseCase: ChargeBalanceUseCase
 ) {
 
     /**
@@ -27,8 +32,8 @@ class UserController(
      */
     @GetMapping("/{userId}/balance")
     fun getBalance(@PathVariable userId: Long): ResponseEntity<Map<String, BalanceResponse>> {
-        // Service 계층에 위임
-        val balance = balanceService.getBalance(userId)
+        // UseCase 계층에 위임
+        val balance = getBalanceUseCase.getBalance(userId)
 
         // data envelope 형태로 응답 반환
         return ResponseEntity.ok(mapOf("data" to balance))
@@ -46,8 +51,8 @@ class UserController(
         @PathVariable userId: Long,
         @Valid @RequestBody request: ChargeBalanceRequest
     ): ResponseEntity<Map<String, ChargeBalanceResponse>> {
-        // Service 계층에 위임
-        val result = balanceService.chargeBalance(userId, request.chargeAmount)
+        // UseCase 계층에 위임
+        val result = chargeBalanceUseCase.chargeBalance(userId, request.chargeAmount)
 
         // data envelope 형태로 응답 반환
         return ResponseEntity.ok(mapOf("data" to result))

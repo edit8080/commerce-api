@@ -12,19 +12,18 @@ interface BalanceService {
      * 사용자 잔액 조회
      *
      * @param userId 사용자 ID
-     * @return 사용자 잔액 정보
-     * @throws BalanceNotFoundException 잔액 정보를 찾을 수 없는 경우
+     * @return 사용자 잔액 정보 (레코드 없으면 0원 반환)
      */
     fun getBalance(userId: Long): BalanceResponse
 
     /**
-     * 사용자 잔액 충전
+     * 사용자 잔액 충전 (UPSERT)
      *
      * @param userId 사용자 ID
      * @param chargeAmount 충전 금액 (1,000 ~ 1,000,000원)
-     * @return 충전 결과 (충전 전/후 잔액, 충전 금액, 충전 시각)
+     * @return 충전 결과 (충전 후 현재 잔액, 충전 시각)
      * @throws IllegalArgumentException 충전 금액이 유효하지 않은 경우
-     * @throws BalanceNotFoundException 잔액 정보를 찾을 수 없는 경우
+     * @note 레코드 없으면 INSERT, 있으면 UPDATE
      */
     fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse
 }

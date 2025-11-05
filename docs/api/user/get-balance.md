@@ -78,7 +78,6 @@ GET /api/users/123/balance
 | Error Code             | HTTP Status | Message                                      |
 |------------------------|-------------|----------------------------------------------|
 | USER_NOT_FOUND         | 404         | 사용자를 찾을 수 없습니다.                   |
-| BALANCE_NOT_FOUND      | 404         | 잔액 정보를 찾을 수 없습니다.                |
 | INTERNAL_SERVER_ERROR  | 500         | 서버 내부 오류가 발생했습니다.               |
 
 ---
@@ -90,7 +89,8 @@ GET /api/users/123/balance
 #### 1. 사용자 잔액 조회
 - **조회 대상**: `BALANCE` 테이블에서 `user_id`로 조회
 - **관계**: USER와 1:1 관계 (사용자당 1개의 잔액 레코드)
-- **초기값**: 신규 사용자는 잔액 0원으로 초기화 (또는 첫 조회 시 자동 생성)
+- **레코드 없을 시**: 0원 반환 (예외 발생 X)
+- **레코드 생성**: 첫 충전 시 자동 생성 (UPSERT)
 
 #### 2. 잔액 정보
 - **amount**: 현재 사용 가능한 잔액 (원 단위, decimal)
@@ -104,7 +104,6 @@ GET /api/users/123/balance
 | 항목                   | 검증 조건                                          | 실패 시 예외                  |
 |------------------------|----------------------------------------------------|-------------------------------|
 | 사용자 존재 여부       | `USER.id = userId`                                 | `USER_NOT_FOUND`              |
-| 잔액 정보 존재 여부    | `BALANCE.user_id = userId`                         | `BALANCE_NOT_FOUND`           |
 
 ---
 
@@ -142,8 +141,9 @@ ON BALANCE(user_id);
 - **BALANCE.amount**: 항상 0 이상 유지
   - 결제 시 잔액 부족 검증 필수 (ORD-005)
   - 트랜잭션으로 원자성 보장
-- **초기화**: 신규 사용자 가입 시 잔액 0원으로 레코드 생성
-  - 또는 첫 조회 시 존재하지 않으면 0원 반환 (또는 자동 생성)
+- **초기화**:
+  - 조회 시: 레코드 없으면 0원 반환
+  - 충전 시: 레코드 없으면 자동 생성 (UPSERT)
 
 ### 확장성
 
@@ -160,37 +160,64 @@ ON BALANCE(user_id);
 sequenceDiagram
     participant Client as Client
     participant Controller as UserController
-    participant Service as BalanceService
+    participant UseCase as GetBalanceUseCase
+    participant UserService as UserService
+    participant BalanceService as BalanceService
+    participant UserRepo as UserRepository
     participant BalanceRepo as BalanceRepository
 
     Client->>Controller: GET /api/users/{userId}/balance
     activate Controller
 
-    Controller->>Service: getBalance(userId)
-    activate Service
+    Controller->>UseCase: getBalance(userId)
+    activate UseCase
 
-    Note over Service: 트랜잭션 시작 (읽기 전용)
+    Note over UseCase: 트랜잭션 시작 (읽기 전용)
 
-    Note over Service: 1. 사용자 존재 여부 확인 (선택적)
+    Note over UseCase: 1. 사용자 존재 여부 확인
 
-    Note over Service: 2. 잔액 정보 조회
+    UseCase->>UserService: validateUserExists(userId)
+    activate UserService
 
-    Service->>BalanceRepo: findByUserId(userId)
-    activate BalanceRepo
-    Note over BalanceRepo: BALANCE 테이블에서<br/>user_id로 조회<br/>(Unique 인덱스 활용)
-    BalanceRepo-->>Service: Balance 엔티티
-    deactivate BalanceRepo
+    UserService->>UserRepo: existsById(userId)
+    activate UserRepo
+    Note over UserRepo: USER 테이블에서<br/>PK로 존재 확인
+    UserRepo-->>UserService: Boolean (true/false)
+    deactivate UserRepo
 
-    alt 잔액 정보 없음
-        Service-->>Controller: BALANCE_NOT_FOUND 예외
+    alt 사용자 없음
+        UserService-->>UseCase: USER_NOT_FOUND 예외
+        UseCase-->>Controller: USER_NOT_FOUND 예외
         Controller-->>Client: 404 Not Found
-    else 잔액 정보 존재
-        Note over Service: 3. DTO 변환<br/>Balance → BalanceResponse
+    else 사용자 존재
+        UserService-->>UseCase: void (정상)
+        deactivate UserService
 
-        Note over Service: 트랜잭션 커밋
+        Note over UseCase: 2. 잔액 정보 조회
 
-        Service-->>Controller: BalanceResponse
-        deactivate Service
+        UseCase->>BalanceService: getBalance(userId)
+        activate BalanceService
+
+        BalanceService->>BalanceRepo: findByUserId(userId)
+        activate BalanceRepo
+        Note over BalanceRepo: BALANCE 테이블에서<br/>user_id로 조회<br/>(Unique 인덱스 활용)
+        BalanceRepo-->>BalanceService: Optional<Balance>
+        deactivate BalanceRepo
+
+        alt 잔액 레코드 없음
+            Note over BalanceService: 0원으로 간주
+            Note over BalanceService: 3. DTO 변환<br/>amount = 0<br/>lastUpdatedAt = null
+        else 잔액 레코드 존재
+            Note over BalanceService: 3. DTO 변환<br/>Balance → BalanceResponse
+        end
+
+        BalanceService-->>UseCase: BalanceResponse
+        deactivate BalanceService
+
+        Note over UseCase: 트랜잭션 커밋
+
+        UseCase-->>Controller: BalanceResponse
+        deactivate UseCase
 
         Controller-->>Client: 200 OK + Response Body
     end
@@ -200,8 +227,8 @@ sequenceDiagram
 ### 트랜잭션 범위 및 격리 수준
 
 #### 트랜잭션 범위
-- **시작**: Service 계층 진입
-- **종료**: DTO 변환 완료
+- **시작**: UseCase 계층 진입 (`GetBalanceUseCase.getBalance()`)
+- **종료**: DTO 반환 완료
 - **속성**: 읽기 전용 (`@Transactional(readOnly = true)`)
 
 #### 격리 수준
@@ -213,19 +240,13 @@ sequenceDiagram
 ### 예외 처리 흐름
 
 #### 1. 사용자 미존재
-- **예외**: `UserNotFoundException`
+- **예외**: `ResourceNotFoundException` (from UserService)
 - **HTTP Status**: 404 Not Found
 - **처리**: GlobalExceptionHandler에서 일괄 처리
-- **발생 시점**: 사용자 존재 여부 확인 시 (선택적)
+- **발생 시점**: UseCase에서 UserService.validateUserExists() 호출 시
+- **전파 경로**: UserService → UseCase → Controller → GlobalExceptionHandler
 
-#### 2. 잔액 정보 미존재
-- **예외**: `BalanceNotFoundException`
-- **HTTP Status**: 404 Not Found
-- **처리**: GlobalExceptionHandler에서 일괄 처리
-- **발생 시점**: 잔액 정보 조회 시
-- **대안**: 존재하지 않으면 0원으로 초기화하여 반환 (비즈니스 정책에 따라)
-
-#### 3. DB 오류
+#### 2. DB 오류
 - **예외**: `DataAccessException`
 - **HTTP Status**: 500 Internal Server Error
 - **처리**: GlobalExceptionHandler에서 일괄 처리

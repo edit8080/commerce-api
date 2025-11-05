@@ -36,6 +36,9 @@ class CouponListControllerTest {
     @MockkBean
     private lateinit var couponIssueUseCase: CouponIssueUseCase
 
+    @MockkBean
+    private lateinit var createCouponUseCase: com.beanbliss.domain.coupon.usecase.CreateCouponUseCase
+
     @Test
     @DisplayName("GET /api/coupons 요청 시 200 OK와 쿠폰 목록을 반환해야 한다")
     fun `GET api coupons 요청 시 200 OK와 쿠폰 목록을 반환해야 한다`() {

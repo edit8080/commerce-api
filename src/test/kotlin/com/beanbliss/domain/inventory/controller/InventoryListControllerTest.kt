@@ -41,6 +41,9 @@ class InventoryListControllerTest {
     @MockkBean
     private lateinit var inventoryService: InventoryService
 
+    @MockkBean
+    private lateinit var inventoryAddStockUseCase: com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
+
     @Test
     @DisplayName("GET /api/inventories - 정상 조회 시 200 OK와 재고 목록을 반환해야 한다")
     fun `정상 조회 시 200 OK와 재고 목록을 반환해야 한다`() {

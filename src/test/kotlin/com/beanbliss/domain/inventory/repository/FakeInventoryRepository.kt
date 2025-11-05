@@ -1,6 +1,7 @@
 package com.beanbliss.domain.inventory.repository
 
 import com.beanbliss.domain.inventory.domain.Inventory
+import com.beanbliss.domain.inventory.dto.InventoryResponse
 
 /**
  * Fake InventoryRepository 구현체 (테스트용)

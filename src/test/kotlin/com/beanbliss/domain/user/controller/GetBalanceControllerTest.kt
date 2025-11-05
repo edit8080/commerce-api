@@ -1,8 +1,8 @@
 package com.beanbliss.domain.user.controller
 
 import com.beanbliss.domain.user.dto.BalanceResponse
-import com.beanbliss.domain.user.exception.BalanceNotFoundException
-import com.beanbliss.domain.user.service.BalanceService
+import com.beanbliss.domain.user.usecase.ChargeBalanceUseCase
+import com.beanbliss.domain.user.usecase.GetBalanceUseCase
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -17,7 +17,7 @@ import java.time.LocalDateTime
 /**
  * [책임]: UserController의 잔액 조회 API 검증
  * - HTTP 요청/응답 검증
- * - Service 호출 검증
+ * - UseCase 호출 검증
  */
 @WebMvcTest(UserController::class)
 @DisplayName("사용자 잔액 조회 Controller 테스트")
@@ -27,7 +27,10 @@ class GetBalanceControllerTest {
     private lateinit var mockMvc: MockMvc
 
     @MockkBean
-    private lateinit var balanceService: BalanceService
+    private lateinit var getBalanceUseCase: GetBalanceUseCase
+
+    @MockkBean
+    private lateinit var chargeBalanceUseCase: ChargeBalanceUseCase
 
     @Test
     @DisplayName("GET /api/users/{userId}/balance 요청 시 200 OK와 잔액 정보를 반환해야 한다")
@@ -42,7 +45,7 @@ class GetBalanceControllerTest {
             lastUpdatedAt = now
         )
 
-        every { balanceService.getBalance(userId) } returns mockResponse
+        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))
@@ -53,16 +56,25 @@ class GetBalanceControllerTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 사용자의 잔액 조회 시 404 Not Found를 반환해야 한다")
-    fun `존재하지 않는 사용자의 잔액 조회 시_404 Not Found를 반환해야 한다`() {
+    @DisplayName("잔액 레코드가 없을 경우 0원과 null lastUpdatedAt을 반환해야 한다")
+    fun `잔액 레코드가 없을 경우_0원과 null lastUpdatedAt을 반환해야 한다`() {
         // Given
-        val userId = 999L
+        val userId = 456L
 
-        every { balanceService.getBalance(userId) } throws BalanceNotFoundException("잔액 정보를 찾을 수 없습니다.")
+        val mockResponse = BalanceResponse(
+            userId = userId,
+            amount = 0,
+            lastUpdatedAt = null
+        )
+
+        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))
-            .andExpect(status().isNotFound)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.userId").value(userId))
+            .andExpect(jsonPath("$.data.amount").value(0))
+            .andExpect(jsonPath("$.data.lastUpdatedAt").doesNotExist())
     }
 
     @Test
@@ -78,7 +90,7 @@ class GetBalanceControllerTest {
             lastUpdatedAt = now
         )
 
-        every { balanceService.getBalance(userId) } returns mockResponse
+        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))

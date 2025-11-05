@@ -32,6 +32,9 @@ class CouponIssueControllerTest {
     @MockkBean
     private lateinit var couponService: CouponService
 
+    @MockkBean
+    private lateinit var createCouponUseCase: com.beanbliss.domain.coupon.usecase.CreateCouponUseCase
+
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
