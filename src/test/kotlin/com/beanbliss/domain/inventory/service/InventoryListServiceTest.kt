@@ -1,8 +1,8 @@
 package com.beanbliss.domain.inventory.service
 
+import com.beanbliss.common.exception.InvalidPageNumberException
+import com.beanbliss.common.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.dto.InventoryResponse
-import com.beanbliss.domain.inventory.exception.InvalidPageNumberException
-import com.beanbliss.domain.inventory.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
