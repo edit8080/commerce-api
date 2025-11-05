@@ -98,11 +98,11 @@ class ProductListControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/products - 파라미터 없이 조회 시 기본값(page=1, size=20)이 적용되어야 한다")
+    @DisplayName("GET /api/products - 파라미터 없이 조회 시 기본값(page=1, size=10)이 적용되어야 한다")
     fun `파라미터 없이 조회 시 기본값이 적용되어야 한다`() {
         // Given
         val defaultPage = 1
-        val defaultSize = 20
+        val defaultSize = 10
         val mockResponse = ProductListResponse(
             content = emptyList(),
             pageable = PageableResponse(

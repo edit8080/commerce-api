@@ -28,13 +28,13 @@ class ProductController(
      * 상품 목록 조회 API
      *
      * @param page 페이지 번호 (1부터 시작, 기본값: 1)
-     * @param size 페이지 크기 (기본값: 20, 최대: 100)
+     * @param size 페이지 크기 (기본값: 10, 최대: 100)
      * @return 상품 목록과 페이징 정보
      */
     @GetMapping
     fun getProducts(
         @RequestParam(defaultValue = "1") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<ProductListResponse> {
         // 파라미터 검증 (PageCalculator에 위임)
         PageCalculator.validatePageParameters(page, size)
