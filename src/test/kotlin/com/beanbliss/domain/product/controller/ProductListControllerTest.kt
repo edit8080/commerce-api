@@ -6,6 +6,7 @@ import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
+import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
 import com.beanbliss.domain.product.usecase.GetProductsUseCase
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -47,6 +48,9 @@ class ProductListControllerTest {
 
     @MockkBean
     private lateinit var getProductsUseCase: GetProductsUseCase
+
+    @MockkBean
+    private lateinit var getProductDetailUseCase: GetProductDetailUseCase
 
     @MockkBean
     private lateinit var getPopularProductsUseCase: GetPopularProductsUseCase
