@@ -37,8 +37,8 @@ class ProductListServiceTest {
 
     @BeforeEach
     fun setUp() {
-        // ProductService는 더 이상 InventoryRepository에 의존하지 않음
-        productService = ProductServiceImpl(productRepository, mockk(relaxed = true))
+        // ProductService는 Product 도메인만 담당
+        productService = ProductServiceImpl(productRepository)
     }
 
     @Test

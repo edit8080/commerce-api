@@ -4,6 +4,7 @@ import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
+import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
 import com.beanbliss.domain.product.usecase.GetProductsUseCase
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.ninjasquad.springmockk.MockkBean
@@ -24,7 +25,7 @@ import java.time.LocalDateTime
  * [검증 목표]:
  * 1. API 엔드포인트가 올바른 경로와 메서드로 매핑되는가?
  * 2. Path Variable이 올바르게 바인딩되는가?
- * 3. Service 결과가 올바른 JSON 형식으로 반환되는가?
+ * 3. UseCase 결과가 올바른 JSON 형식으로 반환되는가?
  * 4. 존재하지 않는 상품 조회 시 적절한 에러 응답이 반환되는가?
  * 5. 적절한 HTTP 상태 코드가 반환되는가?
  *
@@ -43,6 +44,9 @@ class ProductDetailControllerTest {
 
     @MockkBean
     private lateinit var getProductsUseCase: GetProductsUseCase
+
+    @MockkBean
+    private lateinit var getProductDetailUseCase: GetProductDetailUseCase
 
     @MockkBean
     private lateinit var getPopularProductsUseCase: GetPopularProductsUseCase
@@ -80,7 +84,7 @@ class ProductDetailControllerTest {
             )
         )
 
-        every { productService.getProductDetail(productId) } returns mockResponse
+        every { getProductDetailUseCase.getProductDetail(productId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(
@@ -113,7 +117,7 @@ class ProductDetailControllerTest {
         // Given
         val nonExistentProductId = 999L
 
-        every { productService.getProductDetail(nonExistentProductId) } throws
+        every { getProductDetailUseCase.getProductDetail(nonExistentProductId) } throws
                 ResourceNotFoundException("상품 ID: $nonExistentProductId 의 상품을 찾을 수 없습니다.")
 
         // When & Then
@@ -133,7 +137,7 @@ class ProductDetailControllerTest {
         // Given
         val productId = 1L
 
-        every { productService.getProductDetail(productId) } throws
+        every { getProductDetailUseCase.getProductDetail(productId) } throws
                 ResourceNotFoundException("상품 ID: $productId 의 활성 옵션이 없습니다.")
 
         // When & Then
@@ -210,7 +214,7 @@ class ProductDetailControllerTest {
             )
         )
 
-        every { productService.getProductDetail(productId) } returns mockResponse
+        every { getProductDetailUseCase.getProductDetail(productId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(
@@ -266,7 +270,7 @@ class ProductDetailControllerTest {
             )
         )
 
-        every { productService.getProductDetail(productId) } returns mockResponse
+        every { getProductDetailUseCase.getProductDetail(productId) } returns mockResponse
 
         // When & Then
         mockMvc.perform(
@@ -303,7 +307,7 @@ class ProductDetailControllerTest {
             )
         )
 
-        every { productService.getProductDetail(productId) } returns mockResponse
+        every { getProductDetailUseCase.getProductDetail(productId) } returns mockResponse
 
         // When
         mockMvc.perform(

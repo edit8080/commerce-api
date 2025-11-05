@@ -139,9 +139,12 @@ GET /api/products/1
 ## 4. 구현 시 고려사항
 
 ### 4.1 성능 최적화
-- 상품과 옵션을 한 번의 쿼리로 조회 (N+1 문제 방지)
-  - JPA Fetch Join 활용
-- 가용 재고는 별도 서브쿼리 또는 조인으로 계산
+- **상품 정보 조회**: 상품과 옵션을 한 번의 쿼리로 조회 (N+1 문제 방지)
+  - JPA Fetch Join 활용 (ProductService → ProductRepository)
+- **재고 정보 조회**: 옵션별 가용 재고를 Batch로 일괄 조회
+  - `calculateAvailableStockBatch(List<Long> optionIds)` 메서드 활용
+  - WHERE product_option_id IN (...) 방식으로 한 번의 쿼리로 조회
+  - Map<optionId, availableStock> 형태로 반환
 - productId에 인덱스 활용 (Primary Key)
 
 ### 4.2 동시성 제어
@@ -162,7 +165,9 @@ GET /api/products/1
 sequenceDiagram
     participant Client as Client
     participant Controller as ProductController
-    participant Service as ProductService
+    participant UseCase as ProductDetailUseCase
+    participant ProdService as ProductService
+    participant InvService as InventoryService
     participant ProdRepo as ProductRepository
     participant InvRepo as InventoryRepository
     participant DB as Database
@@ -172,48 +177,62 @@ sequenceDiagram
 
     Note over Controller: Path Variable 검증<br/>(productId 형식)
 
-    Controller->>Service: getProductDetail(productId)
-    activate Service
+    Controller->>UseCase: getProductDetail(productId)
+    activate UseCase
 
-    Service->>ProdRepo: findByIdWithOptions(productId)
+    Note over UseCase: [1] 상품 정보 조회
+
+    UseCase->>ProdService: getProductWithOptions(productId)
+    activate ProdService
+
+    ProdService->>ProdRepo: findByIdWithOptions(productId)
     activate ProdRepo
 
     Note over ProdRepo,DB: 상품 및 옵션 조회<br/>- Fetch Join (Product + Options)<br/>- is_active = true 필터링<br/>- 활성 옵션 존재 여부 확인
 
-    ProdRepo-->>Service: Optional<Product>
+    ProdRepo-->>ProdService: Optional<Product>
     deactivate ProdRepo
 
     alt 상품이 존재하지 않거나 활성 옵션이 없음
-        Service-->>Controller: throw ProductNotFoundException
+        ProdService-->>UseCase: throw ProductNotFoundException
+        UseCase-->>Controller: throw ProductNotFoundException
         Controller-->>Client: 404 PRODUCT_NOT_FOUND
     end
 
-    Note over Service: 각 옵션별 가용 재고 계산
+    ProdService-->>UseCase: Product (with options)
+    deactivate ProdService
 
-    loop 각 옵션마다
-        Service->>InvRepo: calculateAvailableStock(optionId)
-        activate InvRepo
+    Note over UseCase: [2] 옵션 ID 목록 추출<br/>(Batch 재고 조회 준비)
 
-        Note over InvRepo,DB: 재고 정보 조회<br/>- Inventory Entity 조회<br/>- totalStock - reservedStock 계산
+    UseCase->>InvService: calculateAvailableStockBatch(optionIds)
+    activate InvService
 
-        InvRepo-->>Service: availableStock
-        deactivate InvRepo
-    end
+    Note over InvService: Batch 재고 조회 요청
 
-    Note over Service: 옵션 정렬 및 응답 구성<br/>- 옵션 정렬 (용량 → 분쇄)
+    InvService->>InvRepo: calculateAvailableStockBatch(optionIds)
+    activate InvRepo
 
-    Note over Service: 응답 DTO 조립
-    Service-->>Controller: ProductDetailResponse
-    deactivate Service
+    Note over InvRepo,DB: 재고 정보 일괄 조회<br/>- WHERE product_option_id IN (...)<br/>- stock - reserved 계산<br/>- Map<optionId, availableStock> 반환
+
+    InvRepo-->>InvService: Map<optionId, availableStock>
+    deactivate InvRepo
+
+    InvService-->>UseCase: Map<optionId, availableStock>
+    deactivate InvService
+
+    Note over UseCase: [3] 응답 구성<br/>- 상품 정보 + 재고 정보 조합<br/>- 옵션 정렬 (용량 → 분쇄)
+
+    UseCase-->>Controller: ProductDetailResponse
+    deactivate UseCase
 
     Controller-->>Client: 200 OK (JSON)
     deactivate Controller
 ```
 
 ### 5.1 트랜잭션 범위
+- **트랜잭션 범위**: UseCase에서 `@Transactional(readOnly = true)` 적용
 - **격리 수준**: READ_COMMITTED
-- **읽기 전용**: `@Transactional(readOnly = true)`
-- 별도의 데이터 수정이 없으므로 트랜잭션 롤백 불필요
+- **트랜잭션 특성**: 별도의 데이터 수정이 없으므로 트랜잭션 롤백 불필요
 
 ### 5.2 예외 처리
 1. **상품 조회 실패**

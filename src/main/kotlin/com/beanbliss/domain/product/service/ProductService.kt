@@ -39,13 +39,15 @@ interface ProductService {
     fun countActiveProducts(): Long
 
     /**
-     * 상품 상세 조회
+     * 상품 + 옵션 정보 조회 (재고 제외)
+     *
+     * [책임]: 상품 도메인 데이터만 조회 (재고 정보는 InventoryService에서 조회)
      *
      * @param productId 상품 ID
-     * @return 상품 상세 정보 (옵션 포함, 가용 재고 계산됨)
+     * @return 상품 정보 (옵션 포함, availableStock = 0)
      * @throws ResourceNotFoundException 상품이 존재하지 않거나 활성 옵션이 없는 경우
      */
-    fun getProductDetail(productId: Long): ProductResponse
+    fun getProductWithOptions(productId: Long): ProductResponse
 
     /**
      * 여러 상품의 기본 정보 조회

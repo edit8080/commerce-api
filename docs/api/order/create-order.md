@@ -496,55 +496,83 @@ POST /api/order
 
 ### UseCase 패턴 적용 (필수)
 
-장바구니 상품 주문 기능은 **8개의 도메인**을 조율하는 매우 복잡한 비즈니스 트랜잭션:
-1. `CartItemRepository`: 장바구니 조회 및 삭제
-2. `ProductOptionRepository`: 상품 가격 조회
-3. `InventoryReservationRepository`: 재고 예약 확인 및 상태 변경 (**하이브리드 재고 관리**)
-4. `InventoryRepository`: 재고 확인 및 차감
-5. `UserCouponRepository`: 쿠폰 유효성 검증 및 사용 처리
-6. `CouponRepository`: 쿠폰 할인 정보 조회
-7. `BalanceRepository`: 잔액 확인 및 차감
-8. `OrderRepository`: 주문 생성
-9. `OrderItemRepository`: 주문 아이템 생성
+장바구니 상품 주문 기능은 **여러 도메인 Service**를 조율하는 매우 복잡한 비즈니스 트랜잭션:
+1. `CartService`: 장바구니 조회 및 삭제
+2. `ProductService`: 상품 정보 및 가격 조회
+3. `InventoryReservationService`: 재고 예약 확인 및 상태 변경 (**하이브리드 재고 관리**)
+4. `InventoryService`: 재고 확인 및 차감
+5. `CouponService`: 쿠폰 유효성 검증 및 사용 처리
+6. `BalanceService`: 잔액 확인 및 차감
+7. `OrderService`: 주문 생성 및 주문 아이템 생성
+8. `UserService`: 사용자 확인
 
 이러한 다중 도메인 의존성을 **UseCase 패턴**으로 추상화:
-1. **단일 책임**: 각 Repository는 자신의 영역만 담당
-2. **조율 책임 분리**: UseCase가 여러 Repository를 조율
-3. **트랜잭션 경계 명확화**: UseCase가 전체 비즈니스 플로우의 트랜잭션 관리
+1. **단일 책임 (SRP)**: 각 Service는 자신의 도메인 영역만 담당, Repository 접근은 Service 내부에서만
+2. **오케스트레이션 분리**: UseCase는 여러 Service를 조율하는 역할만 수행
+3. **트랜잭션 경계 명확화**: 각 Service는 독립적인 트랜잭션 관리, UseCase는 전체 흐름 조율
 4. **확장성**: 향후 알림, 이벤트 발행, 포인트 적립 등 인프라 컴포넌트 추가 시 UseCase에서 통합 관리
 
 ```kotlin
 @Component
 class CreateOrderUseCase(
-    private val cartItemRepository: CartItemRepository,
-    private val productOptionRepository: ProductOptionRepository,
-    private val inventoryReservationRepository: InventoryReservationRepository,
-    private val inventoryRepository: InventoryRepository,
-    private val userCouponRepository: UserCouponRepository,
-    private val couponRepository: CouponRepository,
-    private val balanceRepository: BalanceRepository,
-    private val orderRepository: OrderRepository,
-    private val orderItemRepository: OrderItemRepository,
-    private val userRepository: UserRepository
+    private val userService: UserService,
+    private val cartService: CartService,
+    private val productService: ProductService,
+    private val couponService: CouponService,
+    private val inventoryReservationService: InventoryReservationService,
+    private val inventoryService: InventoryService,
+    private val balanceService: BalanceService,
+    private val orderService: OrderService
 ) {
-    @Transactional
     fun createOrder(request: CreateOrderRequest): CreateOrderResponse {
-        // 1. 장바구니 조회 및 검증 (트랜잭션 밖 수행하여 빠른 실패)
-        // 2. 쿠폰 유효성 검증 (트랜잭션 밖)
-        // 3. 상품 금액 계산 (트랜잭션 밖)
+        // 1. 사용자 존재 확인 (트랜잭션 밖)
+        userService.validateUserExists(request.userId)
 
-        // === 트랜잭션 시작 ===
-        // 4. 재고 예약 확인 (하이브리드 재고 관리)
-        // 5. 재고 확인 및 차감 (FOR UPDATE)
-        // 6. 주문 생성 (ORDER)
-        // 7. 주문 아이템 생성 (ORDER_ITEM)
+        // 2. 장바구니 조회 및 검증 (트랜잭션 밖)
+        val cartItems = cartService.getCartItemsWithProducts(request.userId)
+        cartService.validateCartItems(cartItems)
+
+        // 3. 쿠폰 유효성 검증 (트랜잭션 밖)
+        val couponInfo = request.userCouponId?.let {
+            couponService.validateAndGetCoupon(request.userId, it)
+        }
+
+        // 4. 상품 금액 계산 (트랜잭션 밖)
+        val priceInfo = calculatePriceInfo(cartItems, couponInfo)
+
+        // === 각 Service가 독립적으로 트랜잭션 관리 ===
+
+        // 5. 재고 예약 확인 (하이브리드 재고 관리)
+        inventoryReservationService.validateReservations(request.userId, cartItems)
+
+        // 6. 재고 확인 및 차감 (FOR UPDATE)
+        inventoryService.reduceStockForOrder(cartItems)
+
+        // 7. 주문 생성 및 주문 아이템 생성
+        val order = orderService.createOrderWithItems(
+            userId = request.userId,
+            cartItems = cartItems,
+            priceInfo = priceInfo,
+            userCouponId = request.userCouponId,
+            shippingAddress = request.shippingAddress
+        )
+
         // 8. 잔액 차감 (FOR UPDATE)
+        balanceService.deductBalance(request.userId, priceInfo.finalAmount)
+
         // 9. 재고 예약 상태 변경 (RESERVED → CONFIRMED)
+        inventoryReservationService.confirmReservations(request.userId, cartItems)
+
         // 10. 쿠폰 사용 처리
+        request.userCouponId?.let {
+            couponService.markCouponAsUsed(it, order.id)
+        }
+
         // 11. 장바구니 비우기
-        // === 트랜잭션 커밋 ===
+        cartService.clearCart(request.userId)
 
         // 12. DTO 변환 및 반환
+        return toCreateOrderResponse(order, cartItems, couponInfo, priceInfo)
     }
 }
 ```
@@ -757,44 +785,59 @@ val sortedCartItems = cartItems.sortedBy { it.productOptionId }
 sequenceDiagram
     participant Controller as OrderController
     participant UseCase as CreateOrderUseCase
-    participant CartRepo as CartItemRepository
-    participant ProductRepo as ProductOptionRepository
-    participant CouponRepo as CouponRepository
-    participant UserCouponRepo as UserCouponRepository
-    participant ReservationRepo as InventoryReservationRepository
-    participant InventoryRepo as InventoryRepository
-    participant BalanceRepo as BalanceRepository
-    participant OrderRepo as OrderRepository
-    participant OrderItemRepo as OrderItemRepository
+    participant UserService as UserService
+    participant CartService as CartService
+    participant CouponService as CouponService
+    participant ReservationService as InventoryReservationService
+    participant InventoryService as InventoryService
+    participant OrderService as OrderService
+    participant BalanceService as BalanceService
 
     Controller->>UseCase: createOrder(userId, userCouponId, shippingAddress)
     activate UseCase
 
-    Note over UseCase: 1. 장바구니 조회 및 검증 (트랜잭션 밖)
+    Note over UseCase: 1. 사용자 존재 확인 (트랜잭션 밖)
 
-    UseCase->>CartRepo: findByUserIdWithProductOption(userId)
-    activate CartRepo
-    Note over CartRepo: 장바구니 조회<br/>(JOIN FETCH로 N+1 방지)
-    CartRepo-->>UseCase: List<CartItem>
-    deactivate CartRepo
+    UseCase->>UserService: validateUserExists(userId)
+    activate UserService
+    Note over UserService: UserRepository 호출<br/>사용자 존재 여부 확인
+    UserService-->>UseCase: validated
+    deactivate UserService
+
+    alt 사용자가 존재하지 않음
+        UseCase-->>Controller: USER_NOT_FOUND (404)
+    end
+
+    Note over UseCase: 2. 장바구니 조회 및 검증 (트랜잭션 밖)
+
+    UseCase->>CartService: getCartItemsWithProducts(userId)
+    activate CartService
+    Note over CartService: CartItemRepository 호출<br/>장바구니 조회 (JOIN FETCH로 N+1 방지)
+    CartService-->>UseCase: List<CartItem>
+    deactivate CartService
 
     alt 장바구니가 비어있음
         UseCase-->>Controller: CART_EMPTY (400)
     end
 
-    loop 각 상품 옵션 검증
-        alt 상품 옵션이 비활성화됨
-            UseCase-->>Controller: PRODUCT_OPTION_INACTIVE (400)
-        end
+    UseCase->>CartService: validateCartItems(cartItems)
+    activate CartService
+    Note over CartService: 상품 옵션 활성화 여부 검증
+    CartService-->>UseCase: validated
+    deactivate CartService
+
+    alt 상품 옵션이 비활성화됨
+        UseCase-->>Controller: PRODUCT_OPTION_INACTIVE (400)
     end
 
-    Note over UseCase: 2. 쿠폰 유효성 검증 (트랜잭션 밖)
+    Note over UseCase: 3. 쿠폰 유효성 검증 (트랜잭션 밖)
 
     alt 쿠폰이 제공됨
-        UseCase->>UserCouponRepo: findById(userCouponId)
-        activate UserCouponRepo
-        UserCouponRepo-->>UseCase: UserCoupon
-        deactivate UserCouponRepo
+        UseCase->>CouponService: validateAndGetCoupon(userId, userCouponId)
+        activate CouponService
+        Note over CouponService: UserCouponRepository, CouponRepository 호출<br/>소유권, 유효 기간, 사용 여부 검증
+        CouponService-->>UseCase: CouponInfo
+        deactivate CouponService
 
         alt 쿠폰이 없거나 소유권 불일치
             UseCase-->>Controller: COUPON_NOT_FOUND (404)
@@ -804,17 +847,12 @@ sequenceDiagram
             UseCase-->>Controller: COUPON_ALREADY_USED (400)
         end
 
-        UseCase->>CouponRepo: findById(couponId)
-        activate CouponRepo
-        CouponRepo-->>UseCase: Coupon
-        deactivate CouponRepo
-
         alt 쿠폰 유효 기간 만료
             UseCase-->>Controller: COUPON_EXPIRED (400)
         end
     end
 
-    Note over UseCase: 3. 상품 금액 계산 (트랜잭션 밖)
+    Note over UseCase: 4. 상품 금액 계산 (트랜잭션 밖)
 
     Note over UseCase: originalAmount = Σ(price * quantity)<br/>discountAmount = 쿠폰 할인 계산<br/>finalAmount = originalAmount - discountAmount
 
@@ -822,114 +860,79 @@ sequenceDiagram
         UseCase-->>Controller: MIN_ORDER_AMOUNT_NOT_MET (400)
     end
 
-    Note over UseCase: === 트랜잭션 시작 (READ_COMMITTED) ===
+    Note over UseCase: === 각 Service가 독립적으로 트랜잭션 관리 ===
 
-    Note over UseCase: 4. 재고 예약 확인 (하이브리드 재고 관리)<br/>배치 처리
+    Note over UseCase: 5. 재고 예약 확인 (하이브리드 재고 관리)
 
-    UseCase->>ReservationRepo: findActiveReservationsByUserIdAndProductOptionIds(userId, productOptionIds)
-    activate ReservationRepo
-    Note over ReservationRepo: 배치 조회 (IN 절)<br/>SELECT * WHERE user_id = :userId<br/>AND product_option_id IN (:ids)<br/>AND status='RESERVED' AND expires_at > NOW()
-    ReservationRepo-->>UseCase: List<Reservation>
-    deactivate ReservationRepo
-
-    Note over UseCase: 검증: 모든 아이템의 예약 존재 및 수량 일치 확인
+    UseCase->>ReservationService: validateReservations(userId, cartItems)
+    activate ReservationService
+    Note over ReservationService: @Transactional(readOnly=true)<br/>InventoryReservationRepository 호출<br/>배치 조회 및 검증
+    ReservationService-->>UseCase: validated
+    deactivate ReservationService
 
     alt 재고 예약 없음 또는 불일치
-        Note over UseCase: 트랜잭션 롤백
         UseCase-->>Controller: RESERVATION_NOT_FOUND (404)<br/>or RESERVATION_EXPIRED (400)<br/>or RESERVATION_MISMATCH (400)
     end
 
-    Note over UseCase: 5. 재고 확인 및 차감 (비관적 락)<br/>배치 처리
+    Note over UseCase: 6. 재고 확인 및 차감 (비관적 락)
 
-    UseCase->>InventoryRepo: findAllByProductOptionIdsWithLock(productOptionIds)
-    activate InventoryRepo
-    Note over InventoryRepo: 배치 조회 + 비관적 락 일괄 획득<br/>SELECT * FROM INVENTORY<br/>WHERE product_option_id IN (:ids)<br/>ORDER BY product_option_id ASC<br/>FOR UPDATE
-    InventoryRepo-->>UseCase: List<Inventory>
-    deactivate InventoryRepo
-
-    Note over UseCase: 검증: 모든 아이템의 재고 충분 여부 확인<br/>(inventoryMap에 저장하여 메모리에서 검증)
+    UseCase->>InventoryService: reduceStockForOrder(cartItems)
+    activate InventoryService
+    Note over InventoryService: @Transactional<br/>InventoryRepository 호출<br/>배치 조회 + 비관적 락 (FOR UPDATE)<br/>재고 검증 및 일괄 차감
+    InventoryService-->>UseCase: success
+    deactivate InventoryService
 
     alt 재고 부족
-        Note over UseCase: 트랜잭션 롤백 (락 자동 해제)
         UseCase-->>Controller: INSUFFICIENT_STOCK (409)
     end
 
-    Note over UseCase: 재고 일괄 차감 계산<br/>inventories.forEach { it.stockQuantity -= quantityMap[it.id] }
+    Note over UseCase: 7. 주문 생성 및 주문 아이템 생성
 
-    UseCase->>InventoryRepo: saveAll(inventories)
-    activate InventoryRepo
-    Note over InventoryRepo: 배치 업데이트 (Batch Update)<br/>CASE WHEN 또는 JPA Batch
-    InventoryRepo-->>UseCase: success
-    deactivate InventoryRepo
-
-    Note over UseCase: 6. 주문 생성 (ORDER)
-
-    UseCase->>OrderRepo: save(order)
-    activate OrderRepo
-    Note over OrderRepo: INSERT INTO ORDER
-    OrderRepo-->>UseCase: Order (orderId 생성됨)
-    deactivate OrderRepo
-
-    Note over UseCase: 7. 주문 아이템 생성 (ORDER_ITEM)<br/>배치 처리
-
-    Note over UseCase: 아이템 목록 생성<br/>orderItems = cartItems.map { OrderItem(...) }
-
-    UseCase->>OrderItemRepo: saveAll(orderItems)
-    activate OrderItemRepo
-    Note over OrderItemRepo: 배치 Insert (Batch Insert)<br/>INSERT INTO ORDER_ITEM VALUES ...<br/>(hibernate.jdbc.batch_size 설정)
-    OrderItemRepo-->>UseCase: List<OrderItem>
-    deactivate OrderItemRepo
+    UseCase->>OrderService: createOrderWithItems(userId, cartItems, priceInfo, ...)
+    activate OrderService
+    Note over OrderService: @Transactional<br/>OrderRepository, OrderItemRepository 호출<br/>주문 생성 + 아이템 배치 Insert
+    OrderService-->>UseCase: Order
+    deactivate OrderService
 
     Note over UseCase: 8. 잔액 차감 (비관적 락)
 
-    UseCase->>BalanceRepo: findByUserIdWithLock(userId)
-    activate BalanceRepo
-    Note over BalanceRepo: 비관적 락 획득<br/>SELECT ... FOR UPDATE
-    BalanceRepo-->>UseCase: Balance
-    deactivate BalanceRepo
+    UseCase->>BalanceService: deductBalance(userId, finalAmount)
+    activate BalanceService
+    Note over BalanceService: @Transactional<br/>BalanceRepository 호출<br/>비관적 락 (FOR UPDATE)<br/>잔액 검증 및 차감
+    BalanceService-->>UseCase: success
+    deactivate BalanceService
 
     alt 잔액 부족
-        Note over UseCase: 트랜잭션 롤백 (모든 락 자동 해제)<br/>(재고 락 + 잔액 락 해제)
         UseCase-->>Controller: INSUFFICIENT_BALANCE (409)
     end
 
-    Note over UseCase: balance.amount -= finalAmount
+    Note over UseCase: 9. 재고 예약 상태 변경 (RESERVED → CONFIRMED)
 
-    UseCase->>BalanceRepo: save(balance)
-    activate BalanceRepo
-    Note over BalanceRepo: UPDATE BALANCE<br/>SET amount = newAmount
-    BalanceRepo-->>UseCase: success
-    deactivate BalanceRepo
-
-    Note over UseCase: 9. 재고 예약 상태 변경<br/>배치 처리
-
-    Note over UseCase: 예약 ID 목록 추출<br/>reservationIds = reservations.map { it.id }
-
-    UseCase->>ReservationRepo: bulkUpdateStatus(reservationIds, 'CONFIRMED')
-    activate ReservationRepo
-    Note over ReservationRepo: 벌크 업데이트 (Bulk Update)<br/>UPDATE INVENTORY_RESERVATION<br/>SET status='CONFIRMED', updated_at=NOW()<br/>WHERE id IN (:reservationIds)
-    ReservationRepo-->>UseCase: updatedCount
-    deactivate ReservationRepo
+    UseCase->>ReservationService: confirmReservations(userId, cartItems)
+    activate ReservationService
+    Note over ReservationService: @Transactional<br/>InventoryReservationRepository 호출<br/>벌크 업데이트 (Bulk Update)
+    ReservationService-->>UseCase: success
+    deactivate ReservationService
 
     Note over UseCase: 10. 쿠폰 사용 처리
 
     alt 쿠폰이 제공됨
-        UseCase->>UserCouponRepo: updateAsUsed(userCouponId, orderId)
-        activate UserCouponRepo
-        Note over UserCouponRepo: UPDATE USER_COUPON<br/>SET status='USED', used_order_id=orderId
-        UserCouponRepo-->>UseCase: success
-        deactivate UserCouponRepo
+        UseCase->>CouponService: markCouponAsUsed(userCouponId, orderId)
+        activate CouponService
+        Note over CouponService: @Transactional<br/>UserCouponRepository 호출<br/>쿠폰 상태 → USED
+        CouponService-->>UseCase: success
+        deactivate CouponService
     end
 
     Note over UseCase: 11. 장바구니 비우기
 
-    UseCase->>CartRepo: deleteByUserId(userId)
-    activate CartRepo
-    Note over CartRepo: DELETE FROM CART_ITEM<br/>WHERE user_id = userId
-    CartRepo-->>UseCase: success
-    deactivate CartRepo
+    UseCase->>CartService: clearCart(userId)
+    activate CartService
+    Note over CartService: @Transactional<br/>CartItemRepository 호출<br/>장바구니 전체 삭제
+    CartService-->>UseCase: success
+    deactivate CartService
 
-    Note over UseCase: === 트랜잭션 커밋 ===<br/>(모든 비관적 락 자동 해제)<br/>• 재고 락 해제 (N개 상품)<br/>• 잔액 락 해제 (1개 사용자)
+    Note over UseCase: === 모든 Service 트랜잭션 완료 ===<br/>(각 Service의 트랜잭션 커밋 시 비관적 락 해제)
 
     Note over UseCase: 12. DTO 변환<br/>Order + OrderItem → CreateOrderResponse
 
@@ -940,44 +943,50 @@ sequenceDiagram
 ### 트랜잭션 범위 및 격리 수준
 
 #### 트랜잭션 범위
-- **트랜잭션 밖**:
-  - 장바구니 조회 및 검증 (1단계)
-  - 쿠폰 유효성 검증 (2단계)
-  - 상품 금액 계산 (3단계)
+- **UseCase 레벨 (트랜잭션 없음)**:
+  - UseCase는 트랜잭션을 관리하지 않고 **오케스트레이션만 담당**
+  - 각 Service 호출 시 Service 내부에서 독립적으로 트랜잭션 관리
+
+- **트랜잭션 밖 (UseCase 직접 처리)**:
+  - 사용자 존재 확인 (1단계) - UserService 호출
+  - 장바구니 조회 및 검증 (2단계) - CartService 호출
+  - 쿠폰 유효성 검증 (3단계) - CouponService 호출
+  - 상품 금액 계산 (4단계) - UseCase 내부 계산
   - → 빠른 실패 처리
 
-- **트랜잭션 내**:
-  - 재고 예약 확인 (4단계)
-  - 재고 확인 및 차감 (5단계)
-  - 주문 생성 (6단계)
-  - 주문 아이템 생성 (7단계)
-  - 잔액 차감 (8단계)
-  - 재고 예약 상태 변경 (9단계)
-  - 쿠폰 사용 처리 (10단계)
-  - 장바구니 비우기 (11단계)
-  - → 원자적 처리 보장
+- **각 Service의 독립적인 트랜잭션**:
+  - **InventoryReservationService.validateReservations()**: `@Transactional(readOnly=true)`
+  - **InventoryService.reduceStockForOrder()**: `@Transactional` (비관적 락 포함)
+  - **OrderService.createOrderWithItems()**: `@Transactional`
+  - **BalanceService.deductBalance()**: `@Transactional` (비관적 락 포함)
+  - **InventoryReservationService.confirmReservations()**: `@Transactional`
+  - **CouponService.markCouponAsUsed()**: `@Transactional`
+  - **CartService.clearCart()**: `@Transactional`
+
+**중요**: Service 간 트랜잭션이 분리되어 있으므로, 전체 플로우의 원자성은 **비즈니스 레벨 보상 트랜잭션(Saga 패턴)** 또는 **외부 트랜잭션 매니저**로 관리해야 합니다.
 
 #### 격리 수준
-- **레벨**: `READ_COMMITTED`
+- **레벨**: `READ_COMMITTED` (각 Service의 기본 격리 수준)
 - **이유**:
   - Dirty Read 방지
-  - `FOR UPDATE` 락으로 Lost Update 방지
+  - `FOR UPDATE` 락으로 Lost Update 방지 (InventoryService, BalanceService)
   - 과도한 격리 수준(REPEATABLE_READ, SERIALIZABLE)은 성능 저하 유발
 
 ### 예외 처리 흐름
 
-#### 1. 트랜잭션 밖 예외 (1~3단계)
+#### 1. 트랜잭션 밖 예외 (1~4단계)
 - **예외 종류**:
+  - `USER_NOT_FOUND` (404)
   - `CART_EMPTY` (400)
   - `PRODUCT_OPTION_INACTIVE` (400)
   - `COUPON_NOT_FOUND` (404)
   - `COUPON_ALREADY_USED` (400)
   - `COUPON_EXPIRED` (400)
   - `MIN_ORDER_AMOUNT_NOT_MET` (400)
-- **처리**: UseCase에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
-- **트랜잭션**: 시작 전이므로 롤백 불필요
+- **처리**: UseCase에서 Service 호출 결과 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **트랜잭션**: Service 내부 트랜잭션만 롤백, UseCase는 트랜잭션 없음
 
-#### 2. 트랜잭션 내 예외 (4~11단계)
+#### 2. 각 Service 트랜잭션 내 예외 (5~11단계)
 - **예외 종류**:
   - `RESERVATION_NOT_FOUND` (404): 재고 예약 없음
   - `RESERVATION_EXPIRED` (400): 재고 예약 만료
@@ -985,8 +994,8 @@ sequenceDiagram
   - `INSUFFICIENT_STOCK` (409): 재고 부족
   - `INSUFFICIENT_BALANCE` (409): 잔액 부족
 - **처리**:
-  - UseCase에서 트랜잭션 롤백
-  - 재고 예약 확인, 재고 차감, 주문 생성 등 모든 변경사항 취소
+  - 해당 Service의 트랜잭션만 롤백
+  - 이전에 성공한 Service의 변경사항은 **그대로 유지됨** (보상 트랜잭션 필요)
   - GlobalExceptionHandler에서 일괄 처리
 
 #### 3. 락 타임아웃

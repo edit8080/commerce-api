@@ -7,6 +7,7 @@ import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
+import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
 import com.beanbliss.domain.product.usecase.GetProductsUseCase
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -18,14 +19,14 @@ import org.springframework.web.bind.annotation.*
  *
  * [책임]:
  * 1. HTTP 요청을 받아 파라미터를 추출
- * 2. UseCase 또는 Service 계층에 비즈니스 로직 위임
+ * 2. UseCase 계층에 비즈니스 로직 위임
  * 3. 결과를 HTTP 응답으로 변환
  *
  * [참고]:
  * - 페이징 파라미터 검증은 PageCalculator에서 수행
  * - 인기 상품 파라미터 검증은 Jakarta Validator 사용
  * - 상품 목록 조회는 GetProductsUseCase 사용 (멀티 도메인 오케스트레이션)
- * - 상품 상세 조회는 ProductService 직접 사용 (단일 도메인)
+ * - 상품 상세 조회는 GetProductDetailUseCase 사용 (멀티 도메인 오케스트레이션)
  */
 @Validated
 @RestController
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.*
 class ProductController(
     private val productService: ProductService,
     private val getProductsUseCase: GetProductsUseCase,
+    private val getProductDetailUseCase: GetProductDetailUseCase,
     private val getPopularProductsUseCase: GetPopularProductsUseCase
 ) {
 
@@ -69,8 +71,8 @@ class ProductController(
     fun getProductDetail(
         @PathVariable productId: Long
     ): ApiResponse<ProductResponse> {
-        // Service 호출
-        val result = productService.getProductDetail(productId)
+        // UseCase 호출 (ProductService + InventoryService 오케스트레이션)
+        val result = getProductDetailUseCase.getProductDetail(productId)
 
         // 응답 반환
         return ApiResponse(data = result)
