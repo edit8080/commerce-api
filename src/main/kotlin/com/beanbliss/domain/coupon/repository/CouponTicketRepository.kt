@@ -35,4 +35,13 @@ interface CouponTicketRepository {
      * @return AVAILABLE 티켓 개수
      */
     fun countAvailableTickets(couponId: Long): Int
+
+    /**
+     * 쿠폰 티켓 일괄 저장 (Batch Insert)
+     * - 쿠폰 생성 시 totalQuantity만큼 티켓을 미리 생성
+     *
+     * @param tickets 저장할 티켓 목록
+     * @return 저장된 티켓 목록
+     */
+    fun saveAll(tickets: List<CouponTicketEntity>): List<CouponTicketEntity>
 }

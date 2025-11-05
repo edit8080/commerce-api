@@ -263,7 +263,7 @@ class CreateOrderUseCaseImpl(
             },
             appliedCoupon = if (coupon != null && userCoupon != null) {
                 AppliedCouponInfo(
-                    couponId = coupon.id,
+                    couponId = coupon.id!!,
                     couponCode = coupon.name, // TODO: CouponEntity에 code 필드 필요
                     couponName = coupon.name,
                     discountAmount = discountAmount,

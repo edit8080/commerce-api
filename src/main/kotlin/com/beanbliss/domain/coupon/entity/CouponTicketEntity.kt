@@ -8,7 +8,7 @@ import java.time.LocalDateTime
  * - FOR UPDATE SKIP LOCKED 대상
  */
 data class CouponTicketEntity(
-    val id: Long,
+    val id: Long?,
     val couponId: Long,
     val status: String, // AVAILABLE, ISSUED
     val userId: Long?,

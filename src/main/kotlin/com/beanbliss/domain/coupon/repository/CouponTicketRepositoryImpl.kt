@@ -80,7 +80,7 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
         // AVAILABLE 상태이고 userId가 null인 티켓 중 첫 번째 반환
         return tickets.values
             .filter { it.couponId == couponId && it.status == "AVAILABLE" && it.userId == null }
-            .minByOrNull { it.id } // ID 순서로 선점
+            .minByOrNull { it.id!! } // ID 순서로 선점
     }
 
     override fun updateTicketAsIssued(ticketId: Long, userId: Long, userCouponId: Long) {
@@ -102,5 +102,21 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
         return tickets.values.count {
             it.couponId == couponId && it.status == "AVAILABLE" && it.userId == null
         }
+    }
+
+    override fun saveAll(ticketList: List<CouponTicketEntity>): List<CouponTicketEntity> {
+        val savedTickets = ticketList.map { ticket ->
+            // ID가 null이면 새로운 ID 생성
+            val savedTicket = if (ticket.id == null) {
+                ticket.copy(id = idGenerator.getAndIncrement())
+            } else {
+                ticket
+            }
+
+            tickets[savedTicket.id!!] = savedTicket
+            savedTicket
+        }
+
+        return savedTickets
     }
 }

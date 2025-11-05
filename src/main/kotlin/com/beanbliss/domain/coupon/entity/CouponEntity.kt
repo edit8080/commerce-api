@@ -24,7 +24,7 @@ import java.time.LocalDateTime
  * - DTO 변환 메서드 제공 (toResponse)
  */
 data class CouponEntity(
-    val id: Long,
+    val id: Long?,
     val name: String,
     val discountType: String, // PERCENTAGE, FIXED_AMOUNT
     val discountValue: Int,
@@ -48,7 +48,7 @@ data class CouponEntity(
         val isIssuable = isInValidPeriod && hasRemainingQuantity
 
         return CouponResponse(
-            couponId = id,
+            couponId = id!!,
             name = name,
             discountType = discountType,
             discountValue = discountValue,

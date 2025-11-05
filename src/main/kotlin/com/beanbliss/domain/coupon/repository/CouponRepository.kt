@@ -30,4 +30,12 @@ interface CouponRepository {
      * 전체 쿠폰 개수 조회
      */
     fun countAllCoupons(): Long
+
+    /**
+     * 쿠폰 저장
+     *
+     * @param coupon 저장할 쿠폰 Entity
+     * @return 저장된 쿠폰 Entity (ID 포함)
+     */
+    fun save(coupon: CouponEntity): CouponEntity
 }

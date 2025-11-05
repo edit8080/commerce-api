@@ -69,10 +69,10 @@ class CouponRepositoryImpl : CouponRepository {
 
         // 4. CouponWithQuantity로 변환 (remainingQuantity 계산)
         return pagedCoupons.map { coupon ->
-            val remainingQuantity = calculateRemainingQuantity(coupon.id)
+            val remainingQuantity = calculateRemainingQuantity(coupon.id!!)
 
             CouponWithQuantity(
-                id = coupon.id,
+                id = coupon.id!!,
                 name = coupon.name,
                 discountType = coupon.discountType,
                 discountValue = coupon.discountValue,
@@ -94,6 +94,19 @@ class CouponRepositoryImpl : CouponRepository {
 
     override fun findById(couponId: Long): CouponEntity? {
         return coupons[couponId]
+    }
+
+    override fun save(coupon: CouponEntity): CouponEntity {
+        // ID가 null이면 새로운 ID 생성
+        val savedCoupon = if (coupon.id == null) {
+            val newId = (coupons.keys.maxOrNull() ?: 0L) + 1L
+            coupon.copy(id = newId)
+        } else {
+            coupon
+        }
+
+        coupons[savedCoupon.id!!] = savedCoupon
+        return savedCoupon
     }
 
     // === Private Helper Methods ===

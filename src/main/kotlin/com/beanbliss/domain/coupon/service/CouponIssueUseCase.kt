@@ -59,12 +59,12 @@ class CouponIssueUseCase(
         val userCoupon = userCouponRepository.save(userId, couponId)
 
         // 6. 티켓 상태 업데이트 (AVAILABLE -> ISSUED)
-        couponTicketRepository.updateTicketAsIssued(ticket.id, userId, userCoupon.id)
+        couponTicketRepository.updateTicketAsIssued(ticket.id!!, userId, userCoupon.id)
 
         // 7. DTO 변환 및 반환
         return IssueCouponResponse(
             userCouponId = userCoupon.id,
-            couponId = coupon.id,
+            couponId = coupon.id!!,
             userId = userId,
             couponName = coupon.name,
             discountType = coupon.discountType,

@@ -2,11 +2,16 @@ package com.beanbliss.domain.coupon.controller
 
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.coupon.dto.CouponListResponse
+import com.beanbliss.domain.coupon.dto.CreateCouponRequest
+import com.beanbliss.domain.coupon.dto.CreateCouponResponse
 import com.beanbliss.domain.coupon.dto.IssueCouponRequest
 import com.beanbliss.domain.coupon.dto.IssueCouponResponse
 import com.beanbliss.domain.coupon.service.CouponIssueUseCase
 import com.beanbliss.domain.coupon.service.CouponService
+import com.beanbliss.domain.coupon.usecase.CreateCouponUseCase
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -24,8 +29,32 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/coupons")
 class CouponController(
     private val couponService: CouponService,
-    private val couponIssueUseCase: CouponIssueUseCase
+    private val couponIssueUseCase: CouponIssueUseCase,
+    private val createCouponUseCase: CreateCouponUseCase
 ) {
+
+    /**
+     * 선착순 쿠폰 생성 API
+     *
+     * [기능]:
+     * - 쿠폰 마스터 데이터 생성 (COUPON 테이블)
+     * - totalQuantity 개수만큼 COUPON_TICKET 사전 생성 (AVAILABLE 상태)
+     *
+     * @param request 쿠폰 생성 요청 정보
+     * @return 201 Created - 생성된 쿠폰 정보
+     * @throws InvalidCouponException 비즈니스 규칙 검증 실패 시
+     *   - 할인값이 유효 범위를 벗어난 경우
+     *   - 유효 기간이 잘못된 경우
+     *   - 발급 수량이 유효 범위를 벗어난 경우
+     *   - 정액 할인에 최대 할인 금액이 설정된 경우
+     */
+    @PostMapping
+    fun createCoupon(
+        @Valid @RequestBody request: CreateCouponRequest
+    ): ResponseEntity<CreateCouponResponse> {
+        val response = createCouponUseCase.execute(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
 
     /**
      * 쿠폰 목록 조회 API

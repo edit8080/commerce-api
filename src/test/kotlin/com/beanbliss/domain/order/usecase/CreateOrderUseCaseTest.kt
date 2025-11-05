@@ -219,7 +219,7 @@ class CreateOrderUseCaseTest {
         every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
         every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
         every { userCouponRepository.findById(userCouponId) } returns userCoupon
-        every { couponRepository.findById(coupon.id) } returns coupon
+        every { couponRepository.findById(coupon.id!!) } returns coupon
         every { balanceRepository.findByUserId(userId) } returns balance
         every { inventoryReservationRepository.findActiveReservationsByUserId(userId) } returns listOf(reservation)
         every { inventoryRepository.calculateAvailableStock(1L) } returns 100
