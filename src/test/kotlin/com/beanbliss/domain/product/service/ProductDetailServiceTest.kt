@@ -1,7 +1,7 @@
 package com.beanbliss.domain.product.service
 
 import com.beanbliss.domain.product.repository.ProductRepository
-import com.beanbliss.domain.inventory.repository.InventoryRepository
+import com.beanbliss.domain.inventory.service.InventoryService
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
@@ -17,7 +17,7 @@ import java.time.LocalDateTime
  *
  * [검증 목표]:
  * 1. ProductRepository를 통해 상품 ID로 상품을 조회할 수 있는가?
- * 2. 각 옵션의 가용 재고가 InventoryRepository를 통해 올바르게 계산되는가?
+ * 2. 각 옵션의 가용 재고가 InventoryService를 통해 올바르게 계산되는가?
  * 3. 옵션 목록이 용량(weightGrams) → 분쇄 타입(grindType) 순으로 정렬되는가?
  * 4. 존재하지 않는 상품 ID 조회 시 적절한 예외가 발생하는가?
  * 5. 활성 옵션이 없는 상품 조회 시 적절한 예외가 발생하는가?
@@ -28,16 +28,16 @@ import java.time.LocalDateTime
 @DisplayName("상품 상세 조회 Service 테스트")
 class ProductDetailServiceTest {
 
-    // Mock 객체 (Repository Interface에 의존)
+    // Mock 객체 (Repository와 Service Interface에 의존)
     private val productRepository: ProductRepository = mockk()
-    private val inventoryRepository: InventoryRepository = mockk()
+    private val inventoryService: InventoryService = mockk()
 
     // 테스트 대상 (Service 인터페이스로 선언)
     private lateinit var productService: ProductService
 
     @BeforeEach
     fun setUp() {
-        productService = ProductServiceImpl(productRepository, inventoryRepository)
+        productService = ProductServiceImpl(productRepository, inventoryService)
     }
 
     @Test
@@ -52,7 +52,7 @@ class ProductDetailServiceTest {
         )
 
         every { productRepository.findByIdWithOptions(productId) } returns mockProduct
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
+        every { inventoryService.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
             1L to 50,
             2L to 8
         )
@@ -71,8 +71,8 @@ class ProductDetailServiceTest {
     }
 
     @Test
-    @DisplayName("각 옵션의 가용 재고가 InventoryRepository를 통해 올바르게 계산되어야 한다")
-    fun `각 옵션의 가용 재고가 InventoryRepository를 통해 올바르게 계산되어야 한다`() {
+    @DisplayName("각 옵션의 가용 재고가 InventoryService를 통해 올바르게 계산되어야 한다")
+    fun `각 옵션의 가용 재고가 InventoryService를 통해 올바르게 계산되어야 한다`() {
         // Given
         val productId = 1L
         val mockProduct = createMockProduct(
@@ -82,7 +82,7 @@ class ProductDetailServiceTest {
         )
 
         every { productRepository.findByIdWithOptions(productId) } returns mockProduct
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
+        every { inventoryService.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
             1L to 50,
             2L to 8
         )
@@ -96,8 +96,7 @@ class ProductDetailServiceTest {
         assertEquals(8, result.options[1].availableStock, "옵션 2의 가용 재고가 8이어야 함")
 
         // [성능 최적화 검증]: Batch 조회가 정확히 한 번만 호출되어야 함 (N+1 문제 해결)
-        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) }
-        verify(exactly = 0) { inventoryRepository.calculateAvailableStock(any()) }
+        verify(exactly = 1) { inventoryService.calculateAvailableStockBatch(listOf(1L, 2L)) }
     }
 
     @Test
@@ -124,7 +123,7 @@ class ProductDetailServiceTest {
 
         every { productRepository.findByIdWithOptions(productId) } returns mockProduct
         // Repository가 정렬된 순서로 반환하므로: 3L, 2L, 1L, 4L 순서로 optionId 수집됨
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) } returns mapOf(
+        every { inventoryService.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) } returns mapOf(
             1L to 10, 2L to 10, 3L to 10, 4L to 10
         )
 
@@ -137,7 +136,7 @@ class ProductDetailServiceTest {
         assertEquals(4, resultOptions.size)
 
         // [Repository 호출 검증]: 정렬된 순서대로 optionId를 수집하여 Batch 조회를 호출했는가?
-        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) }
+        verify(exactly = 1) { inventoryService.calculateAvailableStockBatch(listOf(3L, 2L, 1L, 4L)) }
 
         // 정렬 순서: 200g-핸드드립, 200g-홀빈, 500g-핸드드립, 500g-홀빈
         assertEquals(3L, resultOptions[0].optionId, "1번째는 200g 핸드드립이어야 함")
@@ -178,7 +177,7 @@ class ProductDetailServiceTest {
         verify(exactly = 1) { productRepository.findByIdWithOptions(nonExistentProductId) }
 
         // [부작용 방지]: 재고 조회는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.calculateAvailableStockBatch(any()) }
+        verify(exactly = 0) { inventoryService.calculateAvailableStockBatch(any()) }
     }
 
     @Test
@@ -210,7 +209,7 @@ class ProductDetailServiceTest {
         verify(exactly = 1) { productRepository.findByIdWithOptions(productId) }
 
         // [부작용 방지]: 재고 조회는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.calculateAvailableStockBatch(any()) }
+        verify(exactly = 0) { inventoryService.calculateAvailableStockBatch(any()) }
     }
 
     @Test
@@ -225,7 +224,7 @@ class ProductDetailServiceTest {
         )
 
         every { productRepository.findByIdWithOptions(productId) } returns mockProduct
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
+        every { inventoryService.calculateAvailableStockBatch(listOf(1L, 2L)) } returns mapOf(
             1L to 0,  // 품절
             2L to 10  // 재고 있음
         )

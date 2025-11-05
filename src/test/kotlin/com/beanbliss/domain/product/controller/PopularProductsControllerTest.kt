@@ -5,6 +5,7 @@ import com.beanbliss.domain.product.dto.PopularProductInfo
 import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
+import com.beanbliss.domain.product.usecase.GetProductsUseCase
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -39,6 +40,9 @@ class PopularProductsControllerTest {
 
     @MockkBean
     private lateinit var productService: ProductService
+
+    @MockkBean
+    private lateinit var getProductsUseCase: GetProductsUseCase
 
     @MockkBean
     private lateinit var getPopularProductsUseCase: GetPopularProductsUseCase

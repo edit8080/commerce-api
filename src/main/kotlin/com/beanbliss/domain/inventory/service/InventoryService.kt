@@ -39,4 +39,21 @@ interface InventoryService {
      * @throws MaxStockExceededException 최대 재고 수량을 초과하는 경우
      */
     fun addStock(productOptionId: Long, quantity: Int): Int
+
+    /**
+     * 여러 상품 옵션의 가용 재고를 일괄 조회 (Batch 쿼리)
+     *
+     * [비즈니스 로직]:
+     * 1. Repository에서 모든 옵션의 재고 정보를 한 번의 쿼리로 조회
+     * 2. 가용 재고 = 총 재고 - 예약 재고 계산
+     * 3. Map<optionId, availableStock> 형태로 반환
+     *
+     * [성능 최적화]:
+     * - N+1 문제 방지: WHERE product_option_id IN (...) 사용
+     * - 단일 쿼리로 모든 재고 정보 조회
+     *
+     * @param optionIds 조회할 상품 옵션 ID 목록
+     * @return 옵션 ID를 키로, 가용 재고 수량을 값으로 하는 Map
+     */
+    fun calculateAvailableStockBatch(optionIds: List<Long>): Map<Long, Int>
 }

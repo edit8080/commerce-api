@@ -94,4 +94,16 @@ class InventoryServiceImpl(
         // 4. 현재 재고 수량 반환
         return currentStock
     }
+
+    @Transactional(readOnly = true)
+    override fun calculateAvailableStockBatch(optionIds: List<Long>): Map<Long, Int> {
+        // 빈 목록인 경우 조기 반환
+        if (optionIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        // Repository에 위임: Batch 쿼리로 모든 옵션의 가용 재고 조회
+        // 계산식: 총 재고 - 예약 재고 (INVENTORY_RESERVATION)
+        return inventoryRepository.calculateAvailableStockBatch(optionIds)
+    }
 }
