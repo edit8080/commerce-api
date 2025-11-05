@@ -193,32 +193,48 @@ POST /api/coupons/{couponId}/issue
 
 ### UseCase 패턴 적용
 
-쿠폰 발급 기능은 **3개의 Repository**를 조율하는 복잡한 비즈니스 트랜잭션
-- `CouponRepository`: 쿠폰 정보 조회
-- `CouponTicketRepository`: 티켓 조회 및 상태 업데이트
-- `UserCouponRepository`: 사용자 쿠폰 생성 및 중복 확인
+쿠폰 발급 기능은 **여러 Service**를 조율하는 복잡한 비즈니스 트랜잭션
+- `UserService`: 사용자 존재 여부 검증
+- `CouponService`: 쿠폰 정보 조회 및 유효성 검증
+- `CouponTicketService`: 티켓 선점 및 상태 업데이트 (FOR UPDATE SKIP LOCKED)
+- `UserCouponService`: 사용자 쿠폰 생성 및 중복 발급 확인
 
-이러한 다중 도메인 의존성을 **Facade 패턴**으로 추상화하여:
-1. **단일 책임**: 각 Repository는 자신의 영역만 담당
-2. **조율 책임 분리**: UseCase가 여러 Repository를 조율
-3. **트랜잭션 경계 명확화**: UseCase가 전체 비즈니스 플로우의 트랜잭션 관리
+이러한 다중 도메인 의존성을 **UseCase 오케스트레이션 패턴**으로 조율하여:
+1. **단일 책임**: 각 Service는 자신의 도메인 영역만 담당하고 Repository 접근
+2. **조율 책임 분리**: UseCase가 여러 Service를 조율하여 비즈니스 플로우 완성
+3. **트랜잭션 경계 명확화**: 각 Service가 독립적인 트랜잭션 관리 (필요 시 UseCase에서 전체 트랜잭션 관리)
 4. **확장성**: 향후 알림, 이벤트 발행 등 인프라 컴포넌트 추가 시 UseCase에서 통합 관리
 
 ```kotlin
 @Component
 class CouponIssueUseCase(
-    private val couponRepository: CouponRepository,
-    private val couponTicketRepository: CouponTicketRepository,
-    private val userCouponRepository: UserCouponRepository
+    private val userService: UserService,
+    private val couponService: CouponService,
+    private val couponTicketService: CouponTicketService,
+    private val userCouponService: UserCouponService
 ) {
     @Transactional
     fun issueCoupon(couponId: Long, userId: Long): IssueCouponResponse {
-        // 1. 쿠폰 유효성 검증
-        // 2. 중복 발급 방지
-        // 3. 티켓 선점 (FOR UPDATE SKIP LOCKED)
-        // 4. 사용자 쿠폰 생성
-        // 5. 티켓 상태 업데이트
-        // 6. DTO 변환 및 반환
+        // 1. 사용자 존재 여부 검증 (User 도메인)
+        userService.validateUserExists(userId)
+
+        // 2. 쿠폰 유효성 검증 (Coupon 도메인)
+        val coupon = couponService.getValidCoupon(couponId)
+
+        // 3. 중복 발급 방지 검증 (UserCoupon 도메인)
+        userCouponService.validateNotAlreadyIssued(userId, couponId)
+
+        // 4. 티켓 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
+        val ticket = couponTicketService.reserveAvailableTicket(couponId)
+
+        // 5. 사용자 쿠폰 생성 (UserCoupon 도메인)
+        val userCoupon = userCouponService.createUserCoupon(userId, couponId)
+
+        // 6. 티켓 상태 업데이트 (CouponTicket 도메인)
+        couponTicketService.markTicketAsIssued(ticket.ticketId, userId, userCoupon.userCouponId)
+
+        // 7. DTO 변환 및 반환
+        return IssueCouponResponse.from(userCoupon, coupon)
     }
 }
 ```
@@ -285,78 +301,119 @@ ON USER_COUPON(status);
 sequenceDiagram
     participant Controller as CouponController
     participant UseCase as CouponIssueUseCase
+    participant UserSvc as UserService
+    participant CouponSvc as CouponService
+    participant UserCouponSvc as UserCouponService
+    participant TicketSvc as CouponTicketService
+    participant UserRepo as UserRepository
     participant CouponRepo as CouponRepository
-    participant TicketRepo as CouponTicketRepository
     participant UserCouponRepo as UserCouponRepository
+    participant TicketRepo as CouponTicketRepository
 
     Controller->>UseCase: issueCoupon(couponId, userId)
     activate UseCase
 
-    Note over UseCase: 1. 쿠폰 유효성 검증 (트랜잭션 밖)
+    Note over UseCase: 1. UseCase 오케스트레이션 시작<br/>(UseCase는 트랜잭션 관리 X, 각 Service가 독립적으로 관리)
 
-    UseCase->>CouponRepo: findById(couponId)
+    Note over UseCase: 2. 사용자 존재 여부 검증 (User 도메인)
+
+    UseCase->>UserSvc: validateUserExists(userId)
+    activate UserSvc
+    UserSvc->>UserRepo: existsById(userId)
+    activate UserRepo
+    UserRepo-->>UserSvc: boolean
+    deactivate UserRepo
+
+    alt 사용자가 존재하지 않음
+        UserSvc-->>UseCase: throw UserNotFoundException
+        UseCase-->>Controller: USER_NOT_FOUND (404)
+    end
+    UserSvc-->>UseCase: validation success
+    deactivate UserSvc
+
+    Note over UseCase: 3. 쿠폰 유효성 검증 (Coupon 도메인)
+
+    UseCase->>CouponSvc: getValidCoupon(couponId)
+    activate CouponSvc
+    CouponSvc->>CouponRepo: findById(couponId)
     activate CouponRepo
     Note over CouponRepo: 쿠폰 정보 조회
-    CouponRepo-->>UseCase: Coupon
+    CouponRepo-->>CouponSvc: Coupon
     deactivate CouponRepo
 
     alt 쿠폰이 존재하지 않음
+        CouponSvc-->>UseCase: throw CouponNotFoundException
         UseCase-->>Controller: COUPON_NOT_FOUND (404)
     end
 
-    Note over UseCase: 유효 기간 검증<br/>(valid_from <= NOW <= valid_until)
+    Note over CouponSvc: 유효 기간 검증<br/>(valid_from <= NOW <= valid_until)
 
     alt 유효 기간이 아님
+        CouponSvc-->>UseCase: throw IllegalStateException
         UseCase-->>Controller: COUPON_EXPIRED or COUPON_NOT_STARTED (400)
     end
+    CouponSvc-->>UseCase: Coupon
+    deactivate CouponSvc
 
-    Note over UseCase: 2. 트랜잭션 시작 (READ_COMMITTED)
+    Note over UseCase: 4. 중복 발급 방지 검증 (UserCoupon 도메인)
 
-    Note over UseCase: 3. 중복 발급 방지 검증
-
-    UseCase->>UserCouponRepo: existsByUserIdAndCouponId(userId, couponId)
+    UseCase->>UserCouponSvc: validateNotAlreadyIssued(userId, couponId)
+    activate UserCouponSvc
+    UserCouponSvc->>UserCouponRepo: existsByUserIdAndCouponId(userId, couponId)
     activate UserCouponRepo
     Note over UserCouponRepo: 사용자 쿠폰 발급 여부 확인
-    UserCouponRepo-->>UseCase: exists
+    UserCouponRepo-->>UserCouponSvc: exists
     deactivate UserCouponRepo
 
     alt 이미 발급된 쿠폰
-        Note over UseCase: 트랜잭션 롤백
+        UserCouponSvc-->>UseCase: throw IllegalStateException
         UseCase-->>Controller: COUPON_ALREADY_ISSUED (409)
     end
+    UserCouponSvc-->>UseCase: validation success
+    deactivate UserCouponSvc
 
-    Note over UseCase: 4. 쿠폰 티켓 선점<br/>(FOR UPDATE SKIP LOCKED)
+    Note over UseCase: 5. 쿠폰 티켓 선점 (CouponTicket 도메인)<br/>(FOR UPDATE SKIP LOCKED)
 
-    UseCase->>TicketRepo: findAvailableTicketWithLock(couponId)
+    UseCase->>TicketSvc: reserveAvailableTicket(couponId)
+    activate TicketSvc
+    TicketSvc->>TicketRepo: findAvailableTicketWithLock(couponId)
     activate TicketRepo
     Note over TicketRepo: 발급 가능한 티켓 조회 및 비관적 락 설정<br/>(락이 걸린 티켓은 SKIP)
-    TicketRepo-->>UseCase: CouponTicket (or NULL)
+    TicketRepo-->>TicketSvc: CouponTicket (or NULL)
     deactivate TicketRepo
 
     alt 티켓이 없음 (재고 소진)
-        Note over UseCase: 트랜잭션 롤백
+        TicketSvc-->>UseCase: throw OutOfStockException
         UseCase-->>Controller: COUPON_OUT_OF_STOCK (409)
     end
+    TicketSvc-->>UseCase: CouponTicket
+    deactivate TicketSvc
 
-    Note over UseCase: 5. 사용자 쿠폰 생성
+    Note over UseCase: 6. 사용자 쿠폰 생성 (UserCoupon 도메인)
 
-    UseCase->>UserCouponRepo: save(userId, couponId, status='ISSUED')
+    UseCase->>UserCouponSvc: createUserCoupon(userId, couponId)
+    activate UserCouponSvc
+    UserCouponSvc->>UserCouponRepo: save(userId, couponId, status='ISSUED')
     activate UserCouponRepo
     Note over UserCouponRepo: 사용자 쿠폰 발급 기록 생성
-    UserCouponRepo-->>UseCase: UserCoupon
+    UserCouponRepo-->>UserCouponSvc: UserCoupon
     deactivate UserCouponRepo
+    UserCouponSvc-->>UseCase: UserCoupon
+    deactivate UserCouponSvc
 
-    Note over UseCase: 6. 쿠폰 티켓 상태 업데이트
+    Note over UseCase: 7. 쿠폰 티켓 상태 업데이트 (CouponTicket 도메인)
 
-    UseCase->>TicketRepo: updateTicketAsIssued(ticketId, userId, userCouponId)
+    UseCase->>TicketSvc: markTicketAsIssued(ticketId, userId, userCouponId)
+    activate TicketSvc
+    TicketSvc->>TicketRepo: updateTicketAsIssued(ticketId, userId, userCouponId)
     activate TicketRepo
     Note over TicketRepo: 선점한 티켓 상태를 'ISSUED'로 변경
-    TicketRepo-->>UseCase: success
+    TicketRepo-->>TicketSvc: success
     deactivate TicketRepo
+    TicketSvc-->>UseCase: success
+    deactivate TicketSvc
 
-    Note over UseCase: 7. 트랜잭션 커밋
-
-    Note over UseCase: DTO 변환<br/>UserCoupon + Coupon → IssueCouponResponse
+    Note over UseCase: 8. DTO 변환 및 반환<br/>UserCoupon + Coupon → IssueCouponResponse
 
     UseCase-->>Controller: IssueCouponResponse
     deactivate UseCase

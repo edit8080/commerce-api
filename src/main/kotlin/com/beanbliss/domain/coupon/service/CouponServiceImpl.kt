@@ -1,10 +1,14 @@
 package com.beanbliss.domain.coupon.service
 
 import com.beanbliss.common.dto.PageableResponse
+import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.coupon.dto.CouponListData
 import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponResponse
+import com.beanbliss.domain.coupon.entity.CouponEntity
+import com.beanbliss.domain.coupon.exception.CouponExpiredException
+import com.beanbliss.domain.coupon.exception.CouponNotStartedException
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponWithQuantity
 import org.springframework.stereotype.Service
@@ -59,6 +63,23 @@ class CouponServiceImpl(
                 pageable = pageable
             )
         )
+    }
+
+    override fun getValidCoupon(couponId: Long): CouponEntity {
+        // 1. 쿠폰 조회
+        val coupon = couponRepository.findById(couponId)
+            ?: throw ResourceNotFoundException("쿠폰을 찾을 수 없습니다.")
+
+        // 2. 유효 기간 검증
+        val now = LocalDateTime.now()
+        if (now.isBefore(coupon.validFrom)) {
+            throw CouponNotStartedException("아직 사용할 수 없는 쿠폰입니다.")
+        }
+        if (now.isAfter(coupon.validUntil)) {
+            throw CouponExpiredException("유효기간이 만료된 쿠폰입니다.")
+        }
+
+        return coupon
     }
 
     /**

@@ -5,6 +5,8 @@ import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.coupon.dto.UserCouponListData
 import com.beanbliss.domain.coupon.dto.UserCouponListResponse
 import com.beanbliss.domain.coupon.dto.UserCouponResponse
+import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.coupon.exception.CouponAlreadyIssuedException
 import com.beanbliss.domain.coupon.repository.UserCouponRepository
 import com.beanbliss.domain.coupon.repository.UserCouponWithCoupon
 import org.springframework.stereotype.Service
@@ -58,6 +60,17 @@ class UserCouponServiceImpl(
                 )
             )
         )
+    }
+
+    override fun validateNotAlreadyIssued(userId: Long, couponId: Long) {
+        if (userCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
+            throw CouponAlreadyIssuedException("이미 발급받은 쿠폰입니다.")
+        }
+    }
+
+    @Transactional
+    override fun createUserCoupon(userId: Long, couponId: Long): UserCouponEntity {
+        return userCouponRepository.save(userId, couponId)
     }
 
     /**
