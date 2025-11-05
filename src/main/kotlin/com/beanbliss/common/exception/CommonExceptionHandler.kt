@@ -45,6 +45,26 @@ class CommonExceptionHandler {
         return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
     }
 
+    @ExceptionHandler(InvalidPageNumberException::class)
+    fun handleInvalidPageNumber(ex: InvalidPageNumberException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVALID_PAGE_NUMBER",
+            message = ex.message ?: "페이지 번호가 유효하지 않습니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(InvalidPageSizeException::class)
+    fun handleInvalidPageSize(ex: InvalidPageSizeException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVALID_PAGE_SIZE",
+            message = ex.message ?: "페이지 크기가 유효하지 않습니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationExceptions(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
         val errorMessage = ex.bindingResult.fieldErrors.firstOrNull()?.defaultMessage

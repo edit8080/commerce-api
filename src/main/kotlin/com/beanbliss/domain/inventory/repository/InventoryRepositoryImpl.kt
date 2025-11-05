@@ -1,7 +1,9 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.entity.InventoryEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
+import com.beanbliss.domain.product.repository.ProductOptionRepository
 import org.springframework.stereotype.Repository
 import java.util.concurrent.ConcurrentHashMap
 
@@ -10,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - ConcurrentHashMap을 사용하여 Thread-safe 보장
  * - product_option_id를 키로 사용하여 재고 정보 관리
  * - INVENTORY_RESERVATION을 고려하여 가용 재고 계산
+ * - INVENTORY + PRODUCT_OPTION + PRODUCT를 JOIN하여 재고 목록 조회
  *
  * [주의사항]:
  * - 애플리케이션 재시작 시 데이터 소실 (In-memory 특성)
@@ -17,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Repository
 class InventoryRepositoryImpl(
-    private val inventoryReservationRepository: InventoryReservationRepository
+    private val inventoryReservationRepository: InventoryReservationRepository,
+    private val productOptionRepository: ProductOptionRepository
 ) : InventoryRepository {
 
     // Thread-safe한 In-memory 저장소 (product_option_id -> InventoryEntity)
@@ -41,6 +45,53 @@ class InventoryRepositoryImpl(
         return productOptionIds.associateWith { optionId ->
             calculateAvailableStock(optionId)
         }
+    }
+
+    override fun findAllWithProductInfo(
+        page: Int,
+        size: Int,
+        sortBy: String,
+        sortDirection: String
+    ): List<InventoryResponse> {
+        // 1. 모든 재고를 조회하고, ProductOption 정보와 JOIN
+        val inventoryResponses = inventories.values.mapNotNull { inventory ->
+            // ProductOption 정보 조회 (PRODUCT와 JOIN된 정보 포함)
+            val optionDetail = productOptionRepository.findActiveOptionWithProduct(inventory.productOptionId)
+                ?: return@mapNotNull null // 활성 옵션이 아니면 제외
+
+            // InventoryResponse 생성
+            InventoryResponse(
+                inventoryId = inventory.id,
+                productId = optionDetail.productId,
+                productName = optionDetail.productName,
+                productOptionId = optionDetail.optionId,
+                optionCode = optionDetail.optionCode,
+                optionName = "${optionDetail.grindType} ${optionDetail.weightGrams}g", // 옵션명 생성
+                price = optionDetail.price,
+                stockQuantity = inventory.stockQuantity,
+                createdAt = inventory.createdAt
+            )
+        }
+
+        // 2. 정렬 (sortBy, sortDirection 적용)
+        val sorted = when (sortBy) {
+            "created_at" -> {
+                if (sortDirection == "DESC") {
+                    inventoryResponses.sortedByDescending { it.createdAt }
+                } else {
+                    inventoryResponses.sortedBy { it.createdAt }
+                }
+            }
+            else -> inventoryResponses // 기본 정렬 (정렬 기준 없음)
+        }
+
+        // 3. 페이징 적용 (offset, limit)
+        val offset = (page - 1) * size
+        return sorted.drop(offset).take(size)
+    }
+
+    override fun count(): Long {
+        return inventories.size.toLong()
     }
 
     /**

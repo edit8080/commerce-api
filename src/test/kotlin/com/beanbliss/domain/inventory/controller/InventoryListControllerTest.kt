@@ -1,6 +1,8 @@
 package com.beanbliss.domain.inventory.controller
 
 import com.beanbliss.common.dto.PageableResponse
+import com.beanbliss.common.exception.InvalidPageNumberException
+import com.beanbliss.common.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.service.InventoryService
@@ -168,6 +170,10 @@ class InventoryListControllerTest {
     @Test
     @DisplayName("GET /api/inventories - page가 1 미만일 경우 400 Bad Request를 반환해야 한다")
     fun `page가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
+        // Given: Service가 예외를 던지도록 설정
+        every { inventoryService.getInventories(0, 10) } throws
+            InvalidPageNumberException("페이지 번호는 1 이상이어야 합니다.")
+
         // When & Then
         mockMvc.perform(
             get("/api/inventories")
@@ -183,6 +189,10 @@ class InventoryListControllerTest {
     @Test
     @DisplayName("GET /api/inventories - page가 음수일 경우 400 Bad Request를 반환해야 한다")
     fun `page가 음수일 경우 400 Bad Request를 반환해야 한다`() {
+        // Given: Service가 예외를 던지도록 설정
+        every { inventoryService.getInventories(-1, 10) } throws
+                InvalidPageNumberException("페이지 번호는 1 이상이어야 합니다.")
+
         // When & Then
         mockMvc.perform(
             get("/api/inventories")
@@ -198,6 +208,10 @@ class InventoryListControllerTest {
     @Test
     @DisplayName("GET /api/inventories - size가 1 미만일 경우 400 Bad Request를 반환해야 한다")
     fun `size가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
+        // Given: Service가 예외를 던지도록 설정
+        every { inventoryService.getInventories(1, 0) } throws
+            InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
+
         // When & Then
         mockMvc.perform(
             get("/api/inventories")
@@ -213,6 +227,10 @@ class InventoryListControllerTest {
     @Test
     @DisplayName("GET /api/inventories - size가 100 초과일 경우 400 Bad Request를 반환해야 한다")
     fun `size가 100 초과일 경우 400 Bad Request를 반환해야 한다`() {
+        // Given: Service가 예외를 던지도록 설정
+        every { inventoryService.getInventories(1, 101) } throws
+                InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
+
         // When & Then
         mockMvc.perform(
             get("/api/inventories")

@@ -38,7 +38,7 @@ class FakeInventoryListRepository : InventoryRepository {
      * @param sortDirection 정렬 방향 ("ASC" 또는 "DESC")
      * @return 재고 목록
      */
-    fun findAllWithProductInfo(
+    override fun findAllWithProductInfo(
         page: Int,
         size: Int,
         sortBy: String,
@@ -66,7 +66,7 @@ class FakeInventoryListRepository : InventoryRepository {
      *
      * @return 전체 재고 개수
      */
-    fun count(): Long {
+    override fun count(): Long {
         return inventories.size.toLong()
     }
 

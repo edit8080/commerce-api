@@ -36,4 +36,19 @@ class FakeInventoryRepository : InventoryRepository {
             stockMap[optionId] ?: 0
         }
     }
+
+    override fun findAllWithProductInfo(
+        page: Int,
+        size: Int,
+        sortBy: String,
+        sortDirection: String
+    ): List<com.beanbliss.domain.inventory.dto.InventoryResponse> {
+        // 이 테스트에서는 사용하지 않음
+        return emptyList()
+    }
+
+    override fun count(): Long {
+        // 이 테스트에서는 사용하지 않음
+        return 0L
+    }
 }
