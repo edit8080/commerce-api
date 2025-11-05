@@ -383,58 +383,102 @@ class InventoryController(
 
 ## 7. ⚠️ 공통 예외 처리 (Common Layer)
 
-예외 처리를 공통 모듈로 분리하여 API의 일관성을 확보합니다.
+예외 처리를 공통 모듈과 도메인별로 분리하여 관심사를 명확히 분리합니다.
 
-### **코드 7.1: GlobalExceptionHandler**
+### **7.1 예외 분류 원칙**
 
-```
-// com/beanbliss/common/exception/GlobalExceptionHandler.kt
-package com.beanbliss.common.exception
+| 분류 | 위치 | 예시 |
+|------|------|------|
+| **공통 예외** | `com.beanbliss.common.exception` | `ResourceNotFoundException`, `InvalidPageNumberException`, `InvalidPageSizeException` |
+| **도메인 예외** | `com.beanbliss.domain.{도메인}.exception` | `InsufficientStockException` (재고), `OrderCancellationException` (주문) |
 
-import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.ControllerAdvice
-import org.springframework.web.bind.annotation.ExceptionHandler
-import org.springframework.web.bind.MethodArgumentNotValidException
+### **7.2 ExceptionHandler 우선순위**
 
-// 사용자 정의 예외 클래스
-class ResourceNotFoundException(message: String) : RuntimeException(message)
-class InsufficientStockException(message: String) : RuntimeException(message)
+`@Order` 애노테이션으로 예외 처리 우선순위를 제어합니다.
 
-// 공통 예외 응답 DTO
-data class ErrorResponse(val status: Int, val code: String, val message: String)
-
+```kotlin
+// 도메인별 ExceptionHandler (높은 우선순위)
 @ControllerAdvice
-class GlobalExceptionHandler {
-
-    @ExceptionHandler(ResourceNotFoundException::class)
-    fun handleResourceNotFound(ex: ResourceNotFoundException): ResponseEntity<ErrorResponse> {
-        val response = ErrorResponse(HttpStatus.NOT_FOUND.value(), "RESOURCE_NOT_FOUND", ex.message ?: "요청한 자원을 찾을 수 없습니다.")
-        return ResponseEntity(response, HttpStatus.NOT_FOUND) // 404
-    }
-
+@Order(10)
+class InventoryExceptionHandler {
     @ExceptionHandler(InsufficientStockException::class)
-    fun handleInsufficientStock(ex: InsufficientStockException): ResponseEntity<ErrorResponse> {
-        val response = ErrorResponse(HttpStatus.BAD_REQUEST.value(), "INSUFFICIENT_STOCK", ex.message ?: "재고가 부족합니다.")
-        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleValidationExceptions(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
-        val errorMessage = ex.bindingResult.fieldErrors.firstOrNull()?.defaultMessage ?: "유효성 검사에 실패했습니다."
-
-        val response = ErrorResponse(HttpStatus.BAD_REQUEST.value(), "INVALID_INPUT", errorMessage)
-        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
-    }
+    fun handleInsufficientStock(ex: InsufficientStockException): ResponseEntity<ErrorResponse> { ... }
 }
 
+// 공통 ExceptionHandler (낮은 우선순위 - Fallback)
+@ControllerAdvice
+@Order(100)
+class CommonExceptionHandler {
+    @ExceptionHandler(InvalidPageNumberException::class)
+    fun handleInvalidPageNumber(ex: InvalidPageNumberException): ResponseEntity<ErrorResponse> { ... }
+
+    @ExceptionHandler(InvalidPageSizeException::class)
+    fun handleInvalidPageSize(ex: InvalidPageSizeException): ResponseEntity<ErrorResponse> { ... }
+}
 ```
 
-## 8. 📝 테스트 네이밍 가이드
+**처리 순서**: 도메인 핸들러(`@Order(10)`) → 공통 핸들러(`@Order(100)`)
+
+### **7.3 베스트 프랙티스**
+
+1. **공통 예외는 common 패키지**, 도메인 예외는 도메인 패키지에 정의
+2. **@Order로 우선순위 관리**: 도메인(`@Order(10)`), 공통(`@Order(100)`)
+3. **일관된 에러 응답**: `ErrorResponse(status, code, message)` 사용
+
+## 8. 📄 페이지네이션 공통 처리 (Common Layer)
+
+### **8.1 PageCalculator 사용**
+
+페이지네이션 계산은 공통 유틸리티 `PageCalculator`를 사용합니다.
+
+```kotlin
+// Service에서 사용 예시
+import com.beanbliss.common.pagination.PageCalculator
+
+val totalPages = PageCalculator.calculateTotalPages(totalElements, size)
+```
+
+### **8.2 Service 구현 패턴**
+
+```kotlin
+@Service
+class InventoryServiceImpl(
+    private val inventoryRepository: InventoryRepository
+) : InventoryService {
+
+    override fun getInventories(page: Int, size: Int): InventoryListResponse {
+        // 1. 유효성 검증
+        if (page < 1) throw InvalidPageNumberException("페이지 번호는 1 이상이어야 합니다.")
+        if (size !in 1..100) throw InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
+
+        // 2. 데이터 조회
+        val inventories = inventoryRepository.findAllWithProductInfo(page, size, "created_at", "DESC")
+        val totalElements = inventoryRepository.count()
+
+        // 3. 페이지 계산 (PageCalculator 사용)
+        val totalPages = PageCalculator.calculateTotalPages(totalElements, size)
+
+        // 4. 응답 조립
+        return InventoryListResponse(
+            content = inventories,
+            pageable = PageableResponse(page, size, totalElements, totalPages)
+        )
+    }
+}
+```
+
+### **8.3 베스트 프랙티스**
+
+1. **PageCalculator 필수 사용**: 직접 계산 금지 (`(total + size - 1) / size` ❌)
+2. **공통 예외 사용**: `InvalidPageNumberException`, `InvalidPageSizeException`
+3. **Controller 기본값**: `@RequestParam(defaultValue = "1")` page, `(defaultValue = "10")` size
+4. **응답 통일**: 모든 페이지네이션 API는 `PageableResponse` 사용
+
+## 9. 📝 테스트 네이밍 가이드
 
 테스트 파일의 이름은 **테스트 대상의 도메인, 기능, 그리고 계층**을 명확하게 표현해야 합니다. 이를 통해 프로젝트가 성장하더라도 각 테스트의 목적과 범위를 즉시 파악할 수 있습니다.
 
-### **8.1 테스트 파일 네이밍 규칙**
+### **9.1 테스트 파일 네이밍 규칙**
 
 기본 패턴: **`{Domain}{Feature}{Layer}Test.kt`**
 
@@ -442,7 +486,7 @@ class GlobalExceptionHandler {
 - **Feature**: 테스트하는 기능 (예: `List`, `Create`, `Update`, `Delete`, `Top`)
 - **Layer**: 계층 이름 (예: `Controller`, `Service`, `Repository`)
 
-### **8.2 네이밍 예시**
+### **9.2 네이밍 예시**
 
 #### **Controller, Service 계층 테스트**
 ```
@@ -457,7 +501,7 @@ ProductCreateServiceTest.kt           // 상품 생성 비즈니스 로직 테�
 ProductRepositoryTest.kt              // 상품 Repository 전반적인 기능 테스트
 ```
 
-### **8.3 클래스명 및 DisplayName**
+### **9.3 클래스명 및 DisplayName**
 
 테스트 파일명과 일치하도록 클래스명과 `@DisplayName`을 작성합니다.
 
