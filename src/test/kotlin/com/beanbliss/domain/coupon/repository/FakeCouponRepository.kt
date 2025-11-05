@@ -97,6 +97,37 @@ class FakeCouponRepository : CouponRepository {
         )
     }
 
+    override fun save(coupon: CouponEntity): CouponEntity {
+        // ID가 null이면 새로운 ID 생성
+        val savedCoupon = if (coupon.id == null) {
+            val newId = (coupons.maxOfOrNull { it.id } ?: 0L) + 1L
+            coupon.copy(id = newId)
+        } else {
+            coupon
+        }
+
+        // Internal Coupon 모델로 변환하여 저장
+        val internalCoupon = Coupon(
+            id = savedCoupon.id!!,
+            name = savedCoupon.name,
+            discountType = savedCoupon.discountType,
+            discountValue = savedCoupon.discountValue,
+            minOrderAmount = savedCoupon.minOrderAmount,
+            maxDiscountAmount = savedCoupon.maxDiscountAmount,
+            totalQuantity = savedCoupon.totalQuantity,
+            validFrom = savedCoupon.validFrom,
+            validUntil = savedCoupon.validUntil,
+            createdAt = savedCoupon.createdAt,
+            updatedAt = savedCoupon.updatedAt
+        )
+
+        // 기존 쿠폰 제거 후 추가 (업데이트)
+        coupons.removeIf { it.id == internalCoupon.id }
+        coupons.add(internalCoupon)
+
+        return savedCoupon
+    }
+
     // === Test Helper Methods ===
 
     /**
