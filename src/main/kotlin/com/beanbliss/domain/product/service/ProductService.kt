@@ -1,5 +1,6 @@
 package com.beanbliss.domain.product.service
 
+import com.beanbliss.domain.product.dto.ProductBasicInfo
 import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 
@@ -25,4 +26,14 @@ interface ProductService {
      * @throws ResourceNotFoundException 상품이 존재하지 않거나 활성 옵션이 없는 경우
      */
     fun getProductDetail(productId: Long): ProductResponse
+
+    /**
+     * 여러 상품의 기본 정보 조회
+     *
+     * [목적]: 인기 상품 목록 조회 시 상품 기본 정보만 필요한 경우 사용
+     *
+     * @param productIds 조회할 상품 ID 목록
+     * @return 상품 기본 정보 목록 (id, name, brand, description)
+     */
+    fun getProductsByIds(productIds: List<Long>): List<ProductBasicInfo>
 }

@@ -35,3 +35,31 @@ data class ProductOptionResponse(
     val price: Int,
     val availableStock: Int
 )
+
+/**
+ * 인기 상품 목록 조회 응답
+ */
+data class PopularProductsResponse(
+    val products: List<PopularProductInfo>
+)
+
+/**
+ * 인기 상품 정보 (주문 수 포함)
+ */
+data class PopularProductInfo(
+    val productId: Long,
+    val productName: String,
+    val brand: String,
+    val totalOrderCount: Int,
+    val description: String
+)
+
+/**
+ * 상품 기본 정보 (ProductService에서 반환)
+ */
+data class ProductBasicInfo(
+    val productId: Long,
+    val productName: String,
+    val brand: String,
+    val description: String
+)
