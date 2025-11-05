@@ -137,8 +137,7 @@ class PopularProductsControllerTest {
         val invalidPeriod = 0
         val limit = 10
 
-        every { getPopularProductsUseCase.getPopularProducts(invalidPeriod, limit) } throws
-                InvalidParameterException("period는 1 이상 90 이하여야 합니다.")
+        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
 
         // When & Then
         mockMvc.perform(
@@ -160,8 +159,7 @@ class PopularProductsControllerTest {
         val invalidPeriod = 91
         val limit = 10
 
-        every { getPopularProductsUseCase.getPopularProducts(invalidPeriod, limit) } throws
-                InvalidParameterException("period는 1 이상 90 이하여야 합니다.")
+        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
 
         // When & Then
         mockMvc.perform(
@@ -183,8 +181,7 @@ class PopularProductsControllerTest {
         val period = 7
         val invalidLimit = 0
 
-        every { getPopularProductsUseCase.getPopularProducts(period, invalidLimit) } throws
-                InvalidParameterException("limit는 1 이상 50 이하여야 합니다.")
+        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
 
         // When & Then
         mockMvc.perform(
@@ -206,8 +203,7 @@ class PopularProductsControllerTest {
         val period = 7
         val invalidLimit = 51
 
-        every { getPopularProductsUseCase.getPopularProducts(period, invalidLimit) } throws
-                InvalidParameterException("limit는 1 이상 50 이하여야 합니다.")
+        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
 
         // When & Then
         mockMvc.perform(

@@ -3,6 +3,7 @@ package com.beanbliss.domain.product.controller
 import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
+import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -38,6 +39,9 @@ class ProductDetailControllerTest {
 
     @MockkBean
     private lateinit var productService: ProductService
+
+    @MockkBean
+    private lateinit var getPopularProductsUseCase: GetPopularProductsUseCase
 
     @Test
     @DisplayName("GET /api/products/{productId} - 정상 조회 시 200 OK와 상품 상세 정보를 반환해야 한다")

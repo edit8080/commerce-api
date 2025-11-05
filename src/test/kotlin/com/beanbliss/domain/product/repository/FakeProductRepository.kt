@@ -1,5 +1,6 @@
 package com.beanbliss.domain.product.repository
 
+import com.beanbliss.domain.product.dto.ProductBasicInfo
 import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import java.time.LocalDateTime
@@ -104,6 +105,20 @@ class FakeProductRepository : ProductRepository {
 
         // 4. ProductResponse로 변환 (활성 옵션이 없어도 빈 리스트로 반환)
         return product.copy(options = sortedOptions).toResponse()
+    }
+
+    override fun findBasicInfoByIds(productIds: List<Long>): List<ProductBasicInfo> {
+        // productIds에 해당하는 상품들의 기본 정보만 반환
+        return productIds.mapNotNull { productId ->
+            products.firstOrNull { it.productId == productId }?.let { product ->
+                ProductBasicInfo(
+                    productId = product.productId,
+                    productName = product.name,
+                    brand = product.brand,
+                    description = product.description
+                )
+            }
+        }
     }
 
     /**

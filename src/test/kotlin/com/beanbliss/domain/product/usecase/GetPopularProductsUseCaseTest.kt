@@ -1,6 +1,5 @@
 package com.beanbliss.domain.product.usecase
 
-import com.beanbliss.common.exception.InvalidParameterException
 import com.beanbliss.domain.order.dto.ProductOrderCount
 import com.beanbliss.domain.order.service.OrderService
 import com.beanbliss.domain.product.dto.PopularProductInfo
@@ -20,10 +19,9 @@ import org.junit.jupiter.api.Test
  *
  * [검증 목표]:
  * 1. UseCase는 OrderService와 ProductService를 올바르게 오케스트레이션하는가?
- * 2. 파라미터 유효성 검증이 올바르게 수행되는가?
- * 3. 주문 수량 데이터와 상품 정보가 올바르게 병합되는가?
- * 4. 정렬 순서가 유지되는가?
- * 5. 예외 상황에서 올바른 예외가 발생하는가?
+ * 2. 주문 수량 데이터와 상품 정보가 올바르게 병합되는가?
+ * 3. 정렬 순서가 유지되는가?
+ * 4. 데이터 정합성 예외 상황이 올바르게 처리되는가?
  */
 @DisplayName("인기 상품 조회 UseCase 테스트")
 class GetPopularProductsUseCaseTest {
@@ -110,76 +108,6 @@ class GetPopularProductsUseCaseTest {
         assertEquals(150, result.products[0].totalOrderCount)
         assertEquals(120, result.products[1].totalOrderCount)
         assertEquals(100, result.products[2].totalOrderCount)
-    }
-
-    @Test
-    @DisplayName("period가 1 미만일 경우 InvalidParameterException이 발생해야 한다")
-    fun `period가 1 미만일 경우 InvalidParameterException이 발생해야 한다`() {
-        // Given
-        val invalidPeriod = 0
-        val limit = 10
-
-        // When & Then
-        val exception = assertThrows(InvalidParameterException::class.java) {
-            useCase.getPopularProducts(invalidPeriod, limit)
-        }
-
-        assertEquals("period는 1 이상 90 이하여야 합니다.", exception.message)
-
-        // [TDD 검증 목표 5]: 유효성 검증 실패 시, Service가 호출되지 않아야 한다
-        verify(exactly = 0) { orderService.getTopOrderedProducts(any(), any()) }
-        verify(exactly = 0) { productService.getProductsByIds(any()) }
-    }
-
-    @Test
-    @DisplayName("period가 90 초과일 경우 InvalidParameterException이 발생해야 한다")
-    fun `period가 90 초과일 경우 InvalidParameterException이 발생해야 한다`() {
-        // Given
-        val invalidPeriod = 91
-        val limit = 10
-
-        // When & Then
-        val exception = assertThrows(InvalidParameterException::class.java) {
-            useCase.getPopularProducts(invalidPeriod, limit)
-        }
-
-        assertEquals("period는 1 이상 90 이하여야 합니다.", exception.message)
-        verify(exactly = 0) { orderService.getTopOrderedProducts(any(), any()) }
-        verify(exactly = 0) { productService.getProductsByIds(any()) }
-    }
-
-    @Test
-    @DisplayName("limit가 1 미만일 경우 InvalidParameterException이 발생해야 한다")
-    fun `limit가 1 미만일 경우 InvalidParameterException이 발생해야 한다`() {
-        // Given
-        val period = 7
-        val invalidLimit = 0
-
-        // When & Then
-        val exception = assertThrows(InvalidParameterException::class.java) {
-            useCase.getPopularProducts(period, invalidLimit)
-        }
-
-        assertEquals("limit는 1 이상 50 이하여야 합니다.", exception.message)
-        verify(exactly = 0) { orderService.getTopOrderedProducts(any(), any()) }
-        verify(exactly = 0) { productService.getProductsByIds(any()) }
-    }
-
-    @Test
-    @DisplayName("limit가 50 초과일 경우 InvalidParameterException이 발생해야 한다")
-    fun `limit가 50 초과일 경우 InvalidParameterException이 발생해야 한다`() {
-        // Given
-        val period = 7
-        val invalidLimit = 51
-
-        // When & Then
-        val exception = assertThrows(InvalidParameterException::class.java) {
-            useCase.getPopularProducts(period, invalidLimit)
-        }
-
-        assertEquals("limit는 1 이상 50 이하여야 합니다.", exception.message)
-        verify(exactly = 0) { orderService.getTopOrderedProducts(any(), any()) }
-        verify(exactly = 0) { productService.getProductsByIds(any()) }
     }
 
     @Test
