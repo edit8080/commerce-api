@@ -89,4 +89,14 @@ class ProductServiceImpl(
         // 4. 응답 조립
         return product.copy(options = optionsWithStock)
     }
+
+    override fun getProductsByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo> {
+        // 빈 목록인 경우 조기 반환
+        if (productIds.isEmpty()) {
+            return emptyList()
+        }
+
+        // Repository를 통해 상품 기본 정보 조회
+        return productRepository.findBasicInfoByIds(productIds)
+    }
 }

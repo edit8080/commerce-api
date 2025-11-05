@@ -87,6 +87,19 @@ class ProductRepositoryImpl : ProductRepository {
         return product.toResponse(options)
     }
 
+    override fun findBasicInfoByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo> {
+        return productIds.mapNotNull { productId ->
+            products[productId]?.let { product ->
+                com.beanbliss.domain.product.dto.ProductBasicInfo(
+                    productId = product.id,
+                    productName = product.name,
+                    brand = product.brand,
+                    description = product.description
+                )
+            }
+        }
+    }
+
     /**
      * 상품 ID로 활성 옵션 목록 조회 (정렬 포함)
      */

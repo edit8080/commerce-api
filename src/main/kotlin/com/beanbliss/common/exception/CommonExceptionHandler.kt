@@ -1,6 +1,7 @@
 package com.beanbliss.common.exception
 
 import com.beanbliss.common.dto.ErrorResponse
+import jakarta.validation.ConstraintViolationException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -73,6 +74,24 @@ class CommonExceptionHandler {
         val response = ErrorResponse(
             status = HttpStatus.BAD_REQUEST.value(),
             code = "INVALID_INPUT",
+            message = errorMessage
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    /**
+     * Jakarta Validator 검증 실패 처리 (@Validated, @Min, @Max 등)
+     *
+     * Controller의 @RequestParam에 적용된 @Min, @Max 검증 실패 시 발생
+     */
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(ex: ConstraintViolationException): ResponseEntity<ErrorResponse> {
+        val errorMessage = ex.constraintViolations.firstOrNull()?.message
+            ?: "유효하지 않은 파라미터입니다."
+
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "INVALID_PARAMETER",
             message = errorMessage
         )
         return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400

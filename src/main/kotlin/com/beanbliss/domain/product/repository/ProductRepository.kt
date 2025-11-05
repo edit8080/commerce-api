@@ -49,4 +49,15 @@ interface ProductRepository {
      * @return 상품 정보 (옵션 포함) 또는 null (상품이 존재하지 않는 경우)
      */
     fun findByIdWithOptions(productId: Long): ProductResponse?
+
+    /**
+     * 여러 상품의 기본 정보 조회
+     *
+     * - PRODUCT 테이블에서 id, name, brand, description만 조회
+     * - 옵션 정보는 포함하지 않음
+     *
+     * @param productIds 조회할 상품 ID 목록
+     * @return 상품 기본 정보 목록 (존재하는 상품만 반환)
+     */
+    fun findBasicInfoByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo>
 }

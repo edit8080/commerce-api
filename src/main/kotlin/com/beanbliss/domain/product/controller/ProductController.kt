@@ -2,9 +2,14 @@ package com.beanbliss.domain.product.controller
 
 import com.beanbliss.common.dto.ApiResponse
 import com.beanbliss.common.pagination.PageCalculator
+import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
+import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -17,11 +22,14 @@ import org.springframework.web.bind.annotation.*
  *
  * [참고]:
  * - 페이징 파라미터 검증은 PageCalculator에서 수행
+ * - 인기 상품 파라미터 검증은 Jakarta Validator 사용
  */
+@Validated
 @RestController
 @RequestMapping("/api/products")
 class ProductController(
-    private val productService: ProductService
+    private val productService: ProductService,
+    private val getPopularProductsUseCase: GetPopularProductsUseCase
 ) {
 
     /**
@@ -59,6 +67,25 @@ class ProductController(
     ): ApiResponse<ProductResponse> {
         // Service 호출
         val result = productService.getProductDetail(productId)
+
+        // 응답 반환
+        return ApiResponse(data = result)
+    }
+
+    /**
+     * 인기 상품 목록 조회 API
+     *
+     * @param period 조회 기간 (일 단위, 1~90일, 기본값: 7)
+     * @param limit 조회할 상품 개수 (1~50개, 기본값: 10)
+     * @return 인기 상품 목록 (주문 수 기준 내림차순)
+     */
+    @GetMapping("/popular")
+    fun getPopularProducts(
+        @RequestParam(defaultValue = "7") @Min(value = 1, message = "period는 1 이상 90 이하여야 합니다.") @Max(value = 90, message = "period는 1 이상 90 이하여야 합니다.") period: Int,
+        @RequestParam(defaultValue = "10") @Min(value = 1, message = "limit는 1 이상 50 이하여야 합니다.") @Max(value = 50, message = "limit는 1 이상 50 이하여야 합니다.") limit: Int
+    ): ApiResponse<PopularProductsResponse> {
+        // UseCase 호출
+        val result = getPopularProductsUseCase.getPopularProducts(period, limit)
 
         // 응답 반환
         return ApiResponse(data = result)
