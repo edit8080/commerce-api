@@ -34,14 +34,14 @@ GET /api/inventories
 | Parameter | Type    | Required | Default | Description                          |
 |-----------|---------|----------|---------|--------------------------------------|
 | page      | Integer | No       | 1       | 페이지 번호 (1부터 시작)             |
-| size      | Integer | No       | 20      | 페이지 크기 (최대 100)               |
+| size      | Integer | No       | 10      | 페이지 크기 (최대 100)               |
 
 **정렬**: 최신 등록순으로 고정 (`created_at DESC`)
 
 ### Request Example
 
 ```http
-GET /api/inventories?page=1&size=20
+GET /api/inventories?page=1&size=10
 ```
 
 ### Response (Success)
@@ -77,9 +77,9 @@ GET /api/inventories?page=1&size=20
     ],
     "pageable": {
       "pageNumber": 1,
-      "pageSize": 20,
+      "pageSize": 10,
       "totalElements": 45,
-      "totalPages": 3
+      "totalPages": 5
     }
   }
 }
@@ -144,7 +144,7 @@ GET /api/inventories?page=1&size=20
 
 - **페이지 크기 검증**:
   - 범위: 1 ~ 100
-  - 기본값: 20
+  - 기본값: 10
   - 실패 시: `INVALID_PAGE_SIZE` 예외 발생 (400)
 
 #### 2. 재고 목록 조회
