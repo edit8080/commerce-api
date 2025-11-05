@@ -1,10 +1,12 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.entity.InventoryEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.product.repository.ProductOptionRepository
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -92,6 +94,46 @@ class InventoryRepositoryImpl(
 
     override fun count(): Long {
         return inventories.size.toLong()
+    }
+
+    override fun findByProductOptionId(productOptionId: Long): Inventory? {
+        // InventoryEntity를 조회하여 Inventory 도메인 모델로 변환
+        val entity = inventories[productOptionId] ?: return null
+        return Inventory(
+            productOptionId = entity.productOptionId,
+            stockQuantity = entity.stockQuantity
+        )
+    }
+
+    override fun save(inventory: Inventory): Inventory {
+        // 기존 entity가 있으면 수정, 없으면 새로 생성
+        val existingEntity = inventories[inventory.productOptionId]
+
+        val entity = if (existingEntity != null) {
+            // 기존 entity 업데이트
+            existingEntity.copy(
+                stockQuantity = inventory.stockQuantity,
+                updatedAt = LocalDateTime.now()
+            )
+        } else {
+            // 새로운 entity 생성
+            InventoryEntity(
+                id = inventories.size.toLong() + 1, // 간단한 ID 생성
+                productOptionId = inventory.productOptionId,
+                stockQuantity = inventory.stockQuantity,
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+        }
+
+        // 저장
+        inventories[inventory.productOptionId] = entity
+
+        // 저장된 entity를 domain model로 변환하여 반환
+        return Inventory(
+            productOptionId = entity.productOptionId,
+            stockQuantity = entity.stockQuantity
+        )
     }
 
     /**

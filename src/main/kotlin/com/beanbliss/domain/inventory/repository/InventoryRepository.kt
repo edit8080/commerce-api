@@ -1,5 +1,6 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 
 /**
@@ -7,6 +8,22 @@ import com.beanbliss.domain.inventory.dto.InventoryResponse
  * Service는 이 인터페이스에만 의존합니다 (DIP 준수)
  */
 interface InventoryRepository {
+    /**
+     * 상품 옵션 ID로 재고 조회
+     *
+     * @param productOptionId 상품 옵션 ID
+     * @return 재고 도메인 모델 (없으면 null)
+     */
+    fun findByProductOptionId(productOptionId: Long): Inventory?
+
+    /**
+     * 재고 저장 (생성 또는 수정)
+     *
+     * @param inventory 재고 도메인 모델
+     * @return 저장된 재고 도메인 모델
+     */
+    fun save(inventory: Inventory): Inventory
+
     /**
      * 특정 상품 옵션의 가용 재고 계산
      *

@@ -35,11 +35,11 @@ class InventoryAddStockUseCaseTest {
     private val inventoryService: InventoryService = mockk()
 
     // 테스트 대상
-    private lateinit var addStockUseCase: AddStockUseCase
+    private lateinit var inventoryAddStockUseCase: InventoryAddStockUseCase
 
     @BeforeEach
     fun setUp() {
-        addStockUseCase = AddStockUseCase(productOptionService, inventoryService)
+        inventoryAddStockUseCase = InventoryAddStockUseCase(productOptionService, inventoryService)
     }
 
     @Test
@@ -54,7 +54,7 @@ class InventoryAddStockUseCaseTest {
         every { inventoryService.addStock(productOptionId, quantity) } returns expectedCurrentStock
 
         // When
-        val result = addStockUseCase.addStock(productOptionId, quantity)
+        val result = inventoryAddStockUseCase.addStock(productOptionId, quantity)
 
         // Then
         // [책임 검증 1]: ProductOptionService의 existsById가 먼저 호출되었는가?
@@ -80,7 +80,7 @@ class InventoryAddStockUseCaseTest {
         every { inventoryService.addStock(productOptionId, quantity) } returns expectedCurrentStock
 
         // When
-        val result = addStockUseCase.addStock(productOptionId, quantity)
+        val result = inventoryAddStockUseCase.addStock(productOptionId, quantity)
 
         // Then
         assertNotNull(result)
@@ -99,7 +99,7 @@ class InventoryAddStockUseCaseTest {
 
         // When & Then
         val exception = assertThrows<ResourceNotFoundException> {
-            addStockUseCase.addStock(productOptionId, quantity)
+            inventoryAddStockUseCase.addStock(productOptionId, quantity)
         }
 
         assertEquals("상품 옵션 ID: $productOptionId 을(를) 찾을 수 없습니다.", exception.message)
@@ -122,7 +122,7 @@ class InventoryAddStockUseCaseTest {
 
         // When & Then
         val exception = assertThrows<ResourceNotFoundException> {
-            addStockUseCase.addStock(productOptionId, quantity)
+            inventoryAddStockUseCase.addStock(productOptionId, quantity)
         }
 
         assertTrue(exception.message!!.contains("재고 정보를 찾을 수 없습니다"))
@@ -149,7 +149,7 @@ class InventoryAddStockUseCaseTest {
 
         // When & Then
         val exception = assertThrows<MaxStockExceededException> {
-            addStockUseCase.addStock(productOptionId, quantity)
+            inventoryAddStockUseCase.addStock(productOptionId, quantity)
         }
 
         assertTrue(exception.message!!.contains("최대 허용량"))
@@ -178,7 +178,7 @@ class InventoryAddStockUseCaseTest {
         }
 
         // When
-        addStockUseCase.addStock(productOptionId, quantity)
+        inventoryAddStockUseCase.addStock(productOptionId, quantity)
 
         // Then
         // [실행 순서 검증]: ProductOptionService가 먼저 호출되었는가?

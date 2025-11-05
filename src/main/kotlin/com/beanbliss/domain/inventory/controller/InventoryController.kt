@@ -1,8 +1,12 @@
 package com.beanbliss.domain.inventory.controller
 
 import com.beanbliss.common.dto.ApiResponse
+import com.beanbliss.domain.inventory.dto.InventoryAddStockRequest
+import com.beanbliss.domain.inventory.dto.InventoryAddStockResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -20,7 +24,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/inventories")
 class InventoryController(
-    private val inventoryService: InventoryService
+    private val inventoryService: InventoryService,
+    private val inventoryAddStockUseCase: InventoryAddStockUseCase
 ) {
 
     /**
@@ -42,5 +47,32 @@ class InventoryController(
 
         // 200 OK 응답
         return ResponseEntity.ok(ApiResponse(data = result))
+    }
+
+    /**
+     * 재고 추가 API
+     *
+     * POST /api/inventories/{productOptionId}/add
+     *
+     * @param productOptionId 상품 옵션 ID
+     * @param request 재고 추가 요청 (추가할 수량)
+     * @return 재고 추가 결과 (상품 옵션 ID, 현재 재고 수량)
+     */
+    @PostMapping("/{productOptionId}/add")
+    fun addStock(
+        @PathVariable productOptionId: Long,
+        @Valid @RequestBody request: InventoryAddStockRequest
+    ): ResponseEntity<ApiResponse<InventoryAddStockResponse>> {
+        // UseCase 계층에 위임
+        val result = inventoryAddStockUseCase.addStock(productOptionId, request.quantity)
+
+        // 응답 DTO 생성
+        val response = InventoryAddStockResponse(
+            productOptionId = result.productOptionId,
+            currentStock = result.currentStock
+        )
+
+        // 200 OK 응답
+        return ResponseEntity.ok(ApiResponse(data = response))
     }
 }

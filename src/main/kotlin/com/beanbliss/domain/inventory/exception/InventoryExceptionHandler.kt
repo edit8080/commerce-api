@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
  * [책임]:
  * - Inventory 도메인의 비즈니스 예외 처리
  * - InsufficientStockException 처리
+ * - MaxStockExceededException 처리
  *
  * [우선순위]:
  * - @Order(10)으로 높은 우선순위 설정
@@ -28,6 +29,16 @@ class InventoryExceptionHandler {
             status = HttpStatus.BAD_REQUEST.value(),
             code = "INSUFFICIENT_STOCK",
             message = ex.message ?: "재고가 부족합니다."
+        )
+        return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
+    }
+
+    @ExceptionHandler(MaxStockExceededException::class)
+    fun handleMaxStockExceeded(ex: MaxStockExceededException): ResponseEntity<ErrorResponse> {
+        val response = ErrorResponse(
+            status = HttpStatus.BAD_REQUEST.value(),
+            code = "MAX_STOCK_EXCEEDED",
+            message = ex.message ?: "최대 재고 수량을 초과했습니다."
         )
         return ResponseEntity(response, HttpStatus.BAD_REQUEST) // 400
     }

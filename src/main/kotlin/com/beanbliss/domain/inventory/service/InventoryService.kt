@@ -23,4 +23,20 @@ interface InventoryService {
      * @throws InvalidPageSizeException 페이지 크기가 범위를 벗어난 경우
      */
     fun getInventories(page: Int, size: Int): InventoryListResponse
+
+    /**
+     * 재고 추가
+     *
+     * [비즈니스 로직]:
+     * 1. Repository에서 재고 조회 (비관적 락)
+     * 2. 도메인 모델의 addStock() 메서드 호출 (최대 재고 수량 검증 포함)
+     * 3. 변경된 재고 저장
+     *
+     * @param productOptionId 상품 옵션 ID (SKU 기반)
+     * @param quantity 추가할 재고 수량
+     * @return 추가 후 현재 재고 수량
+     * @throws ResourceNotFoundException 재고 정보를 찾을 수 없는 경우
+     * @throws MaxStockExceededException 최대 재고 수량을 초과하는 경우
+     */
+    fun addStock(productOptionId: Long, quantity: Int): Int
 }

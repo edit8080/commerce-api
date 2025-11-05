@@ -1,5 +1,7 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.domain.inventory.domain.Inventory
+
 /**
  * Fake InventoryRepository 구현체 (테스트용)
  *
@@ -10,6 +12,9 @@ class FakeInventoryRepository : InventoryRepository {
 
     // 옵션 ID -> 가용 재고 매핑
     private val stockMap = mutableMapOf<Long, Int>()
+
+    // 옵션 ID -> Inventory 도메인 모델 매핑
+    private val inventoryMap = mutableMapOf<Long, Inventory>()
 
     /**
      * 테스트 데이터 추가용 헬퍼 메서드
@@ -50,5 +55,15 @@ class FakeInventoryRepository : InventoryRepository {
     override fun count(): Long {
         // 이 테스트에서는 사용하지 않음
         return 0L
+    }
+
+    override fun findByProductOptionId(productOptionId: Long): Inventory? {
+        return inventoryMap[productOptionId]
+    }
+
+    override fun save(inventory: Inventory): Inventory {
+        inventoryMap[inventory.productOptionId] = inventory
+        stockMap[inventory.productOptionId] = inventory.stockQuantity
+        return inventory
     }
 }

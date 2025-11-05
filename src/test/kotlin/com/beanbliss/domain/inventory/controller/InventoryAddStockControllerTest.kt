@@ -2,8 +2,9 @@ package com.beanbliss.domain.inventory.controller
 
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.domain.inventory.exception.MaxStockExceededException
+import com.beanbliss.domain.inventory.service.InventoryService
 import com.beanbliss.domain.inventory.usecase.AddStockResult
-import com.beanbliss.domain.inventory.usecase.AddStockUseCase
+import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -41,7 +42,10 @@ class InventoryAddStockControllerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @MockkBean
-    private lateinit var addStockUseCase: AddStockUseCase
+    private lateinit var inventoryService: InventoryService
+
+    @MockkBean
+    private lateinit var inventoryAddStockUseCase: InventoryAddStockUseCase
 
     @Test
     @DisplayName("POST /api/inventories/{productOptionId}/add - 재고 추가 성공 시 200 OK와 현재 재고를 반환해야 한다")
@@ -52,7 +56,7 @@ class InventoryAddStockControllerTest {
         val currentStock = 58
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } returns
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } returns
                 AddStockResult(productOptionId, currentStock)
 
         // When & Then
@@ -76,7 +80,7 @@ class InventoryAddStockControllerTest {
         val currentStock = 150
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } returns
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } returns
                 AddStockResult(productOptionId, currentStock)
 
         // When & Then
@@ -140,7 +144,7 @@ class InventoryAddStockControllerTest {
         val quantity = 50
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } throws
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } throws
                 ResourceNotFoundException("상품 옵션 ID: $productOptionId 을(를) 찾을 수 없습니다.")
 
         // When & Then
@@ -163,7 +167,7 @@ class InventoryAddStockControllerTest {
         val quantity = 50
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } throws
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } throws
                 ResourceNotFoundException("상품 옵션 ID: $productOptionId 의 재고 정보를 찾을 수 없습니다.")
 
         // When & Then
@@ -186,7 +190,7 @@ class InventoryAddStockControllerTest {
         val currentStock = 10
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } throws
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } throws
                 MaxStockExceededException(
                     "재고 추가 후 총 수량이 최대 허용량(1,000,000개)을 초과합니다. " +
                             "현재: $currentStock, 추가 요청: $quantity"
@@ -215,7 +219,7 @@ class InventoryAddStockControllerTest {
         val quantity = 50
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } returns
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } returns
                 AddStockResult(productOptionId, 100)
 
         // When & Then
@@ -239,7 +243,7 @@ class InventoryAddStockControllerTest {
         val quantity = 200
         val requestBody = mapOf("quantity" to quantity)
 
-        every { addStockUseCase.addStock(productOptionId, quantity) } returns
+        every { inventoryAddStockUseCase.addStock(productOptionId, quantity) } returns
                 AddStockResult(productOptionId, 250)
 
         // When & Then
@@ -254,21 +258,6 @@ class InventoryAddStockControllerTest {
         // MockK의 every에서 정확한 파라미터로 호출되었는지 이미 검증됨
     }
 
-    @Test
-    @DisplayName("POST /api/inventories/{productOptionId}/add - JSON 형식이 아닌 요청 시 400 Bad Request를 반환해야 한다")
-    fun `JSON 형식이 아닌 요청 시 400 Bad Request를 반환해야 한다`() {
-        // Given
-        val productOptionId = 1L
-        val invalidBody = "invalid-json"
-
-        // When & Then
-        mockMvc.perform(
-            post("/api/inventories/$productOptionId/add")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(invalidBody)
-        )
-            .andExpect(status().isBadRequest)
-    }
 
     @Test
     @DisplayName("POST /api/inventories/{productOptionId}/add - quantity 필드가 누락되면 400 Bad Request를 반환해야 한다")

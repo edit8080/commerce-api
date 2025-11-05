@@ -1,5 +1,6 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 
 /**
@@ -79,5 +80,15 @@ class FakeInventoryListRepository : InventoryRepository {
     override fun calculateAvailableStockBatch(productOptionIds: List<Long>): Map<Long, Int> {
         // 목록 조회 테스트에서는 사용하지 않음
         return emptyMap()
+    }
+
+    override fun findByProductOptionId(productOptionId: Long): Inventory? {
+        // 목록 조회 테스트에서는 사용하지 않음
+        return null
+    }
+
+    override fun save(inventory: Inventory): Inventory {
+        // 목록 조회 테스트에서는 사용하지 않음
+        return inventory
     }
 }

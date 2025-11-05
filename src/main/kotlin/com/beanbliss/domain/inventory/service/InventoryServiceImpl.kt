@@ -3,10 +3,12 @@ package com.beanbliss.domain.inventory.service
 import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.exception.InvalidPageNumberException
 import com.beanbliss.common.exception.InvalidPageSizeException
+import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * [책임]: 재고 목록 조회 비즈니스 로직 구현
@@ -75,5 +77,21 @@ class InventoryServiceImpl(
         if (size < 1 || size > 100) {
             throw InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
         }
+    }
+
+    @Transactional
+    override fun addStock(productOptionId: Long, quantity: Int): Int {
+        // 1. 재고 조회 (비관적 락 - TODO: Repository 구현 시 적용)
+        val inventory = inventoryRepository.findByProductOptionId(productOptionId)
+            ?: throw ResourceNotFoundException("상품 옵션 ID: $productOptionId 의 재고 정보를 찾을 수 없습니다.")
+
+        // 2. 도메인 모델에 비즈니스 로직 위임 (최대 재고 수량 검증 포함)
+        val currentStock = inventory.addStock(quantity)
+
+        // 3. 변경 사항 저장
+        inventoryRepository.save(inventory)
+
+        // 4. 현재 재고 수량 반환
+        return currentStock
     }
 }
