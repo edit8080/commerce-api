@@ -47,7 +47,7 @@ class FakeInventoryRepository : InventoryRepository {
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<com.beanbliss.domain.inventory.dto.InventoryResponse> {
+    ): List<InventoryResponse> {
         // 이 테스트에서는 사용하지 않음
         return emptyList()
     }

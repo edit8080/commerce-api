@@ -7,6 +7,7 @@ import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.domain.user.repository.UserRepository
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.exception.InvalidParameterException
+import com.beanbliss.domain.product.repository.ProductOptionDetail
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -257,8 +258,8 @@ class CartAddServiceTest {
         optionId: Long,
         optionCode: String,
         isActive: Boolean
-    ): com.beanbliss.domain.product.repository.ProductOptionDetail {
-        return com.beanbliss.domain.product.repository.ProductOptionDetail(
+    ): ProductOptionDetail {
+        return ProductOptionDetail(
             optionId = optionId,
             productId = 1L,
             productName = "에티오피아 예가체프 G1",

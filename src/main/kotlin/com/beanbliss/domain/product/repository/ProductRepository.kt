@@ -1,5 +1,6 @@
 package com.beanbliss.domain.product.repository
 
+import com.beanbliss.domain.product.dto.ProductBasicInfo
 import com.beanbliss.domain.product.dto.ProductResponse
 
 /**
@@ -59,5 +60,5 @@ interface ProductRepository {
      * @param productIds 조회할 상품 ID 목록
      * @return 상품 기본 정보 목록 (존재하는 상품만 반환)
      */
-    fun findBasicInfoByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo>
+    fun findBasicInfoByIds(productIds: List<Long>): List<ProductBasicInfo>
 }

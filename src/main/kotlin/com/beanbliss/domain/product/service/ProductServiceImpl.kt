@@ -55,7 +55,7 @@ class ProductServiceImpl(
         return product
     }
 
-    override fun getProductsByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo> {
+    override fun getProductsByIds(productIds: List<Long>): List<ProductBasicInfo> {
         // 빈 목록인 경우 조기 반환
         if (productIds.isEmpty()) {
             return emptyList()
