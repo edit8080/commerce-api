@@ -1,7 +1,7 @@
 package com.beanbliss.domain.cart.controller
 
-import com.beanbliss.domain.cart.service.CartService
-import com.beanbliss.domain.cart.service.AddToCartResult
+import com.beanbliss.domain.cart.usecase.AddToCartUseCase
+import com.beanbliss.domain.cart.usecase.AddToCartUseCaseResult
 import com.beanbliss.domain.cart.dto.AddToCartRequest
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
@@ -46,7 +46,7 @@ class CartAddControllerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @MockkBean
-    private lateinit var cartService: CartService
+    private lateinit var addToCartUseCase: AddToCartUseCase
 
     @Test
     @DisplayName("신규 장바구니 추가 요청 시 201 Created와 함께 장바구니 아이템 정보를 반환해야 한다")
@@ -73,12 +73,12 @@ class CartAddControllerTest {
             updatedAt = LocalDateTime.of(2025, 11, 3, 14, 30)
         )
 
-        val mockResponse = AddToCartResult(
+        val mockResponse = AddToCartUseCaseResult(
             cartItem = mockCartItem,
             isNewItem = true
         )
 
-        every { cartService.addToCart(any()) } returns mockResponse
+        every { addToCartUseCase.addToCart(any()) } returns mockResponse
 
         // When & Then
         mockMvc.perform(
@@ -99,7 +99,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.data.totalPrice").value(42000))
 
         // [Controller 책임 검증]: Service가 정확히 한 번 호출되었는가?
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -127,12 +127,12 @@ class CartAddControllerTest {
             updatedAt = LocalDateTime.of(2025, 11, 3, 14, 30)
         )
 
-        val mockResponse = AddToCartResult(
+        val mockResponse = AddToCartUseCaseResult(
             cartItem = mockCartItem,
             isNewItem = false // 기존 아이템 수량 증가
         )
 
-        every { cartService.addToCart(any()) } returns mockResponse
+        every { addToCartUseCase.addToCart(any()) } returns mockResponse
 
         // When & Then
         mockMvc.perform(
@@ -144,7 +144,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.data.quantity").value(5))
             .andExpect(jsonPath("$.data.totalPrice").value(105000))
 
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -169,7 +169,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
 
         // [Controller 책임 검증]: 유효성 검사 실패 시 Service는 호출되지 않아야 함
-            verify(exactly = 0) { cartService.addToCart(any()) }
+            verify(exactly = 0) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -193,7 +193,7 @@ class CartAddControllerTest {
             .andExpect(status().isBadRequest) // 400 Bad Request
             .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
 
-        verify(exactly = 0) { cartService.addToCart(any()) }
+        verify(exactly = 0) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -217,7 +217,7 @@ class CartAddControllerTest {
             .andExpect(status().isBadRequest) // 400 Bad Request
             .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
 
-        verify(exactly = 0) { cartService.addToCart(any()) }
+        verify(exactly = 0) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -230,7 +230,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        every { cartService.addToCart(any()) } throws ResourceNotFoundException("사용자 ID: 999를 찾을 수 없습니다.")
+        every { addToCartUseCase.addToCart(any()) } throws ResourceNotFoundException("사용자 ID: 999를 찾을 수 없습니다.")
 
         // When & Then
         mockMvc.perform(
@@ -243,7 +243,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
             .andExpect(jsonPath("$.message").value("사용자 ID: 999를 찾을 수 없습니다."))
 
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -256,7 +256,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        every { cartService.addToCart(any()) } throws ResourceNotFoundException("상품 옵션 ID: 999를 찾을 수 없습니다.")
+        every { addToCartUseCase.addToCart(any()) } throws ResourceNotFoundException("상품 옵션 ID: 999를 찾을 수 없습니다.")
 
         // When & Then
         mockMvc.perform(
@@ -269,7 +269,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
             .andExpect(jsonPath("$.message").value("상품 옵션 ID: 999를 찾을 수 없습니다."))
 
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -282,7 +282,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        every { cartService.addToCart(any()) } throws ResourceNotFoundException("해당 상품 옵션은 현재 판매하지 않습니다.")
+        every { addToCartUseCase.addToCart(any()) } throws ResourceNotFoundException("해당 상품 옵션은 현재 판매하지 않습니다.")
 
         // When & Then
         mockMvc.perform(
@@ -295,7 +295,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
             .andExpect(jsonPath("$.message").value("해당 상품 옵션은 현재 판매하지 않습니다."))
 
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -308,7 +308,7 @@ class CartAddControllerTest {
             quantity = 100
         )
 
-        every { cartService.addToCart(any()) } throws InvalidParameterException("장바구니 내 동일 옵션의 최대 수량은 999개입니다.")
+        every { addToCartUseCase.addToCart(any()) } throws InvalidParameterException("장바구니 내 동일 옵션의 최대 수량은 999개입니다.")
 
         // When & Then
         mockMvc.perform(
@@ -321,7 +321,7 @@ class CartAddControllerTest {
             .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
             .andExpect(jsonPath("$.message").value("장바구니 내 동일 옵션의 최대 수량은 999개입니다."))
 
-        verify(exactly = 1) { cartService.addToCart(any()) }
+        verify(exactly = 1) { addToCartUseCase.addToCart(any()) }
     }
 
     @Test
@@ -344,6 +344,6 @@ class CartAddControllerTest {
             .andExpect(status().isBadRequest) // 400 Bad Request
             .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
 
-        verify(exactly = 0) { cartService.addToCart(any()) }
+        verify(exactly = 0) { addToCartUseCase.addToCart(any()) }
     }
 }

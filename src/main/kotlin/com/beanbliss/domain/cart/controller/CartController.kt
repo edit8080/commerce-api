@@ -2,7 +2,7 @@ package com.beanbliss.domain.cart.controller
 
 import com.beanbliss.domain.cart.dto.AddToCartRequest
 import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.cart.service.CartService
+import com.beanbliss.domain.cart.usecase.AddToCartUseCase
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*
 /**
  * [책임]: 장바구니 API 엔드포인트 제공.
  * - 클라이언트 요청의 유효성 검사 (@Valid)
- * - Service 계층에 위임
+ * - UseCase 계층에 위임
  * - 적절한 HTTP 상태 코드 반환 (201 Created, 200 OK)
  *
  * [주요 API]:
@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/cart")
 class CartController(
-    // DIP 준수: Service Interface에 의존
-    private val cartService: CartService
+    // DIP 준수: UseCase에 의존
+    private val addToCartUseCase: AddToCartUseCase
 ) {
 
     /**
@@ -38,8 +38,8 @@ class CartController(
         @Valid @RequestBody request: AddToCartRequest
     ): ResponseEntity<Map<String, CartItemResponse>> {
 
-        // Service 계층에 위임
-        val result = cartService.addToCart(request)
+        // UseCase 계층에 위임
+        val result = addToCartUseCase.addToCart(request)
 
         // 응답 래핑: {"data": {...}}
         val response = mapOf("data" to result.cartItem)

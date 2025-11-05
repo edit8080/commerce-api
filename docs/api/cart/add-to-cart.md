@@ -180,10 +180,11 @@ totalPrice = price × quantity
 - **JOIN 활용**: 상품 정보 조회 시 PRODUCT와 PRODUCT_OPTION을 JOIN하여 한 번의 쿼리로 조회
 
 ### 4.2 동시성 제어
-- **낙관적 락 (Optimistic Lock)** 사용
-  - 장바구니는 결제 전 임시 데이터이므로 낙관적 락으로 충분
-  - `@Version` 사용하여 동시 수정 감지
-- **실제 재고 차감은 주문 결제 시점**에 비관적 락으로 처리
+- **주문 시점 재검증**으로 데이터 정확성 보장:
+  - 장바구니에 담긴 상품의 활성 상태 재확인 (is_active)
+  - 재고 가용성 검증 및 예약 (INVENTORY_RESERVATION with 비관적 락)
+  - 가격 재계산 (최신 가격 반영)
+  - 쿠폰 유효성 재검증
 
 ### 4.3 데이터 일관성
 - **트랜잭션 범위**:
@@ -199,102 +200,165 @@ totalPrice = price × quantity
 sequenceDiagram
     participant C as Client
     participant Ctrl as CartController
-    participant Svc as CartService
-    participant CartRepo as CartItemRepository
+    participant UC as AddToCartUseCase
+    participant UserSvc as UserService
+    participant ProdSvc as ProductService
+    participant CartSvc as CartService
+    participant UserRepo as UserRepository
     participant ProdRepo as ProductOptionRepository
+    participant CartRepo as CartItemRepository
     participant DB as Database
 
     C->>Ctrl: POST /api/cart/items<br/>{userId, productOptionId, quantity}
+    activate Ctrl
 
-    Note over Ctrl: 1. 요청 유효성 검사<br/>(userId > 0, quantity > 0)
+    Note over Ctrl: 1. 요청 유효성 검사<br/>(userId > 0, productOptionId > 0,<br/>1 <= quantity <= 999)
 
-    Ctrl->>Svc: addToCart(request)
+    Ctrl->>UC: addToCart(request)
+    activate UC
 
-    Note over Svc: 2. 비즈니스 로직 시작<br/>(트랜잭션 시작)
+    Note over UC: 2. UseCase 오케스트레이션 시작<br/>(UseCase는 트랜잭션 관리 X, 각 Service가 독립적으로 관리)
 
-    Note over Svc: 3. 사용자 검증
+    Note over UC: 3. 사용자 검증 (User 도메인)
+    UC->>UserSvc: validateUserExists(userId)
+    activate UserSvc
+
+    UserSvc->>UserRepo: existsById(userId)
+    activate UserRepo
+    UserRepo->>DB: SELECT EXISTS(SELECT 1 FROM USER WHERE id = ?)
+    DB-->>UserRepo: boolean
+    UserRepo-->>UserSvc: boolean
+    deactivate UserRepo
+
     alt 사용자가 존재하지 않음
-        Svc-->>Ctrl: throw UserNotFoundException
+        UserSvc-->>UC: throw UserNotFoundException
+        UC-->>Ctrl: throw UserNotFoundException
         Ctrl-->>C: 404 Not Found
     end
+    UserSvc-->>UC: validation success
+    deactivate UserSvc
 
-    Svc->>ProdRepo: findActiveOptionWithProduct(productOptionId)
-    ProdRepo->>DB: 활성 상태의 상품 옵션 조회<br/>(PRODUCT와 JOIN)
+    Note over UC: 4. 상품 옵션 검증 (Product 도메인)
+    UC->>ProdSvc: getActiveOptionWithProduct(productOptionId)
+    activate ProdSvc
+
+    ProdSvc->>ProdRepo: findActiveOptionWithProduct(productOptionId)
+    activate ProdRepo
+    ProdRepo->>DB: SELECT * FROM PRODUCT_OPTION<br/>JOIN PRODUCT<br/>WHERE option_id = ? AND is_active = true
     DB-->>ProdRepo: ProductOption (or null)
-    ProdRepo-->>Svc: ProductOption
+    ProdRepo-->>ProdSvc: ProductOption (or null)
+    deactivate ProdRepo
 
     alt 상품 옵션이 없거나 비활성
-        Svc-->>Ctrl: throw ResourceNotFoundException
+        ProdSvc-->>UC: throw ResourceNotFoundException
+        UC-->>Ctrl: throw ResourceNotFoundException
         Ctrl-->>C: 404 Not Found
     end
+    ProdSvc-->>UC: ProductOptionInfo
+    deactivate ProdSvc
 
-    Svc->>CartRepo: findByUserIdAndProductOptionId(userId, productOptionId)
-    CartRepo->>DB: 사용자의 장바구니 아이템 조회
+    Note over UC: 5. 장바구니 추가/수정 (Cart 도메인)<br/>비즈니스 로직은 CartService가 처리
+    UC->>CartSvc: upsertCartItem(userId, productOptionId, quantity)
+    activate CartSvc
+
+    Note over CartSvc: 비즈니스 로직: 기존 아이템 확인
+
+    CartSvc->>CartRepo: findByUserIdAndProductOptionId(userId, productOptionId)
+    activate CartRepo
+    CartRepo->>DB: SELECT * FROM CART_ITEM<br/>WHERE user_id = ? AND product_option_id = ?
     DB-->>CartRepo: CartItem (or null)
-    CartRepo-->>Svc: CartItem (or null)
+    CartRepo-->>CartSvc: CartItem (or null)
+    deactivate CartRepo
 
     alt 기존 장바구니 아이템 존재
-        Note over Svc: 4. 중복 추가: 수량 증가
-        Note over Svc: 검증: (기존수량 + 추가수량) <= 999
+        Note over CartSvc: 중복 추가: 수량 증가 처리<br/>검증: (기존수량 + 추가수량) <= 999
 
         alt 최대 수량 초과
-            Svc-->>Ctrl: throw InvalidParameterException
+            CartSvc-->>UC: throw InvalidParameterException
+            UC-->>Ctrl: throw InvalidParameterException
             Ctrl-->>C: 400 Bad Request
         end
 
-        Note over Svc: 5. 수량 업데이트
-        Svc->>CartRepo: updateQuantity(cartItemId, newQuantity)
-        CartRepo->>DB: 장바구니 아이템 수량 수정
+        Note over CartSvc: 수량 업데이트
+
+        CartSvc->>CartRepo: updateQuantity(cartItemId, newQuantity)
+        activate CartRepo
+        CartRepo->>DB: UPDATE CART_ITEM<br/>SET quantity = ?, updated_at = NOW()<br/>WHERE id = ?
         DB-->>CartRepo: 수정된 CartItem
-        CartRepo-->>Svc: Updated CartItem
+        CartRepo-->>CartSvc: Updated CartItem
+        deactivate CartRepo
+
     else 신규 장바구니 아이템
-        Note over Svc: 4. 신규 추가
-        Note over Svc: 검증: quantity <= 999
+        Note over CartSvc: 신규 추가 처리<br/>검증: quantity <= 999
 
         alt 최대 수량 초과
-            Svc-->>Ctrl: throw InvalidParameterException
+            CartSvc-->>UC: throw InvalidParameterException
+            UC-->>Ctrl: throw InvalidParameterException
             Ctrl-->>C: 400 Bad Request
         end
 
-        Note over Svc: 5. 신규 아이템 생성
-        Svc->>CartRepo: save(cartItem)
-        CartRepo->>DB: 신규 장바구니 아이템 저장
+        Note over CartSvc: 신규 아이템 생성
+
+        CartSvc->>CartRepo: save(cartItem)
+        activate CartRepo
+        CartRepo->>DB: INSERT INTO CART_ITEM<br/>(user_id, product_option_id, quantity, created_at, updated_at)<br/>VALUES (?, ?, ?, NOW(), NOW())
         DB-->>CartRepo: 생성된 CartItem (ID 포함)
-        CartRepo-->>Svc: Created CartItem
+        CartRepo-->>CartSvc: Created CartItem
+        deactivate CartRepo
     end
 
-    Note over Svc: 6. 응답 DTO 조립<br/>(트랜잭션 커밋)
+    CartSvc-->>UC: CartItem (신규 또는 수정된)
+    deactivate CartSvc
 
-    Svc-->>Ctrl: CartItemResponse
+    Note over UC: 6. 응답 DTO 조립<br/>(ProductOptionInfo + CartItem 결합)<br/>(트랜잭션 커밋)
+
+    UC-->>Ctrl: CartItemResponse
+    deactivate UC
+
     Ctrl-->>C: 201 Created (신규) 또는<br/>200 OK (수량 증가)
+    deactivate Ctrl
 ```
 
-### 트랜잭션 범위
-- **시작**: `CartService.addToCart()` 진입 시
-- **커밋**: 장바구니 추가/수정 완료 후
-- **롤백**: 예외 발생 시 (옵션 없음, 수량 초과 등)
+### 5.1 트랜잭션 범위
 
-### 격리 수준
-- `READ_COMMITTED`: 다른 트랜잭션의 커밋된 데이터만 읽음
+#### UseCase의 역할
+- **AddToCartUseCase**는 `@Transactional` 어노테이션을 사용하지 않습니다.
+- UseCase는 여러 Service를 조율하는 오케스트레이션 계층으로, 트랜잭션 관리는 각 Service가 담당합니다.
 
-### 예외 처리 흐름
+#### 각 Service의 트랜잭션
+각 Service는 독립적인 트랜잭션 범위를 가집니다:
+
+1. **UserService.validateUserExists()**
+   - **트랜잭션**: `@Transactional(readOnly = true)`
+   - **범위**: UserRepository 조회 작업
+   - **커밋**: 사용자 존재 확인 완료 시
+   - **롤백**: DB 조회 실패 시
+
+2. **ProductService.getActiveOptionWithProduct()**
+   - **트랜잭션**: `@Transactional(readOnly = true)`
+   - **범위**: ProductOptionRepository 조회 작업
+   - **커밋**: 상품 옵션 조회 완료 시
+   - **롤백**: DB 조회 실패 시
+
+3. **CartService.upsertCartItem()**
+   - **트랜잭션**: `@Transactional` (read-write)
+   - **범위**: CartItemRepository 조회 → 수량 검증 → INSERT/UPDATE 작업
+   - **커밋**: 장바구니 아이템 추가/수정 완료 시
+   - **롤백**: 수량 검증 실패 또는 DB 작업 실패 시
+
+#### 격리 수준
+- **레벨**: `READ_COMMITTED` (기본값)
+- **이유**:
+  - Dirty Read 방지 (커밋된 데이터만 읽음)
+  - 장바구니 추가는 단순 조회 + INSERT/UPDATE 작업으로 높은 격리 수준 불필요
+  - 주문 시점에 재고 및 가격 재검증을 수행하므로 장바구니 단계에서는 낮은 격리 수준으로 충분
+
+#### 일관성 보장
+- 각 Service의 트랜잭션은 독립적으로 커밋/롤백됩니다.
+- 장바구니 추가는 단일 도메인(Cart) 작업이 중심이므로 분산 트랜잭션 문제가 발생하지 않습니다.
+- 사용자 검증, 상품 검증은 읽기 전용 작업으로 데이터 정합성에 영향을 주지 않습니다.
+
+### 5.2 예외 처리 흐름
 1. **UserNotFoundException** → 404 (사용자 없음)
 2. **ResourceNotFoundException** → 404 (상품 옵션 없음 또는 비활성)
 3. **InvalidParameterException** → 400 (유효하지 않은 수량)
-4. **OptimisticLockException** → 409 (동시 수정 충돌)
-
----
-
-## 6. 참고사항
-
-### 관련 API
-- `GET /api/cart` - 장바구니 목록 조회
-- `PATCH /api/cart/items/{cartItemId}` - 장바구니 수량 수정
-- `DELETE /api/cart/items/{cartItemId}` - 장바구니 아이템 삭제
-- `GET /api/products/{productId}` - 상품 상세 조회 (장바구니 추가 전 옵션 확인용)
-
-### 비즈니스 제약사항
-- 유효한 userId를 전달해야 함 (존재하는 사용자)
-- 장바구니에 추가해도 재고는 차감되지 않음 (주문 결제 시점에 차감)
-- 비활성 옵션은 장바구니에 추가 불가
-- 장바구니 총 금액에 대한 제한 없음 (주문 시 잔액 확인)
