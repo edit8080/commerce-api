@@ -23,11 +23,12 @@ import java.time.LocalDateTime
 class CouponListServiceTest {
 
     private val couponRepository: CouponRepository = mockk()
+    private val userCouponRepository = mockk<com.beanbliss.domain.coupon.repository.UserCouponRepository>()
     private lateinit var couponService: CouponService
 
     @BeforeEach
     fun setUp() {
-        couponService = CouponServiceImpl(couponRepository)
+        couponService = CouponServiceImpl(couponRepository, userCouponRepository)
     }
 
     @Test

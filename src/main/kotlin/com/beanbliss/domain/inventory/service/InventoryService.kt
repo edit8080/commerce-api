@@ -79,4 +79,23 @@ interface InventoryService {
      * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
      */
     fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<InventoryReservationItemResponse>
+
+    /**
+     * 주문을 위한 재고 확인 및 차감 (비관적 락)
+     *
+     * [비즈니스 로직]:
+     * 1. 장바구니 아이템의 모든 상품 옵션 ID 추출
+     * 2. 재고 일괄 조회 (비관적 락 - FOR UPDATE)
+     * 3. 재고 검증 (수량 확인)
+     * 4. 재고 일괄 차감 (Batch Update)
+     *
+     * [트랜잭션]:
+     * - @Transactional로 원자성 보장
+     * - 비관적 락으로 동시성 제어
+     * - 재고 부족 시 롤백
+     *
+     * @param cartItems 장바구니 아이템 목록
+     * @throws InsufficientStockException 재고가 부족한 경우
+     */
+    fun reduceStockForOrder(cartItems: List<CartItemResponse>)
 }

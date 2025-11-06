@@ -1,5 +1,7 @@
 package com.beanbliss.domain.order.service
 
+import com.beanbliss.domain.order.dto.OrderCreationData
+import com.beanbliss.domain.order.dto.OrderCreationResult
 import com.beanbliss.domain.order.dto.ProductOrderCount
 
 /**
@@ -22,4 +24,20 @@ interface OrderService {
      * @return 상품별 주문 수량 목록 (활성 상품만, 정렬됨)
      */
     fun getTopOrderedProducts(period: Int, limit: Int): List<ProductOrderCount>
+
+    /**
+     * 주문 및 주문 아이템 생성
+     *
+     * [비즈니스 로직]:
+     * 1. OrderEntity 생성 (결제 완료 상태)
+     * 2. OrderItemEntity 목록 생성 (배치 Insert)
+     * 3. OrderCreationResult로 변환
+     *
+     * [트랜잭션]:
+     * - @Transactional로 원자성 보장
+     *
+     * @param data 주문 생성 데이터
+     * @return 생성된 주문 정보
+     */
+    fun createOrderWithItems(data: OrderCreationData): OrderCreationResult
 }

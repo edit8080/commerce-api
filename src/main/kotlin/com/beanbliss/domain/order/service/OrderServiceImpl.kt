@@ -1,7 +1,14 @@
 package com.beanbliss.domain.order.service
 
+import com.beanbliss.domain.order.dto.OrderCreationData
+import com.beanbliss.domain.order.dto.OrderCreationResult
+import com.beanbliss.domain.order.dto.OrderItemResponse
 import com.beanbliss.domain.order.dto.ProductOrderCount
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
+import com.beanbliss.domain.order.entity.OrderStatus
 import com.beanbliss.domain.order.repository.OrderItemRepository
+import com.beanbliss.domain.order.repository.OrderRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -10,11 +17,12 @@ import java.time.LocalDateTime
  * [책임]: 주문 비즈니스 로직 구현
  *
  * [DIP 준수]:
- * - OrderItemRepository 인터페이스에만 의존
+ * - OrderRepository, OrderItemRepository 인터페이스에만 의존
  */
 @Service
 @Transactional(readOnly = true)
 class OrderServiceImpl(
+    private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository
 ) : OrderService {
 
@@ -38,5 +46,76 @@ class OrderServiceImpl(
 
         // 2. Repository를 통해 주문 수량 조회
         return orderItemRepository.findTopOrderedProducts(startDate, limit)
+    }
+
+    /**
+     * 주문 및 주문 아이템 생성
+     *
+     * [구현 전략]:
+     * 1. OrderEntity 생성 (결제 완료 상태)
+     * 2. OrderRepository를 통해 주문 저장
+     * 3. OrderItemEntity 목록 생성 (장바구니 아이템 기반)
+     * 4. OrderItemRepository를 통해 주문 아이템 배치 저장
+     * 5. OrderCreationResult로 변환 및 반환
+     *
+     * [트랜잭션]:
+     * - @Transactional로 원자성 보장
+     *
+     * @param data 주문 생성 데이터
+     * @return 생성된 주문 정보
+     */
+    @Transactional
+    override fun createOrderWithItems(data: OrderCreationData): OrderCreationResult {
+        val now = LocalDateTime.now()
+
+        // 1. OrderEntity 생성
+        val orderEntity = OrderEntity(
+            id = 0L, // Auto-generated
+            userId = data.userId,
+            totalAmount = data.originalAmount,
+            discountAmount = data.discountAmount,
+            finalAmount = data.finalAmount,
+            shippingAddress = data.shippingAddress,
+            orderStatus = OrderStatus.PAYMENT_COMPLETED,
+            orderedAt = now,
+            updatedAt = now
+        )
+
+        // 2. 주문 저장
+        val savedOrder = orderRepository.save(orderEntity)
+
+        // 3. OrderItemEntity 목록 생성
+        val orderItems = data.cartItems.map { cartItem ->
+            OrderItemEntity(
+                id = 0L, // Auto-generated
+                orderId = savedOrder.id,
+                productOptionId = cartItem.productOptionId,
+                quantity = cartItem.quantity,
+                unitPrice = cartItem.price,
+                totalPrice = cartItem.totalPrice
+            )
+        }
+
+        // 4. 주문 아이템 배치 저장
+        orderItemRepository.saveAll(orderItems)
+
+        // 5. OrderCreationResult로 변환
+        val orderItemResponses = data.cartItems.map { cartItem ->
+            OrderItemResponse(
+                productOptionId = cartItem.productOptionId,
+                productName = cartItem.productName,
+                optionCode = cartItem.optionCode,
+                quantity = cartItem.quantity,
+                unitPrice = cartItem.price,
+                totalPrice = cartItem.totalPrice
+            )
+        }
+
+        return OrderCreationResult(
+            orderId = savedOrder.id,
+            orderStatus = savedOrder.orderStatus,
+            orderItems = orderItemResponses,
+            orderedAt = savedOrder.orderedAt
+        )
     }
 }

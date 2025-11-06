@@ -3,7 +3,9 @@ package com.beanbliss.domain.cart.service
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.cart.repository.CartItemRepository
 import com.beanbliss.domain.order.exception.CartEmptyException
+import com.beanbliss.domain.order.exception.ProductOptionInactiveException
 import com.beanbliss.domain.product.repository.ProductOptionDetail
+import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.common.exception.InvalidParameterException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,6 +16,8 @@ import java.time.LocalDateTime
  * - 중복 아이템 처리 (수량 증가)
  * - 최대 수량 제한 검증
  * - Cart 도메인 내 데이터 관리
+ * - 장바구니 아이템 검증 (상품 옵션 활성화 여부)
+ * - 장바구니 비우기
  *
  * [트랜잭션]: @Transactional을 통해 원자성 보장
  * - 단일 트랜잭션 내에서 조회 → 저장/수정 수행
@@ -21,11 +25,13 @@ import java.time.LocalDateTime
  *
  * [DIP 준수]:
  * - CartItemRepository Interface에만 의존
+ * - ProductOptionRepository Interface에만 의존
  */
 @Service
 @Transactional
 class CartServiceImpl(
-    private val cartItemRepository: CartItemRepository
+    private val cartItemRepository: CartItemRepository,
+    private val productOptionRepository: ProductOptionRepository
 ) : CartService {
 
     companion object {
@@ -123,5 +129,35 @@ class CartServiceImpl(
         }
 
         return cartItems
+    }
+
+    /**
+     * 장바구니 아이템 검증
+     *
+     * [비즈니스 규칙]:
+     * - 모든 상품 옵션이 활성화되어 있는지 확인
+     *
+     * @param cartItems 검증할 장바구니 아이템 목록
+     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
+     */
+    override fun validateCartItems(cartItems: List<CartItemResponse>) {
+        cartItems.forEach { cartItem ->
+            val productOption = productOptionRepository.findActiveOptionWithProduct(cartItem.productOptionId)
+            if (productOption == null || !productOption.isActive) {
+                throw ProductOptionInactiveException("비활성화된 상품 옵션이 포함되어 있습니다. 상품 옵션 ID: ${cartItem.productOptionId}")
+            }
+        }
+    }
+
+    /**
+     * 사용자의 장바구니 비우기
+     *
+     * [비즈니스 규칙]:
+     * - 사용자의 모든 장바구니 아이템 삭제
+     *
+     * @param userId 사용자 ID
+     */
+    override fun clearCart(userId: Long) {
+        cartItemRepository.deleteByUserId(userId)
     }
 }

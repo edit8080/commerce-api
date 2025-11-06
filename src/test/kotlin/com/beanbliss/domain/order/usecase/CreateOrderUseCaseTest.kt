@@ -1,29 +1,20 @@
 package com.beanbliss.domain.order.usecase
 
 import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.cart.repository.CartItemRepository
+import com.beanbliss.domain.cart.service.CartService
+import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.entity.CouponEntity
-import com.beanbliss.domain.coupon.entity.UserCouponEntity
-import com.beanbliss.domain.coupon.enums.UserCouponStatus
-import com.beanbliss.domain.coupon.repository.CouponRepository
-import com.beanbliss.domain.coupon.repository.UserCouponRepository
-import com.beanbliss.domain.inventory.entity.InventoryEntity
-import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
-import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
-import com.beanbliss.domain.inventory.repository.InventoryRepository
-import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
-import com.beanbliss.domain.order.entity.OrderEntity
-import com.beanbliss.domain.order.entity.OrderItemEntity
+import com.beanbliss.domain.coupon.service.CouponService
+import com.beanbliss.domain.inventory.service.InventoryReservationService
+import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.order.dto.OrderCreationResult
+import com.beanbliss.domain.order.dto.OrderItemResponse
 import com.beanbliss.domain.order.entity.OrderStatus
 import com.beanbliss.domain.order.exception.*
-import com.beanbliss.domain.order.repository.OrderItemRepository
-import com.beanbliss.domain.order.repository.OrderRepository
-import com.beanbliss.domain.product.entity.ProductEntity
-import com.beanbliss.domain.product.entity.ProductOptionEntity
-import com.beanbliss.domain.product.repository.ProductOptionDetail
-import com.beanbliss.domain.product.repository.ProductOptionRepository
-import com.beanbliss.domain.user.entity.BalanceEntity
-import com.beanbliss.domain.user.repository.BalanceRepository
+import com.beanbliss.domain.order.service.OrderService
+import com.beanbliss.domain.user.exception.InsufficientBalanceException
+import com.beanbliss.domain.user.service.BalanceService
+import com.beanbliss.domain.user.service.UserService
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -33,50 +24,42 @@ import org.junit.jupiter.api.assertThrows
 import java.time.LocalDateTime
 
 /**
- * [책임]: CreateOrderUseCase의 비즈니스 로직 검증
- * - 쿠폰 검증 로직
- * - 재고 예약 검증 로직
- * - 재고 차감 로직
- * - 잔액 차감 로직
- * - 주문 생성 로직
+ * [책임]: CreateOrderUseCase의 Service 조율 로직 검증
+ * - 각 Service 메서드 호출 순서 검증
+ * - Service 간 데이터 전달 검증
+ * - 예외 처리 흐름 검증
  */
 @DisplayName("주문 생성 UseCase 테스트")
 class CreateOrderUseCaseTest {
 
     private lateinit var createOrderUseCase: CreateOrderUseCase
-    private lateinit var cartItemRepository: CartItemRepository
-    private lateinit var productOptionRepository: ProductOptionRepository
-    private lateinit var inventoryReservationRepository: InventoryReservationRepository
-    private lateinit var inventoryRepository: InventoryRepository
-    private lateinit var userCouponRepository: UserCouponRepository
-    private lateinit var couponRepository: CouponRepository
-    private lateinit var balanceRepository: BalanceRepository
-    private lateinit var orderRepository: OrderRepository
-    private lateinit var orderItemRepository: OrderItemRepository
+    private lateinit var userService: UserService
+    private lateinit var cartService: CartService
+    private lateinit var couponService: CouponService
+    private lateinit var inventoryReservationService: InventoryReservationService
+    private lateinit var inventoryService: InventoryService
+    private lateinit var orderService: OrderService
+    private lateinit var balanceService: BalanceService
 
     @BeforeEach
     fun setUp() {
         // Mock 객체 생성
-        cartItemRepository = mockk(relaxed = true)
-        productOptionRepository = mockk(relaxed = true)
-        inventoryReservationRepository = mockk(relaxed = true)
-        inventoryRepository = mockk(relaxed = true)
-        userCouponRepository = mockk(relaxed = true)
-        couponRepository = mockk(relaxed = true)
-        balanceRepository = mockk(relaxed = true)
-        orderRepository = mockk(relaxed = true)
-        orderItemRepository = mockk(relaxed = true)
+        userService = mockk(relaxed = true)
+        cartService = mockk(relaxed = true)
+        couponService = mockk(relaxed = true)
+        inventoryReservationService = mockk(relaxed = true)
+        inventoryService = mockk(relaxed = true)
+        orderService = mockk(relaxed = true)
+        balanceService = mockk(relaxed = true)
 
         createOrderUseCase = CreateOrderUseCaseImpl(
-            cartItemRepository = cartItemRepository,
-            productOptionRepository = productOptionRepository,
-            inventoryReservationRepository = inventoryReservationRepository,
-            inventoryRepository = inventoryRepository,
-            userCouponRepository = userCouponRepository,
-            couponRepository = couponRepository,
-            balanceRepository = balanceRepository,
-            orderRepository = orderRepository,
-            orderItemRepository = orderItemRepository
+            userService = userService,
+            cartService = cartService,
+            couponService = couponService,
+            inventoryReservationService = inventoryReservationService,
+            inventoryService = inventoryService,
+            orderService = orderService,
+            balanceService = balanceService
         )
     }
 
@@ -101,42 +84,6 @@ class CreateOrderUseCaseTest {
             totalPrice = price * quantity,
             createdAt = now,
             updatedAt = now
-        )
-    }
-
-    private fun createProductOptionWithProduct(
-        productOptionId: Long = 1L,
-        isActive: Boolean = true
-    ): ProductOptionDetail {
-        return ProductOptionDetail(
-            optionId = productOptionId,
-            productId = 1L,
-            productName = "에티오피아 예가체프",
-            optionCode = "ETH-YRG-WH-200g",
-            origin = "Ethiopia",
-            grindType = "WHOLE_BEAN",
-            weightGrams = 200,
-            price = 15000,
-            isActive = isActive
-        )
-    }
-
-    private fun createUserCoupon(
-        userCouponId: Long = 456L,
-        userId: Long = 123L,
-        couponId: Long = 789L,
-        status: UserCouponStatus = UserCouponStatus.ISSUED
-    ): UserCouponEntity {
-        val now = LocalDateTime.now()
-        return UserCouponEntity(
-            id = userCouponId,
-            userId = userId,
-            couponId = couponId,
-            status = status,
-            usedAt = null,
-            usedOrderId = null,
-            createdAt = now.minusDays(1),
-            updatedAt = now.minusDays(1)
         )
     }
 
@@ -166,40 +113,6 @@ class CreateOrderUseCaseTest {
         )
     }
 
-    private fun createBalance(
-        userId: Long = 123L,
-        amount: Int = 100000
-    ): BalanceEntity {
-        val now = LocalDateTime.now()
-        return BalanceEntity(
-            id = 1L,
-            userId = userId,
-            amount = amount,
-            createdAt = now.minusDays(30),
-            updatedAt = now
-        )
-    }
-
-    private fun createInventoryReservation(
-        userId: Long = 123L,
-        productOptionId: Long = 1L,
-        quantity: Int = 2,
-        status: InventoryReservationStatus = InventoryReservationStatus.RESERVED,
-        expiresAt: LocalDateTime = LocalDateTime.now().plusMinutes(10)
-    ): InventoryReservationEntity {
-        val now = LocalDateTime.now()
-        return InventoryReservationEntity(
-            id = 1L,
-            productOptionId = productOptionId,
-            userId = userId,
-            quantity = quantity,
-            status = status,
-            reservedAt = now,
-            expiresAt = expiresAt,
-            updatedAt = now
-        )
-    }
-
     @Test
     @DisplayName("주문 생성 성공 시_주문 정보를 반환해야 한다")
     fun `주문 생성 성공 시_주문 정보를 반환해야 한다`() {
@@ -209,48 +122,36 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem(quantity = 2, price = 15000) // totalPrice = 30000
-        val productOption = createProductOptionWithProduct()
-        val userCoupon = createUserCoupon(userCouponId = userCouponId, userId = userId)
         val coupon = createCoupon(discountValue = 10, minOrderAmount = 10000) // 10% 할인
-        val balance = createBalance(amount = 100000)
-        val reservation = createInventoryReservation(userId = userId)
+        val now = LocalDateTime.now()
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { userCouponRepository.findById(userCouponId) } returns userCoupon
-        every { couponRepository.findById(coupon.id!!) } returns coupon
-        every { balanceRepository.findByUserId(userId) } returns balance
-        every { inventoryReservationRepository.findActiveReservationsByUserId(userId) } returns listOf(reservation)
-        every { inventoryRepository.calculateAvailableStock(1L) } returns 100
-
-        val savedOrder = OrderEntity(
-            id = 1L,
-            userId = userId,
-            totalAmount = 30000,
-            discountAmount = 3000, // 10% of 30000
-            finalAmount = 27000,
-            shippingAddress = shippingAddress,
+        // Mock 설정: Service 호출
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { couponService.validateAndGetCoupon(userId, userCouponId) } returns CouponValidationResult(coupon)
+        every { couponService.calculateDiscount(coupon, 30000) } returns 3000 // 10% 할인 = 3000원
+        every { inventoryReservationService.validateReservations(userId, any()) } just Runs
+        every { inventoryService.reduceStockForOrder(any()) } just Runs
+        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
+            orderId = 1L,
             orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderedAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            orderItems = listOf(
+                OrderItemResponse(
+                    productOptionId = 1L,
+                    productName = "에티오피아 예가체프",
+                    optionCode = "ETH-YRG-WH-200g",
+                    quantity = 2,
+                    unitPrice = 15000,
+                    totalPrice = 30000
+                )
+            ),
+            orderedAt = now
         )
-        every { orderRepository.save(any()) } returns savedOrder
-
-        val savedOrderItems = listOf(
-            OrderItemEntity(
-                id = 1L,
-                orderId = 1L,
-                productOptionId = 1L,
-                quantity = 2,
-                unitPrice = 15000,
-                totalPrice = 30000
-            )
-        )
-        every { orderItemRepository.saveAll(any()) } returns savedOrderItems
-        every { inventoryReservationRepository.save(any()) } returns reservation
-        every { userCouponRepository.save(any(), any()) } returns userCoupon
-        every { cartItemRepository.deleteByUserId(userId) } just Runs
+        every { balanceService.deductBalance(userId, 27000) } just Runs
+        every { inventoryReservationService.confirmReservations(userId, any()) } just Runs
+        every { couponService.markCouponAsUsed(userCouponId, 1L) } just Runs
+        every { cartService.clearCart(userId) } just Runs
 
         // When
         val response = createOrderUseCase.createOrder(userId, userCouponId, shippingAddress)
@@ -266,11 +167,19 @@ class CreateOrderUseCaseTest {
         assertNotNull(response.appliedCoupon)
         assertEquals("10% 할인 쿠폰", response.appliedCoupon?.couponName)
 
-        // Verify
-        verify(exactly = 1) { cartItemRepository.findByUserId(userId) }
-        verify(exactly = 1) { orderRepository.save(any()) }
-        verify(exactly = 1) { orderItemRepository.saveAll(any()) }
-        verify(exactly = 1) { cartItemRepository.deleteByUserId(userId) }
+        // Verify: 각 Service 메서드가 호출되었는지 검증
+        verify(exactly = 1) { userService.validateUserExists(userId) }
+        verify(exactly = 1) { cartService.getCartItemsWithProducts(userId) }
+        verify(exactly = 1) { cartService.validateCartItems(any()) }
+        verify(exactly = 1) { couponService.validateAndGetCoupon(userId, userCouponId) }
+        verify(exactly = 1) { couponService.calculateDiscount(coupon, 30000) }
+        verify(exactly = 1) { inventoryReservationService.validateReservations(userId, any()) }
+        verify(exactly = 1) { inventoryService.reduceStockForOrder(any()) }
+        verify(exactly = 1) { orderService.createOrderWithItems(any()) }
+        verify(exactly = 1) { balanceService.deductBalance(userId, 27000) }
+        verify(exactly = 1) { inventoryReservationService.confirmReservations(userId, any()) }
+        verify(exactly = 1) { couponService.markCouponAsUsed(userCouponId, 1L) }
+        verify(exactly = 1) { cartService.clearCart(userId) }
     }
 
     @Test
@@ -282,43 +191,32 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem(quantity = 2, price = 15000) // totalPrice = 30000
-        val productOption = createProductOptionWithProduct()
-        val balance = createBalance(amount = 100000)
-        val reservation = createInventoryReservation(userId = userId)
+        val now = LocalDateTime.now()
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { balanceRepository.findByUserId(userId) } returns balance
-        every { inventoryReservationRepository.findActiveReservationsByUserId(userId) } returns listOf(reservation)
-        every { inventoryRepository.calculateAvailableStock(1L) } returns 100
-
-        val savedOrder = OrderEntity(
-            id = 1L,
-            userId = userId,
-            totalAmount = 30000,
-            discountAmount = 0,
-            finalAmount = 30000,
-            shippingAddress = shippingAddress,
+        // Mock 설정: Service 호출
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { inventoryReservationService.validateReservations(userId, any()) } just Runs
+        every { inventoryService.reduceStockForOrder(any()) } just Runs
+        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
+            orderId = 1L,
             orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderedAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            orderItems = listOf(
+                OrderItemResponse(
+                    productOptionId = 1L,
+                    productName = "에티오피아 예가체프",
+                    optionCode = "ETH-YRG-WH-200g",
+                    quantity = 2,
+                    unitPrice = 15000,
+                    totalPrice = 30000
+                )
+            ),
+            orderedAt = now
         )
-        every { orderRepository.save(any()) } returns savedOrder
-
-        val savedOrderItems = listOf(
-            OrderItemEntity(
-                id = 1L,
-                orderId = 1L,
-                productOptionId = 1L,
-                quantity = 2,
-                unitPrice = 15000,
-                totalPrice = 30000
-            )
-        )
-        every { orderItemRepository.saveAll(any()) } returns savedOrderItems
-        every { inventoryReservationRepository.save(any()) } returns reservation
-        every { cartItemRepository.deleteByUserId(userId) } just Runs
+        every { balanceService.deductBalance(userId, 30000) } just Runs
+        every { inventoryReservationService.confirmReservations(userId, any()) } just Runs
+        every { cartService.clearCart(userId) } just Runs
 
         // When
         val response = createOrderUseCase.createOrder(userId, userCouponId, shippingAddress)
@@ -333,12 +231,19 @@ class CreateOrderUseCaseTest {
         assertEquals(30000, response.priceInfo.finalAmount)
         assertNull(response.appliedCoupon) // 쿠폰을 사용하지 않음
 
-        // Verify
-        verify(exactly = 1) { cartItemRepository.findByUserId(userId) }
-        verify(exactly = 1) { orderRepository.save(any()) }
-        verify(exactly = 1) { orderItemRepository.saveAll(any()) }
-        verify(exactly = 1) { cartItemRepository.deleteByUserId(userId) }
-        verify(exactly = 0) { userCouponRepository.findById(any()) } // 쿠폰 조회하지 않음
+        // Verify: 쿠폰 관련 Service는 호출되지 않아야 함
+        verify(exactly = 1) { userService.validateUserExists(userId) }
+        verify(exactly = 1) { cartService.getCartItemsWithProducts(userId) }
+        verify(exactly = 1) { cartService.validateCartItems(any()) }
+        verify(exactly = 0) { couponService.validateAndGetCoupon(any(), any()) }
+        verify(exactly = 0) { couponService.calculateDiscount(any(), any()) }
+        verify(exactly = 1) { inventoryReservationService.validateReservations(userId, any()) }
+        verify(exactly = 1) { inventoryService.reduceStockForOrder(any()) }
+        verify(exactly = 1) { orderService.createOrderWithItems(any()) }
+        verify(exactly = 1) { balanceService.deductBalance(userId, 30000) }
+        verify(exactly = 1) { inventoryReservationService.confirmReservations(userId, any()) }
+        verify(exactly = 0) { couponService.markCouponAsUsed(any(), any()) }
+        verify(exactly = 1) { cartService.clearCart(userId) }
     }
 
     @Test
@@ -350,12 +255,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val productOption = createProductOptionWithProduct()
 
-        // Mock 설정: 쿠폰을 찾을 수 없음
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { userCouponRepository.findById(userCouponId) } returns null
+        // Mock 설정: CouponService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { couponService.validateAndGetCoupon(userId, userCouponId) } throws UserCouponNotFoundException("사용자 쿠폰을 찾을 수 없습니다.")
 
         // When & Then
         val exception = assertThrows<UserCouponNotFoundException> {
@@ -374,18 +279,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val productOption = createProductOptionWithProduct()
-        val userCoupon = createUserCoupon(userCouponId = userCouponId, userId = userId)
-        val expiredCoupon = createCoupon(
-            validFrom = LocalDateTime.now().minusDays(30),
-            validUntil = LocalDateTime.now().minusDays(1) // 만료됨
-        )
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { userCouponRepository.findById(userCouponId) } returns userCoupon
-        every { couponRepository.findById(userCoupon.couponId) } returns expiredCoupon
+        // Mock 설정: CouponService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { couponService.validateAndGetCoupon(userId, userCouponId) } throws UserCouponExpiredException("쿠폰이 만료되었습니다.")
 
         // When & Then
         val exception = assertThrows<UserCouponExpiredException> {
@@ -404,17 +303,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val productOption = createProductOptionWithProduct()
-        val usedCoupon = createUserCoupon(
-            userCouponId = userCouponId,
-            userId = userId,
-            status = UserCouponStatus.USED // 이미 사용됨
-        )
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { userCouponRepository.findById(userCouponId) } returns usedCoupon
+        // Mock 설정: CouponService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { couponService.validateAndGetCoupon(userId, userCouponId) } throws UserCouponAlreadyUsedException("이미 사용된 쿠폰입니다.")
 
         // When & Then
         val exception = assertThrows<UserCouponAlreadyUsedException> {
@@ -433,15 +327,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem(quantity = 1, price = 5000) // totalPrice = 5000 (최소 주문 금액 미달)
-        val productOption = createProductOptionWithProduct()
-        val userCoupon = createUserCoupon(userCouponId = userCouponId, userId = userId)
-        val coupon = createCoupon(minOrderAmount = 10000) // 최소 주문 금액 10000원
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { userCouponRepository.findById(userCouponId) } returns userCoupon
-        every { couponRepository.findById(userCoupon.couponId) } returns coupon
+        // Mock 설정: CouponService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { couponService.validateAndGetCoupon(userId, userCouponId) } throws InvalidCouponOrderAmountException("최소 주문 금액 10000원을 충족하지 못했습니다.")
 
         // When & Then
         val exception = assertThrows<InvalidCouponOrderAmountException> {
@@ -459,14 +350,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val productOption = createProductOptionWithProduct()
-        val balance = createBalance(amount = 100000)
 
-        // Mock 설정: 재고 예약을 찾을 수 없음
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { balanceRepository.findByUserId(userId) } returns balance
-        every { inventoryReservationRepository.findActiveReservationsByUserId(userId) } returns emptyList() // 예약 없음
+        // Mock 설정: InventoryReservationService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { inventoryReservationService.validateReservations(userId, any()) } throws InventoryReservationNotFoundException("재고 예약을 찾을 수 없습니다.")
 
         // When & Then
         val exception = assertThrows<InventoryReservationNotFoundException> {
@@ -484,18 +373,12 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val productOption = createProductOptionWithProduct()
-        val balance = createBalance(amount = 100000)
-        val expiredReservation = createInventoryReservation(
-            userId = userId,
-            expiresAt = LocalDateTime.now().minusMinutes(1) // 만료됨
-        )
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { balanceRepository.findByUserId(userId) } returns balance
-        every { inventoryReservationRepository.findActiveReservationsByUserId(userId) } returns listOf(expiredReservation)
+        // Mock 설정: InventoryReservationService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { inventoryReservationService.validateReservations(userId, any()) } throws InventoryReservationExpiredException("재고 예약이 만료되었습니다.")
 
         // When & Then
         val exception = assertThrows<InventoryReservationExpiredException> {
@@ -513,13 +396,30 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem(quantity = 2, price = 15000) // totalPrice = 30000
-        val productOption = createProductOptionWithProduct()
-        val balance = createBalance(amount = 20000) // 부족한 잔액
+        val now = LocalDateTime.now()
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns productOption
-        every { balanceRepository.findByUserId(userId) } returns balance
+        // Mock 설정: BalanceService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } just Runs
+        every { inventoryReservationService.validateReservations(userId, any()) } just Runs
+        every { inventoryService.reduceStockForOrder(any()) } just Runs
+        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
+            orderId = 1L,
+            orderStatus = OrderStatus.PAYMENT_COMPLETED,
+            orderItems = listOf(
+                OrderItemResponse(
+                    productOptionId = 1L,
+                    productName = "에티오피아 예가체프",
+                    optionCode = "ETH-YRG-WH-200g",
+                    quantity = 2,
+                    unitPrice = 15000,
+                    totalPrice = 30000
+                )
+            ),
+            orderedAt = now
+        )
+        every { balanceService.deductBalance(userId, 30000) } throws InsufficientBalanceException("사용자 잔액이 부족합니다.")
 
         // When & Then
         val exception = assertThrows<InsufficientBalanceException> {
@@ -537,11 +437,11 @@ class CreateOrderUseCaseTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
 
         val cartItem = createCartItem()
-        val inactiveProductOption = createProductOptionWithProduct(isActive = false) // 비활성화됨
 
-        // Mock 설정
-        every { cartItemRepository.findByUserId(userId) } returns listOf(cartItem)
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns inactiveProductOption
+        // Mock 설정: CartService에서 예외 발생
+        every { userService.validateUserExists(userId) } just Runs
+        every { cartService.getCartItemsWithProducts(userId) } returns listOf(cartItem)
+        every { cartService.validateCartItems(any()) } throws ProductOptionInactiveException("비활성화된 상품 옵션이 포함되어 있습니다.")
 
         // When & Then
         val exception = assertThrows<ProductOptionInactiveException> {

@@ -7,28 +7,38 @@ import com.beanbliss.domain.coupon.domain.DiscountType
 import com.beanbliss.domain.coupon.dto.CouponListData
 import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponResponse
+import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.dto.CreateCouponRequest
 import com.beanbliss.domain.coupon.entity.CouponEntity
+import com.beanbliss.domain.coupon.enums.UserCouponStatus
 import com.beanbliss.domain.coupon.exception.CouponExpiredException
 import com.beanbliss.domain.coupon.exception.CouponNotStartedException
 import com.beanbliss.domain.coupon.exception.InvalidCouponException
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponWithQuantity
+import com.beanbliss.domain.coupon.repository.UserCouponRepository
+import com.beanbliss.domain.order.exception.InvalidCouponOrderAmountException
+import com.beanbliss.domain.order.exception.UserCouponAlreadyUsedException
+import com.beanbliss.domain.order.exception.UserCouponExpiredException
+import com.beanbliss.domain.order.exception.UserCouponNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+import kotlin.math.min
 
 /**
  * [책임]: 쿠폰 비즈니스 로직 구현
  * - 쿠폰 생성 및 비즈니스 규칙 검증
  * - 쿠폰 목록 조회
+ * - 쿠폰 유효성 검증 및 사용 처리
  * - Repository 호출
  * - DTO 변환
  */
 @Service
 @Transactional(readOnly = true)
 class CouponServiceImpl(
-    private val couponRepository: CouponRepository
+    private val couponRepository: CouponRepository,
+    private val userCouponRepository: UserCouponRepository
 ) : CouponService {
 
     @Transactional
@@ -130,6 +140,67 @@ class CouponServiceImpl(
         }
 
         return coupon
+    }
+
+    override fun validateAndGetCoupon(userId: Long, userCouponId: Long): CouponValidationResult {
+        // 1. 사용자 쿠폰 조회
+        val userCoupon = userCouponRepository.findById(userCouponId)
+            ?: throw UserCouponNotFoundException("사용자 쿠폰을 찾을 수 없습니다.")
+
+        // 2. 소유권 확인
+        if (userCoupon.userId != userId) {
+            throw UserCouponNotFoundException("해당 쿠폰에 대한 권한이 없습니다.")
+        }
+
+        // 3. 상태 확인
+        if (userCoupon.status != UserCouponStatus.ISSUED) {
+            throw UserCouponAlreadyUsedException("이미 사용된 쿠폰입니다.")
+        }
+
+        // 4. 쿠폰 정보 조회
+        val coupon = couponRepository.findById(userCoupon.couponId)
+            ?: throw UserCouponNotFoundException("쿠폰 정보를 찾을 수 없습니다.")
+
+        // 5. 유효 기간 확인
+        val now = LocalDateTime.now()
+        if (now < coupon.validFrom || now > coupon.validUntil) {
+            throw UserCouponExpiredException("쿠폰이 만료되었습니다.")
+        }
+
+        return CouponValidationResult(coupon)
+    }
+
+    @Transactional
+    override fun markCouponAsUsed(userCouponId: Long, orderId: Long) {
+        // 1. 사용자 쿠폰 조회
+        val userCoupon = userCouponRepository.findById(userCouponId)
+            ?: throw UserCouponNotFoundException("사용자 쿠폰을 찾을 수 없습니다.")
+
+        // 2. 쿠폰 상태를 USED로 변경
+        val now = LocalDateTime.now()
+        val updatedCoupon = userCoupon.copy(
+            status = UserCouponStatus.USED,
+            usedOrderId = orderId,
+            usedAt = now,
+            updatedAt = now
+        )
+
+        // 3. 저장
+        userCouponRepository.save(updatedCoupon.userId, updatedCoupon.couponId)
+    }
+
+    override fun calculateDiscount(coupon: CouponEntity, originalAmount: Int): Int {
+        // 할인 금액 계산 로직
+        return when (coupon.discountType) {
+            "PERCENTAGE" -> {
+                val calculated = (originalAmount * coupon.discountValue) / 100
+                // maxDiscountAmount가 0이면 제한 없음 (Int.MAX_VALUE로 처리)
+                val maxDiscount = if (coupon.maxDiscountAmount > 0) coupon.maxDiscountAmount else Int.MAX_VALUE
+                min(calculated, maxDiscount)
+            }
+            "FIXED_AMOUNT" -> coupon.discountValue
+            else -> 0
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.beanbliss.domain.coupon.service
 
 import com.beanbliss.domain.coupon.dto.CouponListResponse
+import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.dto.CreateCouponRequest
 import com.beanbliss.domain.coupon.entity.CouponEntity
 
@@ -41,4 +42,46 @@ interface CouponService {
      * @throws CouponExpiredException 쿠폰 유효 기간이 만료된 경우
      */
     fun getValidCoupon(couponId: Long): CouponEntity
+
+    /**
+     * 쿠폰 유효성 검증 및 조회
+     *
+     * [비즈니스 규칙]:
+     * - 사용자 쿠폰 존재 및 소유권 확인
+     * - 쿠폰 상태 확인 (ISSUED)
+     * - 쿠폰 유효 기간 확인
+     *
+     * @param userId 사용자 ID
+     * @param userCouponId 사용자 쿠폰 ID
+     * @return 검증된 쿠폰 정보
+     * @throws UserCouponNotFoundException 쿠폰을 찾을 수 없거나 소유권이 없는 경우
+     * @throws UserCouponAlreadyUsedException 이미 사용된 쿠폰인 경우
+     * @throws UserCouponExpiredException 쿠폰이 만료된 경우
+     */
+    fun validateAndGetCoupon(userId: Long, userCouponId: Long): CouponValidationResult
+
+    /**
+     * 쿠폰 사용 처리
+     *
+     * [비즈니스 규칙]:
+     * - 쿠폰 상태를 USED로 변경
+     * - 사용 주문 ID 및 사용 시각 기록
+     *
+     * @param userCouponId 사용자 쿠폰 ID
+     * @param orderId 주문 ID
+     */
+    fun markCouponAsUsed(userCouponId: Long, orderId: Long)
+
+    /**
+     * 쿠폰 할인 금액 계산
+     *
+     * [비즈니스 로직]:
+     * - PERCENTAGE: (원가 * 할인율 / 100), 최대 할인 금액 제한 적용
+     * - FIXED_AMOUNT: 할인 금액 그대로 반환
+     *
+     * @param coupon 쿠폰 정보
+     * @param originalAmount 원래 주문 금액
+     * @return 할인 금액
+     */
+    fun calculateDiscount(coupon: CouponEntity, originalAmount: Int): Int
 }

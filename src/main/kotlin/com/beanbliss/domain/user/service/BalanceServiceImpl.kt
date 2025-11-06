@@ -3,6 +3,8 @@ package com.beanbliss.domain.user.service
 import com.beanbliss.domain.user.dto.BalanceResponse
 import com.beanbliss.domain.user.dto.ChargeBalanceResponse
 import com.beanbliss.domain.user.entity.BalanceEntity
+import com.beanbliss.domain.user.exception.BalanceNotFoundException
+import com.beanbliss.domain.user.exception.InsufficientBalanceException
 import com.beanbliss.domain.user.repository.BalanceRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -92,5 +94,29 @@ class BalanceServiceImpl(
         if (chargeAmount > 1000000) {
             throw IllegalArgumentException("1회 최대 충전 금액은 1,000,000원입니다.")
         }
+    }
+
+    @Transactional
+    override fun deductBalance(userId: Long, amount: Int) {
+        // 1. 비관적 락으로 잔액 조회 (FOR UPDATE)
+        val balance = balanceRepository.findByUserIdWithLock(userId)
+            ?: throw BalanceNotFoundException("사용자 ID: $userId 의 잔액 정보를 찾을 수 없습니다.")
+
+        // 2. 잔액 충분성 검증
+        if (balance.amount < amount) {
+            throw InsufficientBalanceException(
+                "잔액이 부족합니다. 현재 잔액: ${balance.amount}원, 결제 금액: ${amount}원"
+            )
+        }
+
+        // 3. 잔액 차감
+        val now = LocalDateTime.now()
+        val updatedBalance = balance.copy(
+            amount = balance.amount - amount,
+            updatedAt = now
+        )
+
+        // 4. 변경 사항 저장
+        balanceRepository.save(updatedBalance)
     }
 }

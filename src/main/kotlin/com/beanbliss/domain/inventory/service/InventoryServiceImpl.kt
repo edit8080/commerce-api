@@ -7,6 +7,7 @@ import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
+import com.beanbliss.domain.inventory.entity.InventoryEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository
@@ -144,24 +145,25 @@ class InventoryServiceImpl(
             throw DuplicateReservationException("이미 진행 중인 주문 예약이 있습니다.")
         }
 
-        // 2. 가용 재고 계산 및 예약 생성
-        val now = LocalDateTime.now()
-        val expiresAt = now.plusMinutes(30)
-        val reservations = mutableListOf<InventoryReservationItemResponse>()
+        // 2. 가용 재고 일괄 조회 (Bulk 조회 - 단일 쿼리)
+        val productOptionIds = cartItems.map { it.productOptionId }
+        val availableStocks = inventoryRepository.calculateAvailableStockBatch(productOptionIds)
 
+        // 3. 재고 충분성 검증
         cartItems.forEach { cartItem ->
-            // 가용 재고 조회
-            val availableStock = inventoryRepository.calculateAvailableStock(cartItem.productOptionId)
-
-            // 재고 충분성 검증
+            val availableStock = availableStocks[cartItem.productOptionId] ?: 0
             if (availableStock < cartItem.quantity) {
                 throw InsufficientAvailableStockException(
                     "가용 재고가 부족합니다. 상품 옵션 ID: ${cartItem.productOptionId}"
                 )
             }
+        }
 
-            // 예약 생성
-            val reservation = InventoryReservationEntity(
+        // 4. 예약 엔티티 생성 (Bulk Insert 준비)
+        val now = LocalDateTime.now()
+        val expiresAt = now.plusMinutes(30)
+        val reservationEntities = cartItems.map { cartItem ->
+            InventoryReservationEntity(
                 id = 0L,
                 productOptionId = cartItem.productOptionId,
                 userId = userId,
@@ -171,11 +173,18 @@ class InventoryServiceImpl(
                 expiresAt = expiresAt,
                 updatedAt = now
             )
+        }
 
-            val savedReservation = inventoryReservationRepository.save(reservation)
+        // 5. 예약 일괄 저장 (Batch Insert - 단일 트랜잭션)
+        // [성능 최적화]: N번의 INSERT를 단일 Batch INSERT로 처리
+        val savedReservations = inventoryReservationRepository.saveAll(reservationEntities)
 
-            // 응답 DTO 변환
-            val reservationResponse = InventoryReservationItemResponse(
+        // 6. 응답 DTO 변환
+        val reservations = savedReservations.mapIndexed { index, savedReservation ->
+            val cartItem = cartItems[index]
+            val availableStock = availableStocks[cartItem.productOptionId]!!
+
+            InventoryReservationItemResponse(
                 reservationId = savedReservation.id,
                 productOptionId = savedReservation.productOptionId,
                 productName = cartItem.productName,
@@ -186,10 +195,45 @@ class InventoryServiceImpl(
                 reservedAt = savedReservation.reservedAt,
                 expiresAt = savedReservation.expiresAt
             )
-
-            reservations.add(reservationResponse)
         }
 
         return reservations
+    }
+
+    @Transactional
+    override fun reduceStockForOrder(cartItems: List<CartItemResponse>) {
+        // 1. 장바구니 아이템의 모든 상품 옵션 ID 추출
+        val productOptionIds = cartItems.map { it.productOptionId }
+
+        // 2. 재고 일괄 조회 (Bulk 조회 - 단일 쿼리)
+        // [성능 최적화]: WHERE product_option_id IN (...) 사용으로 N+1 문제 방지
+        // TODO: Repository에서 비관적 락(FOR UPDATE) 지원 필요
+        val inventories = inventoryRepository.findAllByProductOptionIds(productOptionIds)
+
+        // 2-1. 조회된 재고가 모든 상품 옵션에 대해 존재하는지 확인
+        if (inventories.size != productOptionIds.size) {
+            val foundIds = inventories.map { it.productOptionId }.toSet()
+            val missingIds = productOptionIds.filterNot { it in foundIds }
+            throw ResourceNotFoundException("재고 정보를 찾을 수 없습니다. 상품 옵션 ID: ${missingIds.joinToString()}")
+        }
+
+        // 3. 재고 검증 (Map으로 변환하여 O(1) 조회)
+        val inventoryMap = inventories.associateBy { it.productOptionId }
+        cartItems.forEach { cartItem ->
+            val inventory = inventoryMap[cartItem.productOptionId]!!
+
+            if (inventory.stockQuantity < cartItem.quantity) {
+                throw com.beanbliss.domain.inventory.exception.InsufficientStockException(
+                    "재고가 부족합니다. 상품 옵션 ID: ${cartItem.productOptionId}, 현재 재고: ${inventory.stockQuantity}, 요청 수량: ${cartItem.quantity}"
+                )
+            }
+        }
+
+        // 4. 재고 일괄 차감
+        cartItems.forEach { cartItem ->
+            val inventory = inventoryMap[cartItem.productOptionId]!!
+            inventory.stockQuantity = inventory.stockQuantity - cartItem.quantity
+            inventoryRepository.save(inventory)
+        }
     }
 }

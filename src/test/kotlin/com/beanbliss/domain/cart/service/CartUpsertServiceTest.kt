@@ -28,13 +28,14 @@ class CartUpsertServiceTest {
 
     // Mock 객체 (Repository Interface에 의존)
     private val cartItemRepository: CartItemRepository = mockk()
+    private val productOptionRepository = mockk<com.beanbliss.domain.product.repository.ProductOptionRepository>()
 
     // 테스트 대상 (Service 인터페이스로 선언)
     private lateinit var cartService: CartService
 
     @BeforeEach
     fun setUp() {
-        cartService = CartServiceImpl(cartItemRepository)
+        cartService = CartServiceImpl(cartItemRepository, productOptionRepository)
     }
 
     @Test

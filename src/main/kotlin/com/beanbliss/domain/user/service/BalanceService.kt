@@ -26,4 +26,24 @@ interface BalanceService {
      * @note 레코드 없으면 INSERT, 있으면 UPDATE
      */
     fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse
+
+    /**
+     * 사용자 잔액 차감 (주문 결제)
+     *
+     * [비즈니스 로직]:
+     * 1. 비관적 락으로 잔액 조회 (FOR UPDATE)
+     * 2. 잔액 존재 여부 확인
+     * 3. 잔액 충분성 검증
+     * 4. 잔액 차감 및 저장
+     *
+     * [트랜잭션]:
+     * - @Transactional로 원자성 보장
+     * - 비관적 락으로 동시성 제어
+     *
+     * @param userId 사용자 ID
+     * @param amount 차감할 금액
+     * @throws BalanceNotFoundException 잔액 정보를 찾을 수 없는 경우
+     * @throws InsufficientBalanceException 잔액이 부족한 경우
+     */
+    fun deductBalance(userId: Long, amount: Int)
 }

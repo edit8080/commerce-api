@@ -105,6 +105,19 @@ class InventoryRepositoryImpl(
         )
     }
 
+    override fun findAllByProductOptionIds(productOptionIds: List<Long>): List<Inventory> {
+        // Bulk 조회: WHERE product_option_id IN (...) 시뮬레이션
+        // 실제 DB에서는 단일 쿼리로 처리됨
+        return productOptionIds.mapNotNull { productOptionId ->
+            inventories[productOptionId]?.let { entity ->
+                Inventory(
+                    productOptionId = entity.productOptionId,
+                    stockQuantity = entity.stockQuantity
+                )
+            }
+        }
+    }
+
     override fun save(inventory: Inventory): Inventory {
         // 기존 entity가 있으면 수정, 없으면 새로 생성
         val existingEntity = inventories[inventory.productOptionId]

@@ -53,6 +53,13 @@ class InventoryReservationRepositoryImpl : InventoryReservationRepository {
         return savedReservation
     }
 
+    override fun saveAll(reservations: List<InventoryReservationEntity>): List<InventoryReservationEntity> {
+        // Batch Insert 시뮬레이션 (실제 DB에서는 단일 쿼리로 처리됨)
+        return reservations.map { reservation ->
+            save(reservation)
+        }
+    }
+
     override fun findActiveReservationsByUserId(userId: Long): List<InventoryReservationEntity> {
         val now = LocalDateTime.now()
         return reservations.values.filter { reservation ->

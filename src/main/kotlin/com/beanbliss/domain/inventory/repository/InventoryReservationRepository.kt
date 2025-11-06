@@ -40,6 +40,18 @@ interface InventoryReservationRepository {
     fun save(reservation: InventoryReservationEntity): InventoryReservationEntity
 
     /**
+     * 재고 예약 일괄 저장 (Batch Insert)
+     *
+     * [성능 최적화]:
+     * - N+1 문제 방지: Batch Insert로 단일 트랜잭션 처리
+     * - N개의 예약을 한 번의 DB 작업으로 처리
+     *
+     * @param reservations 저장할 예약 정보 목록
+     * @return 저장된 InventoryReservationEntity 목록
+     */
+    fun saveAll(reservations: List<InventoryReservationEntity>): List<InventoryReservationEntity>
+
+    /**
      * 사용자 ID로 활성 예약 목록 조회
      * - status IN ('RESERVED', 'CONFIRMED')
      * - expires_at > NOW()

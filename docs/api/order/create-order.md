@@ -494,89 +494,6 @@ POST /api/order
 
 ## 4. 구현 시 고려사항
 
-### UseCase 패턴 적용 (필수)
-
-장바구니 상품 주문 기능은 **여러 도메인 Service**를 조율하는 매우 복잡한 비즈니스 트랜잭션:
-1. `CartService`: 장바구니 조회 및 삭제
-2. `ProductService`: 상품 정보 및 가격 조회
-3. `InventoryReservationService`: 재고 예약 확인 및 상태 변경 (**하이브리드 재고 관리**)
-4. `InventoryService`: 재고 확인 및 차감
-5. `CouponService`: 쿠폰 유효성 검증 및 사용 처리
-6. `BalanceService`: 잔액 확인 및 차감
-7. `OrderService`: 주문 생성 및 주문 아이템 생성
-8. `UserService`: 사용자 확인
-
-이러한 다중 도메인 의존성을 **UseCase 패턴**으로 추상화:
-1. **단일 책임 (SRP)**: 각 Service는 자신의 도메인 영역만 담당, Repository 접근은 Service 내부에서만
-2. **오케스트레이션 분리**: UseCase는 여러 Service를 조율하는 역할만 수행
-3. **트랜잭션 경계 명확화**: 각 Service는 독립적인 트랜잭션 관리, UseCase는 전체 흐름 조율
-4. **확장성**: 향후 알림, 이벤트 발행, 포인트 적립 등 인프라 컴포넌트 추가 시 UseCase에서 통합 관리
-
-```kotlin
-@Component
-class CreateOrderUseCase(
-    private val userService: UserService,
-    private val cartService: CartService,
-    private val productService: ProductService,
-    private val couponService: CouponService,
-    private val inventoryReservationService: InventoryReservationService,
-    private val inventoryService: InventoryService,
-    private val balanceService: BalanceService,
-    private val orderService: OrderService
-) {
-    fun createOrder(request: CreateOrderRequest): CreateOrderResponse {
-        // 1. 사용자 존재 확인 (트랜잭션 밖)
-        userService.validateUserExists(request.userId)
-
-        // 2. 장바구니 조회 및 검증 (트랜잭션 밖)
-        val cartItems = cartService.getCartItemsWithProducts(request.userId)
-        cartService.validateCartItems(cartItems)
-
-        // 3. 쿠폰 유효성 검증 (트랜잭션 밖)
-        val couponInfo = request.userCouponId?.let {
-            couponService.validateAndGetCoupon(request.userId, it)
-        }
-
-        // 4. 상품 금액 계산 (트랜잭션 밖)
-        val priceInfo = calculatePriceInfo(cartItems, couponInfo)
-
-        // === 각 Service가 독립적으로 트랜잭션 관리 ===
-
-        // 5. 재고 예약 확인 (하이브리드 재고 관리)
-        inventoryReservationService.validateReservations(request.userId, cartItems)
-
-        // 6. 재고 확인 및 차감 (FOR UPDATE)
-        inventoryService.reduceStockForOrder(cartItems)
-
-        // 7. 주문 생성 및 주문 아이템 생성
-        val order = orderService.createOrderWithItems(
-            userId = request.userId,
-            cartItems = cartItems,
-            priceInfo = priceInfo,
-            userCouponId = request.userCouponId,
-            shippingAddress = request.shippingAddress
-        )
-
-        // 8. 잔액 차감 (FOR UPDATE)
-        balanceService.deductBalance(request.userId, priceInfo.finalAmount)
-
-        // 9. 재고 예약 상태 변경 (RESERVED → CONFIRMED)
-        inventoryReservationService.confirmReservations(request.userId, cartItems)
-
-        // 10. 쿠폰 사용 처리
-        request.userCouponId?.let {
-            couponService.markCouponAsUsed(it, order.id)
-        }
-
-        // 11. 장바구니 비우기
-        cartService.clearCart(request.userId)
-
-        // 12. DTO 변환 및 반환
-        return toCreateOrderResponse(order, cartItems, couponInfo, priceInfo)
-    }
-}
-```
-
 ### 동시성 제어
 
 #### FOR UPDATE 비관적 락 전략
@@ -590,18 +507,30 @@ class CreateOrderUseCase(
 - **데드락 방지**: `product_option_id` 오름차순 정렬 후 락 획득
 
 ```kotlin
-// 데드락 방지: 상품 옵션 ID 순으로 정렬 후 재고 차감
-val sortedCartItems = cartItems.sortedBy { it.productOptionId }
+// Bulk 조회로 N+1 문제 방지
+val productOptionIds = cartItems.map { it.productOptionId }
+val inventories = inventoryRepository.findAllByProductOptionIds(productOptionIds)
 
-sortedCartItems.forEach { cartItem ->
-    val inventory = inventoryRepository.findByProductOptionIdWithLock(cartItem.productOptionId)
-        ?: throw IllegalStateException("재고 정보를 찾을 수 없습니다")
+// 조회된 재고 검증 (모든 상품 옵션에 대한 재고가 존재하는지 확인)
+if (inventories.size != productOptionIds.size) {
+    val foundIds = inventories.map { it.productOptionId }.toSet()
+    val missingIds = productOptionIds.filterNot { it in foundIds }
+    throw ResourceNotFoundException("재고 정보를 찾을 수 없습니다. 상품 옵션 ID: ${missingIds.joinToString()}")
+}
 
+// 재고 충분성 검증 (Map으로 변환하여 O(1) 조회)
+val inventoryMap = inventories.associateBy { it.productOptionId }
+cartItems.forEach { cartItem ->
+    val inventory = inventoryMap[cartItem.productOptionId]!!
     if (inventory.stockQuantity < cartItem.quantity) {
-        throw InsufficientStockException("재고 부족")
+        throw InsufficientStockException("재고 부족: 상품 옵션 ID ${cartItem.productOptionId}")
     }
+}
 
-    inventory.stockQuantity -= cartItem.quantity
+// 재고 일괄 차감
+cartItems.forEach { cartItem ->
+    val inventory = inventoryMap[cartItem.productOptionId]!!
+    inventory.stockQuantity = inventory.stockQuantity - cartItem.quantity
     inventoryRepository.save(inventory)
 }
 ```
@@ -769,12 +698,13 @@ fun bulkUpdateStatus(
   - DB 오류 → 전체 롤백
 
 #### 데드락 방지
-- **재고 차감 순서 정렬**: `product_option_id` 오름차순 정렬 후 락 획득
+- **재고 조회 순서 정렬**: `product_option_id` 오름차순 정렬 후 Bulk 조회
 - **타임아웃 설정**: 락 대기 시간 10초 (설정 가능)
 
 ```kotlin
-// 데드락 방지: product_option_id 순으로 정렬
-val sortedCartItems = cartItems.sortedBy { it.productOptionId }
+// N+1 문제 방지 + 데드락 방지: Bulk 조회 (Repository에서 ORDER BY 처리)
+val productOptionIds = cartItems.map { it.productOptionId }
+val inventories = inventoryRepository.findAllByProductOptionIds(productOptionIds) // ORDER BY product_option_id ASC
 ```
 
 ---

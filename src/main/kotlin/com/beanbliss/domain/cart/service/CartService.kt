@@ -42,6 +42,27 @@ interface CartService {
      * @throws CartEmptyException 장바구니가 비어 있는 경우
      */
     fun getCartItemsWithProducts(userId: Long): List<CartItemResponse>
+
+    /**
+     * 장바구니 아이템 검증
+     *
+     * [비즈니스 규칙]:
+     * - 모든 상품 옵션이 활성화되어 있는지 확인
+     *
+     * @param cartItems 검증할 장바구니 아이템 목록
+     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
+     */
+    fun validateCartItems(cartItems: List<CartItemResponse>)
+
+    /**
+     * 사용자의 장바구니 비우기
+     *
+     * [비즈니스 규칙]:
+     * - 사용자의 모든 장바구니 아이템 삭제
+     *
+     * @param userId 사용자 ID
+     */
+    fun clearCart(userId: Long)
 }
 
 /**
