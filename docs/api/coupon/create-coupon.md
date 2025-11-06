@@ -130,25 +130,35 @@ POST /api/coupons
 
 ### 유효성 검사
 
+#### Controller 계층 검증 (Request DTO의 `@Valid`)
+
 1. **필수 필드 검증**
    - name, discountType, discountValue, totalQuantity, validFrom, validUntil은 필수입니다.
+   - Bean Validation: `@NotNull`, `@NotBlank`
 
 2. **할인 타입 검증**
    - discountType은 `PERCENTAGE` 또는 `FIXED_AMOUNT`만 허용합니다.
+   - Bean Validation: `@Pattern` 또는 커스텀 Validator
 
-3. **할인값 검증**
+3. **할인값 범위 검증**
    - 정률 할인(PERCENTAGE): 1 이상 100 이하
    - 정액 할인(FIXED_AMOUNT): 1 이상
+   - Bean Validation: `@Min`, `@Max`
 
-4. **최대 할인 금액 검증**
+4. **유효 기간 순서 검증**
+   - validFrom은 validUntil보다 이전이어야 합니다.
+   - Bean Validation: 커스텀 클래스 레벨 Validator
+
+5. **발급 수량 범위 검증**
+   - totalQuantity는 1 이상 10,000 이하여야 합니다.
+   - Bean Validation: `@Min(1)`, `@Max(10000)`
+
+#### CouponService 계층 검증 (비즈니스 규칙)
+
+6. **최대 할인 금액 규칙 검증**
    - maxDiscountAmount는 정률 할인(PERCENTAGE) 시만 적용 가능합니다.
    - 정액 할인(FIXED_AMOUNT) 시 maxDiscountAmount가 설정되면 검증 오류를 반환합니다.
-
-5. **유효 기간 검증**
-   - validFrom은 validUntil보다 이전이어야 합니다.
-
-6. **발급 수량 검증**
-   - totalQuantity는 1 이상 10,000 이하여야 합니다.
+   - 이유: 할인 타입과 최대 할인 금액 간의 복잡한 비즈니스 규칙
 
 ---
 
@@ -184,22 +194,22 @@ sequenceDiagram
     Client->>Controller: POST /api/coupons
     Note over Client,Controller: CreateCouponRequest
 
-    Controller->>Controller: 유효성 검증 (@Valid)
+    Controller->>Controller: 유효성 검증 (@Valid)<br/>(필수 필드, 할인 타입, 할인값 범위,<br/>유효 기간 순서, 발급 수량 범위)
     alt 유효성 검증 실패
         Controller-->>Client: 400 Bad Request
     end
 
-    Controller->>UseCase: execute(request)
+    Controller->>UseCase: createCoupon(request)
 
     Note over UseCase: @Transactional 시작
 
-    UseCase->>UseCase: 비즈니스 규칙 검증<br/>(할인 타입, 할인값, 유효 기간)
+    UseCase->>CouponService: createCoupon(request)
+    CouponService->>CouponService: 비즈니스 규칙 검증<br/>(할인 타입별 최대 할인 금액 규칙)
     alt 비즈니스 규칙 위반
+        CouponService-->>UseCase: throw InvalidCouponException
         UseCase-->>Controller: throw InvalidCouponException
         Controller-->>Client: 400 Bad Request
     end
-
-    UseCase->>CouponService: createCoupon(request)
     CouponService->>CouponService: CouponEntity 생성
     CouponService->>CouponRepo: save(coupon)
     CouponRepo->>DB: INSERT INTO COUPON
@@ -228,12 +238,23 @@ sequenceDiagram
 - **격리 수준**: `READ_COMMITTED` (기본값)
 
 ### 예외 처리 흐름
-1. **Controller 계층**:
-   - `@Valid` 검증 실패 → `MethodArgumentNotValidException` → 400 Bad Request
 
-2. **UseCase 계층**:
-   - 비즈니스 규칙 위반 → `InvalidCouponException` → 400 Bad Request
-   - DB 저장 실패 → `DataAccessException` → 500 Internal Server Error
+1. **Controller 계층 (Request DTO 검증)**:
+   - `@Valid` 검증 실패 (필수 필드, 할인 타입, 할인값 범위, 유효 기간, 발급 수량)
+   - 예외: `MethodArgumentNotValidException`
+   - HTTP Status: 400 Bad Request
 
-3. **GlobalExceptionHandler**:
+2. **CouponService 계층 (비즈니스 규칙 검증)**:
+   - 최대 할인 금액 규칙 위반 (정액 할인 시 maxDiscountAmount 설정)
+   - 예외: `InvalidCouponException`
+   - HTTP Status: 400 Bad Request
+   - 트랜잭션 롤백
+
+3. **DB 오류**:
+   - COUPON 또는 COUPON_TICKET 저장 실패
+   - 예외: `DataAccessException`
+   - HTTP Status: 500 Internal Server Error
+   - 트랜잭션 롤백
+
+4. **GlobalExceptionHandler**:
    - 모든 예외를 통합 처리하여 일관된 에러 응답을 반환합니다.

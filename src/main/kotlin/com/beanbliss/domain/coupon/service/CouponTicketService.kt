@@ -8,6 +8,19 @@ import com.beanbliss.domain.coupon.entity.CouponTicketEntity
  */
 interface CouponTicketService {
     /**
+     * 쿠폰 티켓 일괄 생성
+     *
+     * [책임]:
+     * - totalQuantity만큼 AVAILABLE 상태의 티켓을 생성
+     * - 배치 삽입으로 성능 최적화
+     *
+     * @param couponId 쿠폰 ID
+     * @param totalQuantity 생성할 티켓 수량
+     * @return 생성된 티켓 리스트
+     */
+    fun createTickets(couponId: Long, totalQuantity: Int): List<CouponTicketEntity>
+
+    /**
      * 발급 가능한 티켓 선점 (FOR UPDATE SKIP LOCKED)
      *
      * @param couponId 쿠폰 ID

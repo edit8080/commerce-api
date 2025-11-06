@@ -1,6 +1,7 @@
 package com.beanbliss.domain.coupon.service
 
 import com.beanbliss.domain.coupon.dto.CouponListResponse
+import com.beanbliss.domain.coupon.dto.CreateCouponRequest
 import com.beanbliss.domain.coupon.entity.CouponEntity
 
 /**
@@ -8,6 +9,19 @@ import com.beanbliss.domain.coupon.entity.CouponEntity
  * Controller는 이 인터페이스에만 의존합니다 (DIP 준수)
  */
 interface CouponService {
+    /**
+     * 쿠폰 생성
+     *
+     * [책임]:
+     * - 비즈니스 규칙 검증 (정액 할인에 최대 할인 금액 설정 불가)
+     * - CouponEntity 생성 및 저장
+     *
+     * @param request 쿠폰 생성 요청
+     * @return 생성된 쿠폰 Entity
+     * @throws InvalidCouponException 비즈니스 규칙 위반 시
+     */
+    fun createCoupon(request: CreateCouponRequest): CouponEntity
+
     /**
      * 쿠폰 목록 조회
      *

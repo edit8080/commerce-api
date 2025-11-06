@@ -52,7 +52,7 @@ class CouponController(
     fun createCoupon(
         @Valid @RequestBody request: CreateCouponRequest
     ): ResponseEntity<CreateCouponResponse> {
-        val response = createCouponUseCase.execute(request)
+        val response = createCouponUseCase.createCoupon(request)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 

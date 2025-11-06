@@ -3,12 +3,15 @@ package com.beanbliss.domain.coupon.service
 import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.pagination.PageCalculator
+import com.beanbliss.domain.coupon.domain.DiscountType
 import com.beanbliss.domain.coupon.dto.CouponListData
 import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponResponse
+import com.beanbliss.domain.coupon.dto.CreateCouponRequest
 import com.beanbliss.domain.coupon.entity.CouponEntity
 import com.beanbliss.domain.coupon.exception.CouponExpiredException
 import com.beanbliss.domain.coupon.exception.CouponNotStartedException
+import com.beanbliss.domain.coupon.exception.InvalidCouponException
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponWithQuantity
 import org.springframework.stereotype.Service
@@ -16,17 +19,64 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 
 /**
- * [책임]: 쿠폰 목록 조회 비즈니스 로직 구현
+ * [책임]: 쿠폰 비즈니스 로직 구현
+ * - 쿠폰 생성 및 비즈니스 규칙 검증
+ * - 쿠폰 목록 조회
  * - Repository 호출
- * - isIssuable 계산
  * - DTO 변환
- * - 페이징 정보 구성
  */
 @Service
 @Transactional(readOnly = true)
 class CouponServiceImpl(
     private val couponRepository: CouponRepository
 ) : CouponService {
+
+    @Transactional
+    override fun createCoupon(request: CreateCouponRequest): CouponEntity {
+        // 1. 비즈니스 규칙 검증
+        validateMaxDiscountAmountRule(request)
+
+        // 2. CouponEntity 생성
+        val couponEntity = createCouponEntity(request)
+
+        // 3. Repository에 저장
+        return couponRepository.save(couponEntity)
+    }
+
+    /**
+     * 최대 할인 금액 규칙 검증
+     *
+     * [책임]:
+     * - 할인 타입에 따른 최대 할인 금액 설정 가능 여부 검증
+     * - 정액 할인(FIXED_AMOUNT)에는 최대 할인 금액을 설정할 수 없음
+     * - 정률 할인(PERCENTAGE)에만 최대 할인 금액 설정 가능
+     */
+    private fun validateMaxDiscountAmountRule(request: CreateCouponRequest) {
+        // 정액 할인에 최대 할인 금액 설정 불가 검증
+        if (request.discountType == DiscountType.FIXED_AMOUNT && request.maxDiscountAmount != null) {
+            throw InvalidCouponException("정액 할인에는 최대 할인 금액을 설정할 수 없습니다.")
+        }
+    }
+
+    /**
+     * CouponEntity 생성
+     */
+    private fun createCouponEntity(request: CreateCouponRequest): CouponEntity {
+        val now = LocalDateTime.now()
+        return CouponEntity(
+            id = null, // Auto-generated
+            name = request.name,
+            discountType = request.discountType.name,
+            discountValue = request.discountValue,
+            minOrderAmount = request.minOrderAmount,
+            maxDiscountAmount = request.maxDiscountAmount ?: 0,
+            totalQuantity = request.totalQuantity,
+            validFrom = request.validFrom,
+            validUntil = request.validUntil,
+            createdAt = now,
+            updatedAt = now
+        )
+    }
 
     override fun getCoupons(page: Int, size: Int): CouponListResponse {
         // 1. Repository에서 쿠폰 목록 조회 (정렬: created_at DESC)
