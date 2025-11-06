@@ -1,7 +1,5 @@
 package com.beanbliss.domain.inventory.service
 
-import com.beanbliss.common.exception.InvalidPageNumberException
-import com.beanbliss.common.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
@@ -17,10 +15,12 @@ import java.time.LocalDateTime
  * 재고 목록 조회 Service의 비즈니스 로직을 검증하는 테스트
  *
  * [검증 목표]:
- * 1. 파라미터 유효성 검증이 올바르게 수행되는가?
- * 2. Repository 호출이 올바른 파라미터로 이루어지는가?
- * 3. 페이지 정보가 올바르게 조립되는가?
- * 4. created_at DESC 정렬이 적용되는가?
+ * 1. Repository 호출이 올바른 파라미터로 이루어지는가?
+ * 2. 페이지 정보가 올바르게 조립되는가?
+ * 3. created_at DESC 정렬이 적용되는가?
+ *
+ * [참고]:
+ * - 파라미터 유효성 검증은 Controller에서 Jakarta Validator로 수행되므로 Service 테스트에서 제외
  *
  * [관련 API]:
  * - GET /api/inventories
@@ -142,81 +142,6 @@ class InventoryListServiceTest {
         assertEquals(0, result.pageable.totalPages)
     }
 
-    @Test
-    @DisplayName("page가 1 미만일 경우 InvalidPageNumberException이 발생해야 한다")
-    fun `page가 1 미만일 경우 InvalidPageNumberException이 발생해야 한다`() {
-        // Given
-        val invalidPage = 0
-        val size = 20
-
-        // When & Then
-        val exception = assertThrows<InvalidPageNumberException> {
-            inventoryService.getInventories(invalidPage, size)
-        }
-
-        assertEquals("페이지 번호는 1 이상이어야 합니다.", exception.message)
-
-        // [책임 검증]: 유효성 검증 실패 시 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.findAllWithProductInfo(any(), any(), any(), any()) }
-        verify(exactly = 0) { inventoryRepository.count() }
-    }
-
-    @Test
-    @DisplayName("page가 음수일 경우 InvalidPageNumberException이 발생해야 한다")
-    fun `page가 음수일 경우 InvalidPageNumberException이 발생해야 한다`() {
-        // Given
-        val invalidPage = -1
-        val size = 20
-
-        // When & Then
-        val exception = assertThrows<InvalidPageNumberException> {
-            inventoryService.getInventories(invalidPage, size)
-        }
-
-        assertEquals("페이지 번호는 1 이상이어야 합니다.", exception.message)
-
-        // [책임 검증]: 유효성 검증 실패 시 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.findAllWithProductInfo(any(), any(), any(), any()) }
-        verify(exactly = 0) { inventoryRepository.count() }
-    }
-
-    @Test
-    @DisplayName("size가 1 미만일 경우 InvalidPageSizeException이 발생해야 한다")
-    fun `size가 1 미만일 경우 InvalidPageSizeException이 발생해야 한다`() {
-        // Given
-        val page = 1
-        val invalidSize = 0
-
-        // When & Then
-        val exception = assertThrows<InvalidPageSizeException> {
-            inventoryService.getInventories(page, invalidSize)
-        }
-
-        assertEquals("페이지 크기는 1 이상 100 이하여야 합니다.", exception.message)
-
-        // [책임 검증]: 유효성 검증 실패 시 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.findAllWithProductInfo(any(), any(), any(), any()) }
-        verify(exactly = 0) { inventoryRepository.count() }
-    }
-
-    @Test
-    @DisplayName("size가 100 초과일 경우 InvalidPageSizeException이 발생해야 한다")
-    fun `size가 100 초과일 경우 InvalidPageSizeException이 발생해야 한다`() {
-        // Given
-        val page = 1
-        val invalidSize = 101
-
-        // When & Then
-        val exception = assertThrows<InvalidPageSizeException> {
-            inventoryService.getInventories(page, invalidSize)
-        }
-
-        assertEquals("페이지 크기는 1 이상 100 이하여야 합니다.", exception.message)
-
-        // [책임 검증]: 유효성 검증 실패 시 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { inventoryRepository.findAllWithProductInfo(any(), any(), any(), any()) }
-        verify(exactly = 0) { inventoryRepository.count() }
-    }
 
     @Test
     @DisplayName("전체 페이지 수가 올바르게 계산되어야 한다 (올림 처리)")

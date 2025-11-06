@@ -13,16 +13,16 @@ interface InventoryService {
      * 재고 목록 조회
      *
      * [비즈니스 로직]:
-     * 1. 파라미터 유효성 검증 (page >= 1, 1 <= size <= 100)
-     * 2. Repository에서 재고 목록 조회 (created_at DESC 정렬)
-     * 3. Repository에서 전체 재고 개수 조회
-     * 4. 페이지 정보 조립 (totalPages 계산)
+     * 1. Repository에서 재고 목록 조회 (created_at DESC 정렬)
+     * 2. Repository에서 전체 재고 개수 조회
+     * 3. 페이지 정보 조립 (totalPages 계산)
      *
-     * @param page 페이지 번호 (1부터 시작)
-     * @param size 페이지 크기 (1~100)
+     * [참고]:
+     * - 파라미터 유효성 검증은 Controller에서 Jakarta Validator로 수행됨
+     *
+     * @param page 페이지 번호 (1부터 시작, Controller에서 검증됨)
+     * @param size 페이지 크기 (1~100, Controller에서 검증됨)
      * @return 재고 목록 + 페이징 정보
-     * @throws InvalidPageNumberException 페이지 번호가 1 미만인 경우
-     * @throws InvalidPageSizeException 페이지 크기가 범위를 벗어난 경우
      */
     fun getInventories(page: Int, size: Int): InventoryListResponse
 

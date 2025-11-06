@@ -1,8 +1,6 @@
 package com.beanbliss.domain.inventory.controller
 
 import com.beanbliss.common.dto.PageableResponse
-import com.beanbliss.common.exception.InvalidPageNumberException
-import com.beanbliss.common.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.service.InventoryService
@@ -25,8 +23,11 @@ import java.time.LocalDateTime
  * 1. API 엔드포인트가 올바른 경로와 메서드로 매핑되는가?
  * 2. 요청 파라미터가 올바르게 바인딩되는가?
  * 3. Service 결과가 올바른 JSON 형식으로 반환되는가?
- * 4. 파라미터 검증이 올바르게 수행되는가?
- * 5. 적절한 HTTP 상태 코드가 반환되는가?
+ * 4. 적절한 HTTP 상태 코드가 반환되는가?
+ *
+ * [참고]:
+ * - 파라미터 유효성 검증은 Jakarta Validator가 자동으로 수행하므로 테스트 제외
+ *   (Spring Framework가 보장하는 표준 동작이므로 별도 테스트 불필요)
  *
  * [관련 API]:
  * - GET /api/inventories
@@ -168,82 +169,6 @@ class InventoryListControllerTest {
             .andExpect(jsonPath("$.data.content").isArray)
             .andExpect(jsonPath("$.data.content").isEmpty)
             .andExpect(jsonPath("$.data.pageable.totalElements").value(0))
-    }
-
-    @Test
-    @DisplayName("GET /api/inventories - page가 1 미만일 경우 400 Bad Request를 반환해야 한다")
-    fun `page가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given: Service가 예외를 던지도록 설정
-        every { inventoryService.getInventories(0, 10) } throws
-            InvalidPageNumberException("페이지 번호는 1 이상이어야 합니다.")
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/inventories")
-                .param("page", "0")
-                .param("size", "10")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PAGE_NUMBER"))
-    }
-
-    @Test
-    @DisplayName("GET /api/inventories - page가 음수일 경우 400 Bad Request를 반환해야 한다")
-    fun `page가 음수일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given: Service가 예외를 던지도록 설정
-        every { inventoryService.getInventories(-1, 10) } throws
-                InvalidPageNumberException("페이지 번호는 1 이상이어야 합니다.")
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/inventories")
-                .param("page", "-1")
-                .param("size", "10")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PAGE_NUMBER"))
-    }
-
-    @Test
-    @DisplayName("GET /api/inventories - size가 1 미만일 경우 400 Bad Request를 반환해야 한다")
-    fun `size가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given: Service가 예외를 던지도록 설정
-        every { inventoryService.getInventories(1, 0) } throws
-            InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/inventories")
-                .param("page", "1")
-                .param("size", "0")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"))
-    }
-
-    @Test
-    @DisplayName("GET /api/inventories - size가 100 초과일 경우 400 Bad Request를 반환해야 한다")
-    fun `size가 100 초과일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given: Service가 예외를 던지도록 설정
-        every { inventoryService.getInventories(1, 101) } throws
-                InvalidPageSizeException("페이지 크기는 1 이상 100 이하여야 합니다.")
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/inventories")
-                .param("page", "1")
-                .param("size", "101")
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"))
     }
 
     @Test

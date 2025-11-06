@@ -7,6 +7,8 @@ import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.service.InventoryService
 import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -33,14 +35,20 @@ class InventoryController(
      *
      * GET /api/inventories?page={page}&size={size}
      *
-     * @param page 페이지 번호 (기본값: 1)
-     * @param size 페이지 크기 (기본값: 10)
+     * @param page 페이지 번호 (기본값: 1, 최소: 1)
+     * @param size 페이지 크기 (기본값: 10, 범위: 1~100)
      * @return 재고 목록 + 페이징 정보
      */
     @GetMapping
     fun getInventories(
-        @RequestParam(defaultValue = "1") page: Int,
-        @RequestParam(defaultValue = "10") size: Int
+        @RequestParam(defaultValue = "1")
+        @Min(value = 1, message = "페이지 번호는 1 이상이어야 합니다.")
+        page: Int,
+
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다.")
+        @Max(value = 100, message = "페이지 크기는 100 이하여야 합니다.")
+        size: Int
     ): ResponseEntity<ApiResponse<InventoryListResponse>> {
         // Service 계층에 위임
         val result = inventoryService.getInventories(page, size)
