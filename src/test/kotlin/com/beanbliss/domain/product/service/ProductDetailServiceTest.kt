@@ -1,6 +1,7 @@
 package com.beanbliss.domain.product.service
 
 import com.beanbliss.domain.product.repository.ProductRepository
+import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
@@ -29,13 +30,14 @@ class ProductDetailServiceTest {
 
     // Mock 객체 (Repository Interface에 의존)
     private val productRepository: ProductRepository = mockk()
+    private val productOptionRepository: ProductOptionRepository = mockk()
 
     // 테스트 대상 (Service 인터페이스로 선언)
     private lateinit var productService: ProductService
 
     @BeforeEach
     fun setUp() {
-        productService = ProductServiceImpl(productRepository)
+        productService = ProductServiceImpl(productRepository, productOptionRepository)
     }
 
     @Test

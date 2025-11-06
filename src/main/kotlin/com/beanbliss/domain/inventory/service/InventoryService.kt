@@ -1,6 +1,8 @@
 package com.beanbliss.domain.inventory.service
 
+import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
+import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
 
 /**
  * [책임]: 재고 관리 기능의 계약 정의
@@ -56,4 +58,25 @@ interface InventoryService {
      * @return 옵션 ID를 키로, 가용 재고 수량을 값으로 하는 Map
      */
     fun calculateAvailableStockBatch(optionIds: List<Long>): Map<Long, Int>
+
+    /**
+     * 재고 예약 생성
+     *
+     * [비즈니스 로직]:
+     * 1. 중복 예약 방지: 사용자의 활성 예약 존재 여부 확인
+     * 2. 가용 재고 계산 및 충분성 검증
+     * 3. 예약 엔티티 생성 (30분 만료)
+     * 4. 예약 정보 응답 DTO 변환
+     *
+     * [트랜잭션]:
+     * - @Transactional로 원자성 보장
+     * - 재고 부족 시 롤백
+     *
+     * @param userId 사용자 ID
+     * @param cartItems 장바구니 아이템 목록 (상품 정보 포함)
+     * @return 생성된 재고 예약 정보 목록
+     * @throws DuplicateReservationException 이미 활성 예약이 존재하는 경우
+     * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
+     */
+    fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<InventoryReservationItemResponse>
 }

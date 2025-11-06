@@ -9,6 +9,7 @@ import com.beanbliss.domain.product.repository.ProductOptionDetail
  *
  * [주요 기능]:
  * - 장바구니 아이템 추가/수정 (Upsert)
+ * - 장바구니 아이템 조회 (상품 정보 포함)
  */
 interface CartService {
     /**
@@ -29,6 +30,18 @@ interface CartService {
         productOption: ProductOptionDetail,
         quantity: Int
     ): UpsertCartItemResult
+
+    /**
+     * 사용자의 장바구니 아이템 목록 조회 (상품 정보 포함)
+     *
+     * [비즈니스 규칙]:
+     * - 장바구니가 비어 있으면 예외 발생
+     *
+     * @param userId 사용자 ID
+     * @return 장바구니 아이템 목록 (상품명, 옵션 코드, 가격 등 포함)
+     * @throws CartEmptyException 장바구니가 비어 있는 경우
+     */
+    fun getCartItemsWithProducts(userId: Long): List<CartItemResponse>
 }
 
 /**

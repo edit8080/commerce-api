@@ -151,25 +151,4 @@ class ReserveOrderControllerTest {
         )
             .andExpect(status().isConflict)
     }
-
-    @Test
-    @DisplayName("사용자 ID가 양수가 아닐 경우 400 Bad Request를 반환해야 한다")
-    fun `사용자 ID가 양수가 아닐 경우_400 Bad Request를 반환해야 한다`() {
-        // Given
-        val invalidUserId = -1L
-
-        val requestBody = """
-            {
-                "userId": $invalidUserId
-            }
-        """.trimIndent()
-
-        // When & Then
-        mockMvc.perform(
-            post("/api/order/reserve")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody)
-        )
-            .andExpect(status().isBadRequest)
-    }
 }

@@ -1,8 +1,10 @@
 package com.beanbliss.domain.product.service
 
 import com.beanbliss.common.exception.ResourceNotFoundException
+import com.beanbliss.domain.order.exception.ProductOptionInactiveException
 import com.beanbliss.domain.product.dto.ProductBasicInfo
 import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.domain.product.repository.ProductRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -17,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class ProductServiceImpl(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val productOptionRepository: ProductOptionRepository
 ) : ProductService {
 
     override fun getActiveProducts(
@@ -63,5 +66,25 @@ class ProductServiceImpl(
 
         // Repository를 통해 상품 기본 정보 조회
         return productRepository.findBasicInfoByIds(productIds)
+    }
+
+    /**
+     * 상품 옵션들의 활성 여부 검증
+     *
+     * [비즈니스 규칙]:
+     * - 모든 옵션이 존재하고 활성 상태(is_active = true)여야 합니다.
+     * - 하나라도 비활성 상태이면 예외 발생
+     *
+     * @param optionIds 검증할 상품 옵션 ID 목록
+     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
+     */
+    override fun validateProductOptionsActive(optionIds: List<Long>) {
+        // 각 옵션의 활성 여부 검증
+        optionIds.forEach { optionId ->
+            val productOption = productOptionRepository.findActiveOptionWithProduct(optionId)
+            if (productOption == null || !productOption.isActive) {
+                throw ProductOptionInactiveException("비활성화된 상품 옵션이 포함되어 있습니다. (옵션 ID: $optionId)")
+            }
+        }
     }
 }

@@ -4,6 +4,7 @@ import com.beanbliss.common.exception.InvalidPageNumberException
 import com.beanbliss.common.exception.InvalidPageSizeException
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.repository.InventoryRepository
+import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -29,13 +30,14 @@ class InventoryListServiceTest {
 
     // Mock 객체 (Repository Interface에 의존)
     private val inventoryRepository: InventoryRepository = mockk()
+    private val inventoryReservationRepository: InventoryReservationRepository = mockk()
 
     // 테스트 대상 (Service 인터페이스로 선언)
     private lateinit var inventoryService: InventoryService
 
     @BeforeEach
     fun setUp() {
-        inventoryService = InventoryServiceImpl(inventoryRepository)
+        inventoryService = InventoryServiceImpl(inventoryRepository, inventoryReservationRepository)
     }
 
     @Test

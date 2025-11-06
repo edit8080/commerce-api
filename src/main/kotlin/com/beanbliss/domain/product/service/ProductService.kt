@@ -58,4 +58,16 @@ interface ProductService {
      * @return 상품 기본 정보 목록 (id, name, brand, description)
      */
     fun getProductsByIds(productIds: List<Long>): List<ProductBasicInfo>
+
+    /**
+     * 상품 옵션들의 활성 여부 검증
+     *
+     * [비즈니스 규칙]:
+     * - 모든 옵션이 존재하고 활성 상태(is_active = true)여야 합니다.
+     * - 하나라도 비활성 상태이면 예외 발생
+     *
+     * @param optionIds 검증할 상품 옵션 ID 목록
+     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
+     */
+    fun validateProductOptionsActive(optionIds: List<Long>)
 }

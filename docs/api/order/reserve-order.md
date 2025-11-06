@@ -9,18 +9,16 @@
 - 사용자가 장바구니에서 "주문하기" 버튼 클릭 시 호출
 - 장바구니 상품들에 대한 재고를 30분간 예약
 - 예약된 재고는 다른 사용자의 가용 재고 계산 시 차감됨
-- 30분 내 결제하지 않으면 예약 자동 만료 (v1.0에서는 미구현)
 
 ### PRD 참고
 - **관련 테이블**: `INVENTORY_RESERVATION`
 - **시나리오**: 하이브리드 재고 관리 전략 (Phase 1)
 
-### 연관 테이블
-- `CART_ITEM`: 장바구니 조회
-- `PRODUCT_OPTION`: 상품 가격 및 활성 여부 조회
-- `INVENTORY`: 재고 조회 (가용 재고 계산)
-- `INVENTORY_RESERVATION`: 재고 예약 정보 저장
-- `USER`: 사용자 정보 확인
+### 연관 도메인 및 테이블
+- **Cart 도메인**: `CART_ITEM` (장바구니 조회)
+- **Product 도메인**: `PRODUCT_OPTION` (상품 가격 및 활성 여부 조회)
+- **Inventory 도메인**: `INVENTORY`, `INVENTORY_RESERVATION` (재고 조회, 예약 생성)
+- **User 도메인**: `USER` (사용자 정보 확인)
 
 ---
 
@@ -231,147 +229,13 @@ POST /api/order/reserve
 
 ## 4. 구현 시 고려사항
 
-### UseCase 패턴 적용
-
-주문 예약 기능은 **4개의 도메인**을 조율:
-1. `CartItemRepository`: 장바구니 조회
-2. `ProductOptionRepository`: 상품 정보 조회
-3. `InventoryRepository`: 재고 조회
-4. `InventoryReservationRepository`: 예약 생성 및 조회
-
-```kotlin
-@Component
-class ReserveOrderUseCase(
-    private val cartItemRepository: CartItemRepository,
-    private val productOptionRepository: ProductOptionRepository,
-    private val inventoryRepository: InventoryRepository,
-    private val inventoryReservationRepository: InventoryReservationRepository,
-    private val userRepository: UserRepository
-) {
-    @Transactional
-    fun reserveOrder(userId: Long): ReserveOrderResponse {
-        // 1. 장바구니 조회 및 검증
-        // 2. 중복 예약 방지
-        // 3. 가용 재고 계산 및 예약 생성
-        // 4. 응답 반환
-    }
-}
-```
-
 ### 동시성 제어
 
-#### FOR UPDATE 비관적 락 전략
-**목적**: 동시 예약 요청 시 가용 재고 정합성 보장 및 오버 예약 방지
+InventoryService에서 비관적 락을 사용하여 동시 예약 요청 시 재고 정합성을 보장합니다.
 
-#### 문제 상황: Race Condition
-
-서로 다른 사용자가 하나 남은 재고를 동시에 예약하려고 할 때:
-
-**시나리오**:
-- 실제 재고: 10개
-- 이미 예약된 재고: 9개
-- **가용 재고: 1개**
-- **사용자 A와 B가 동시에 1개씩 예약 시도**
-
-**비관적 락 없이 (❌ 오버 예약 발생)**:
-```
-시간    사용자 A                          사용자 B
-──────────────────────────────────────────────────────────
-T1     트랜잭션 시작                    트랜잭션 시작
-T2     재고 조회 (10개)                 재고 조회 (10개)
-T3     예약 합계 조회 (9개)             예약 합계 조회 (9개)
-T4     가용 재고 계산 = 1               가용 재고 계산 = 1
-T5     검증 통과 (1 >= 1) ✓             검증 통과 (1 >= 1) ✓
-T6     예약 생성 (A의 예약)
-T7     커밋 ✓                           예약 생성 (B의 예약)
-T8                                      커밋 ✓
-──────────────────────────────────────────────────────────
-결과: 예약 합계 11개, 실제 재고 10개 → 오버 예약! ❌
-```
-
-**비관적 락 적용 (✅ 오버 예약 방지)**:
-```
-시간    사용자 A                          사용자 B
-──────────────────────────────────────────────────────────
-T1     트랜잭션 시작                    트랜잭션 시작
-T2     재고 조회 + 락 획득 (10개) 🔒   재고 조회 시도 (대기...)
-T3     예약 합계 조회 (9개)             (대기 중...)
-T4     가용 재고 계산 = 1               (대기 중...)
-T5     검증 통과 (1 >= 1) ✓             (대기 중...)
-T6     예약 생성 (A의 예약)             (대기 중...)
-T7     커밋 ✓ (락 해제)                 락 획득 🔒
-T8                                      재고 조회 (10개)
-T9                                      예약 합계 조회 (10개)
-T10                                     가용 재고 계산 = 0
-T11                                     검증 실패 (0 < 1) ❌
-T12                                     롤백
-──────────────────────────────────────────────────────────
-결과: 사용자 A만 예약 성공, 사용자 B는 재고 부족 ✅
-```
-
-#### 해결책: INVENTORY 테이블에 비관적 락 적용
-
-```kotlin
-@Transactional(isolation = Isolation.READ_COMMITTED)
-fun reserveOrder(userId: Long): ReserveOrderResponse {
-    // 1. 장바구니 조회 (트랜잭션 밖에서 이미 수행)
-
-    // 2. 중복 예약 방지
-
-    // 3. 각 상품에 대해 순차적으로 비관적 락 획득 (데드락 방지)
-    val sortedCartItems = cartItems.sortedBy { it.productOptionId }
-
-    sortedCartItems.forEach { cartItem ->
-        // 재고에 비관적 락 설정 (다른 트랜잭션은 대기)
-        val inventory = inventoryRepository
-            .findByProductOptionIdWithLock(cartItem.productOptionId)
-            ?: throw IllegalStateException("재고 정보 없음")
-
-        // 예약된 수량 합계 조회 (커밋된 예약만)
-        val reservedQuantity = reservationRepository
-            .sumQuantityByProductOptionIdAndStatus(
-                cartItem.productOptionId,
-                listOf("RESERVED", "CONFIRMED")
-            ) ?: 0
-
-        // 가용 재고 계산
-        val availableStock = inventory.stockQuantity - reservedQuantity
-
-        // 검증 (먼저 락을 획득한 사용자만 통과)
-        if (availableStock < cartItem.quantity) {
-            throw InsufficientAvailableStockException(
-                "가용 재고 부족: 상품 옵션 ID ${cartItem.productOptionId}"
-            )
-        }
-
-        // 예약 생성
-        reservationRepository.save(reservation)
-    }
-
-    // 커밋 시 락 해제
-}
-```
-
-#### 비관적 락 설정
-
-```kotlin
-@Query("""
-    SELECT i FROM Inventory i
-    WHERE i.productOptionId = :productOptionId
-""")
-@Lock(LockModeType.PESSIMISTIC_WRITE)
-@QueryHints(
-    QueryHint(name = "javax.persistence.lock.timeout", value = "5000")
-)
-fun findByProductOptionIdWithLock(
-    @Param("productOptionId") productOptionId: Long
-): Inventory?
-```
-
-#### 데드락 방지
-- **재고 락 획득 순서**: `product_option_id` 오름차순 정렬
-- **타임아웃 설정**: 락 대기 시간 5초
-- **이유**: 여러 상품을 동시에 예약할 때 순서를 보장하여 데드락 방지
+- **비관적 락**: `InventoryRepository.findByProductOptionIdWithLock()`을 통해 INVENTORY 행 잠금 (FOR UPDATE)
+- **데드락 방지**: 여러 상품 동시 예약 시 `product_option_id` 오름차순 정렬로 락 획득 순서 보장
+- **격리 수준**: `READ_COMMITTED`로 커밋된 예약만 가용 재고 계산에 포함
 
 ### 성능 최적화
 
@@ -393,9 +257,9 @@ ON INVENTORY_RESERVATION(expires_at);
 - **중복 예약 확인**: 인덱스 활용 (user_id, status, expires_at)
 - **예약 일괄 생성**: Batch Insert 사용
 
-#### 3. 트랜잭션 범위 최소화
-- 장바구니 조회 및 검증: 트랜잭션 밖에서 수행 (빠른 실패)
-- 가용 재고 계산 ~ 예약 생성: 트랜잭션 내에서 원자적 수행
+#### 3. 트랜잭션 범위
+- UseCase의 `@Transactional`에 의해 전체 플로우가 하나의 트랜잭션으로 처리
+- 모든 Service 호출이 성공하거나 모두 실패 (원자성 보장)
 
 ### 데이터 일관성
 
@@ -405,30 +269,6 @@ ON INVENTORY_RESERVATION(expires_at);
   - 커밋된 예약만 가용 재고 계산에 포함
 - **원자성**: 모든 예약이 생성되거나 모두 실패
 
-#### 타임아웃 처리 (v1.0에서는 미구현)
-향후 구현 시:
-- **만료 시각**: `reserved_at + 30분`
-- **만료 처리**:
-  - 스케줄러 또는 메시지 큐로 만료 시각 체크
-  - `status`를 `'EXPIRED'`로 변경
-  - 가용 재고 계산 시 제외
-
-```kotlin
-// 향후 스케줄러 구현 예시
-@Scheduled(fixedRate = 60000) // 1분마다 실행
-fun expireReservations() {
-    val expiredReservations = reservationRepository.findByStatusAndExpiresAtBefore(
-        status = "RESERVED",
-        expiresAt = LocalDateTime.now()
-    )
-
-    expiredReservations.forEach { reservation ->
-        reservation.status = "EXPIRED"
-        reservationRepository.save(reservation)
-    }
-}
-```
-
 ---
 
 ## 5. 레이어드 아키텍처 흐름
@@ -437,81 +277,120 @@ fun expireReservations() {
 sequenceDiagram
     participant Controller as OrderController
     participant UseCase as ReserveOrderUseCase
+    participant UserSvc as UserService
+    participant CartSvc as CartService
+    participant ProductSvc as ProductService
+    participant InventorySvc as InventoryService
     participant CartRepo as CartItemRepository
-    participant ProductRepo as ProductOptionRepository
     participant InventoryRepo as InventoryRepository
     participant ReservationRepo as InventoryReservationRepository
 
     Controller->>UseCase: reserveOrder(userId)
     activate UseCase
 
-    Note over UseCase: 1. 장바구니 조회 및 검증
+    Note over UseCase: === 검증 로직 (트랜잭션 밖) ===
 
-    UseCase->>CartRepo: findByUserIdWithProductOption(userId)
+    Note over UseCase: 1. 사용자 검증
+
+    UseCase->>UserSvc: validateUserExists(userId)
+    activate UserSvc
+    Note over UserSvc: 사용자 존재 여부 확인
+    UserSvc-->>UseCase: ✓
+    deactivate UserSvc
+
+    alt 사용자가 존재하지 않음
+        UseCase-->>Controller: USER_NOT_FOUND (404)
+    end
+
+    Note over UseCase: 2. 장바구니 조회 및 검증
+
+    UseCase->>CartSvc: getCartItemsWithProducts(userId)
+    activate CartSvc
+    CartSvc->>CartRepo: findByUserIdWithProductOption(userId)
     activate CartRepo
     Note over CartRepo: 장바구니 조회<br/>(JOIN FETCH)
-    CartRepo-->>UseCase: List<CartItem>
+    CartRepo-->>CartSvc: List<CartItem>
     deactivate CartRepo
+    CartSvc-->>UseCase: List<CartItem>
+    deactivate CartSvc
 
     alt 장바구니가 비어있음
         UseCase-->>Controller: CART_EMPTY (400)
     end
 
-    loop 각 상품 옵션 검증
-        alt 상품 옵션이 비활성화됨
-            UseCase-->>Controller: PRODUCT_OPTION_INACTIVE (400)
-        end
+    Note over UseCase: 3. 상품 옵션 활성화 검증
+
+    UseCase->>ProductSvc: validateProductOptionsActive(optionIds)
+    activate ProductSvc
+    Note over ProductSvc: 각 상품 옵션의<br/>is_active = true 확인
+    ProductSvc-->>UseCase: ✓
+    deactivate ProductSvc
+
+    alt 비활성화된 상품 옵션 존재
+        UseCase-->>Controller: PRODUCT_OPTION_INACTIVE (400)
     end
 
-    Note over UseCase: === 트랜잭션 시작 (READ_COMMITTED) ===
+    Note over UseCase: === 재고 예약 (InventoryService 트랜잭션 내) ===
 
-    Note over UseCase: 2. 중복 예약 방지
+    Note over UseCase: 4. 재고 예약 (InventoryService에 위임)
 
-    UseCase->>ReservationRepo: countActiveReservations(userId)
+    UseCase->>InventorySvc: reserveInventory(userId, cartItems)
+    activate InventorySvc
+
+    Note over InventorySvc: @Transactional 시작<br/>(READ_COMMITTED)
+
+    Note over InventorySvc: 4-1. 중복 예약 방지
+
+    InventorySvc->>ReservationRepo: countActiveReservations(userId)
     activate ReservationRepo
     Note over ReservationRepo: SELECT COUNT(*)<br/>WHERE status IN ('RESERVED', 'CONFIRMED')<br/>AND expires_at > NOW()
-    ReservationRepo-->>UseCase: count
+    ReservationRepo-->>InventorySvc: count
     deactivate ReservationRepo
 
     alt 활성 예약이 이미 존재
-        Note over UseCase: 트랜잭션 롤백
+        Note over InventorySvc: 트랜잭션 롤백
+        InventorySvc-->>UseCase: DUPLICATE_RESERVATION (409)
         UseCase-->>Controller: DUPLICATE_RESERVATION (409)
     end
 
-    Note over UseCase: 3. 가용 재고 계산 및 예약 생성
+    Note over InventorySvc: 4-2. 가용 재고 계산 및 예약 생성
 
     loop 각 장바구니 아이템
-        UseCase->>InventoryRepo: findByProductOptionId(productOptionId)
+        InventorySvc->>InventoryRepo: findByProductOptionIdWithLock(productOptionId)
         activate InventoryRepo
-        Note over InventoryRepo: 실제 재고 조회
-        InventoryRepo-->>UseCase: Inventory
+        Note over InventoryRepo: 비관적 락 획득<br/>(FOR UPDATE)
+        InventoryRepo-->>InventorySvc: Inventory (🔒 Locked)
         deactivate InventoryRepo
 
-        UseCase->>ReservationRepo: sumQuantityByProductOptionIdAndStatus(productOptionId, ['RESERVED', 'CONFIRMED'])
+        InventorySvc->>ReservationRepo: sumQuantityByProductOptionIdAndStatusIn(productOptionId, ['RESERVED', 'CONFIRMED'])
         activate ReservationRepo
         Note over ReservationRepo: 예약된 수량 합계 계산
-        ReservationRepo-->>UseCase: reservedQuantity
+        ReservationRepo-->>InventorySvc: reservedQuantity
         deactivate ReservationRepo
 
-        Note over UseCase: availableStock = actualStock - reservedQuantity
+        Note over InventorySvc: availableStock = actualStock - reservedQuantity
 
         alt 가용 재고 부족
-            Note over UseCase: 트랜잭션 롤백
+            Note over InventorySvc: 트랜잭션 롤백
+            InventorySvc-->>UseCase: INSUFFICIENT_AVAILABLE_STOCK (409)
             UseCase-->>Controller: INSUFFICIENT_AVAILABLE_STOCK (409)
         end
 
-        Note over UseCase: 예약 정보 생성<br/>status = 'RESERVED'<br/>expires_at = NOW() + 30분
+        Note over InventorySvc: 예약 정보 생성<br/>status = 'RESERVED'<br/>expires_at = NOW() + 30분
 
-        UseCase->>ReservationRepo: save(reservation)
+        InventorySvc->>ReservationRepo: save(reservation)
         activate ReservationRepo
         Note over ReservationRepo: INSERT INTO INVENTORY_RESERVATION
-        ReservationRepo-->>UseCase: Reservation
+        ReservationRepo-->>InventorySvc: Reservation
         deactivate ReservationRepo
     end
 
-    Note over UseCase: === 트랜잭션 커밋 ===
+    Note over InventorySvc: @Transactional 커밋 (락 해제)
 
-    Note over UseCase: DTO 변환<br/>Reservation → ReserveOrderResponse
+    InventorySvc-->>UseCase: List<InventoryReservation>
+    deactivate InventorySvc
+
+    Note over UseCase: 5. DTO 변환<br/>Reservation → ReserveOrderResponse
 
     UseCase-->>Controller: ReserveOrderResponse
     deactivate UseCase
@@ -520,36 +399,61 @@ sequenceDiagram
 ### 트랜잭션 범위 및 격리 수준
 
 #### 트랜잭션 범위
-- **트랜잭션 밖**:
-  - 장바구니 조회 및 검증 (1단계)
-  - → 빠른 실패 처리
+트랜잭션은 InventoryService의 `@Transactional` 어노테이션에 의해 재고 예약 작업만 트랜잭션으로 묶입니다:
 
-- **트랜잭션 내**:
-  - 중복 예약 방지 (2단계)
-  - 가용 재고 계산 및 예약 생성 (3단계)
-  - → 원자적 처리 보장
+- **트랜잭션 밖 (빠른 실패 처리)**:
+  1. 사용자 검증 (`UserService.validateUserExists()`)
+  2. 장바구니 조회 및 검증 (`CartService.getCartItemsWithProducts()`)
+  3. 상품 옵션 활성화 검증 (`ProductService.validateProductOptionsActive()`)
+  - **장점**: 검증 실패 시 트랜잭션을 시작하지 않아 DB 리소스 절약
+
+- **트랜잭션 내 (InventoryService.reserveInventory())**:
+  1. 중복 예약 방지 검증
+  2. 비관적 락 + 가용 재고 계산
+  3. 예약 생성
+
+- **원자성 보장**:
+  - 재고 예약 작업이 모두 성공하거나 모두 실패
+  - 예외 발생 시 자동 롤백
+
+- **비관적 락 범위**:
+  - `InventoryService.reserveInventory()` 내에서 발생
+  - Repository의 `findByProductOptionIdWithLock()`으로 INVENTORY 행 잠금
+  - InventoryService 트랜잭션 커밋 시 락 자동 해제
 
 #### 격리 수준
 - **레벨**: `READ_COMMITTED`
 - **이유**:
   - Dirty Read 방지 (커밋된 예약만 계산)
-  - 실제 재고를 차감하지 않으므로 비관적 락 불필요
+  - 비관적 락으로 동시성 제어 (InventoryService에서 처리)
   - 높은 동시성 지원
 
 ### 예외 처리 흐름
 
-#### 1. 트랜잭션 밖 예외 (1단계)
-- **예외 종류**:
-  - `CART_EMPTY` (400)
-  - `PRODUCT_OPTION_INACTIVE` (400)
-- **처리**: UseCase에서 검증 후 예외 발생 → GlobalExceptionHandler
-- **트랜잭션**: 시작 전이므로 롤백 불필요
+#### 1. 트랜잭션 밖 예외 (검증 로직)
+검증 로직에서 예외 발생 시 트랜잭션이 시작되지 않습니다:
 
-#### 2. 트랜잭션 내 예외 (2~3단계)
-- **예외 종류**:
-  - `DUPLICATE_RESERVATION` (409): 중복 예약
+- **UserService**:
+  - `USER_NOT_FOUND` (404): 사용자가 존재하지 않음
+
+- **CartService**:
+  - `CART_EMPTY` (400): 장바구니가 비어있음
+
+- **ProductService**:
+  - `PRODUCT_OPTION_INACTIVE` (400): 비활성화된 상품 옵션 포함
+
+#### 2. 트랜잭션 내 예외 (InventoryService)
+InventoryService의 트랜잭션 내에서 예외 발생 시 자동 롤백됩니다:
+
+- **InventoryService**:
+  - `DUPLICATE_RESERVATION` (409): 중복 예약 존재
   - `INSUFFICIENT_AVAILABLE_STOCK` (409): 가용 재고 부족
-- **처리**: UseCase에서 트랜잭션 롤백 → GlobalExceptionHandler
+
+- **롤백 처리**:
+  - Spring의 `@Transactional`에 의한 자동 롤백
+  - 모든 DB 변경사항 롤백
+  - 비관적 락 자동 해제
+  - UseCase에서 예외를 Controller로 전파 → GlobalExceptionHandler
 
 #### 3. DB 오류
 - **예외**: `DataAccessException`

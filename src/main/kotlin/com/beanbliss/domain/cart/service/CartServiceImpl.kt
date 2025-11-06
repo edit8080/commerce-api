@@ -2,6 +2,7 @@ package com.beanbliss.domain.cart.service
 
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.cart.repository.CartItemRepository
+import com.beanbliss.domain.order.exception.CartEmptyException
 import com.beanbliss.domain.product.repository.ProductOptionDetail
 import com.beanbliss.common.exception.InvalidParameterException
 import org.springframework.stereotype.Service
@@ -100,5 +101,27 @@ class CartServiceImpl(
                 isNewItem = true
             )
         }
+    }
+
+    /**
+     * 사용자의 장바구니 아이템 목록 조회 (상품 정보 포함)
+     *
+     * [비즈니스 규칙]:
+     * - 장바구니가 비어 있으면 예외 발생
+     *
+     * @param userId 사용자 ID
+     * @return 장바구니 아이템 목록 (상품명, 옵션 코드, 가격 등 포함)
+     * @throws CartEmptyException 장바구니가 비어 있는 경우
+     */
+    override fun getCartItemsWithProducts(userId: Long): List<CartItemResponse> {
+        // 1. 장바구니 조회
+        val cartItems = cartItemRepository.findByUserId(userId)
+
+        // 2. 빈 장바구니 검증
+        if (cartItems.isEmpty()) {
+            throw CartEmptyException("장바구니가 비어 있습니다.")
+        }
+
+        return cartItems
     }
 }
