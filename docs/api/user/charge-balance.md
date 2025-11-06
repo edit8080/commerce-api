@@ -152,12 +152,13 @@ POST /api/users/123/balance/charge
 
 ### 유효성 검사
 
-| 항목                   | 검증 조건                                          | 실패 시 예외                     |
+**Controller 계층에서 파라미터 검증을 수행합니다.**
+
+| 항목                   | 검증 조건                                          | 실패 시 HTTP Status              |
 |------------------------|----------------------------------------------------|----------------------------------|
-| 충전 금액 최소값       | `chargeAmount >= 1000`                             | `INVALID_CHARGE_AMOUNT_MIN`      |
-| 충전 금액 최대값       | `chargeAmount <= 1000000`                          | `INVALID_CHARGE_AMOUNT_MAX`      |
-| 충전 금액 양수         | `chargeAmount > 0`                                 | `INVALID_CHARGE_AMOUNT_MIN`      |
-| 사용자 존재 여부       | `USER.id = userId`                                 | `USER_NOT_FOUND`                 |
+| 충전 금액 최소값       | `chargeAmount >= 1000`                             | 400 Bad Request                  |
+| 충전 금액 최대값       | `chargeAmount <= 1000000`                          | 400 Bad Request                  |
+| 사용자 존재 여부       | `USER.id = userId`                                 | 404 Not Found                    |
 
 ---
 
@@ -222,20 +223,14 @@ sequenceDiagram
     Client->>Controller: POST /api/users/{userId}/balance/charge
     activate Controller
 
+    Note over Controller: 1. 충전 금액 유효성 검증<br/>(@Min, @Max)
+
+    alt 충전 금액이 1,000원 미만 또는 1,000,000원 초과
+        Controller-->>Client: 400 Bad Request (MethodArgumentNotValidException)
+    end
+
     Controller->>UseCase: chargeBalance(userId, chargeAmount)
     activate UseCase
-
-    Note over UseCase: 1. 충전 금액 유효성 검증 (트랜잭션 밖)
-
-    alt 충전 금액이 1,000원 미만 또는 음수
-        UseCase-->>Controller: INVALID_CHARGE_AMOUNT_MIN (400)
-        Controller-->>Client: 400 Bad Request
-    end
-
-    alt 충전 금액이 1,000,000원 초과
-        UseCase-->>Controller: INVALID_CHARGE_AMOUNT_MAX (400)
-        Controller-->>Client: 400 Bad Request
-    end
 
     Note over UseCase: 2. 사용자 존재 여부 확인
 
@@ -324,25 +319,15 @@ sequenceDiagram
 ### 예외 처리 흐름
 
 #### 1. 충전 금액 유효성 검증 실패
-
-##### 1-1. 최소 금액 미만 (1,000원 미만)
-- **예외**: `IllegalArgumentException` ("충전 금액은 1,000원 이상이어야 합니다")
-- **Error Code**: `INVALID_CHARGE_AMOUNT_MIN`
+- **예외**: `MethodArgumentNotValidException` (Spring Bean Validation)
 - **HTTP Status**: 400 Bad Request
-- **처리**: ChargeBalanceUseCase에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
-- **트랜잭션**: 시작 전이므로 롤백 불필요
-
-##### 1-2. 최대 금액 초과 (1,000,000원 초과)
-- **예외**: `IllegalArgumentException` ("1회 최대 충전 금액은 1,000,000원입니다")
-- **Error Code**: `INVALID_CHARGE_AMOUNT_MAX`
-- **HTTP Status**: 400 Bad Request
-- **처리**: ChargeBalanceUseCase에서 검증 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **처리**: Controller 진입 전 자동 검증 → GlobalExceptionHandler에서 일괄 처리
 - **트랜잭션**: 시작 전이므로 롤백 불필요
 
 #### 2. 사용자 존재 여부 확인 실패
 - **예외**: `ResourceNotFoundException` ("사용자를 찾을 수 없습니다")
 - **HTTP Status**: 404 Not Found
-- **처리**: ChargeBalanceUseCase에서 UserService 호출 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
+- **처리**: UseCase에서 UserService 호출 후 예외 발생 → GlobalExceptionHandler에서 일괄 처리
 - **트랜잭션**: 시작 전이므로 롤백 불필요
 
 #### 3. 락 타임아웃

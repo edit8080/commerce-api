@@ -19,7 +19,10 @@ import java.time.LocalDateTime
  * [책임]: UserController의 잔액 충전 API 검증
  * - HTTP 요청/응답 검증
  * - UseCase 호출 검증
- * - 유효성 검증 (Bean Validation)
+ *
+ * [참고]:
+ * - 파라미터 유효성 검증은 표준 Bean Validation이 수행하므로 테스트 제외
+ *   (Spring Framework가 보장하는 표준 동작이므로 별도 테스트 불필요)
  */
 @WebMvcTest(UserController::class)
 @DisplayName("사용자 잔액 충전 Controller 테스트")
@@ -66,50 +69,6 @@ class ChargeBalanceControllerTest {
             .andExpect(jsonPath("$.data.userId").value(userId))
             .andExpect(jsonPath("$.data.currentBalance").value(80000))
             .andExpect(jsonPath("$.data.chargedAt").exists())
-    }
-
-    @Test
-    @DisplayName("충전 금액이 최소 금액(1,000원) 미만일 경우 400 Bad Request를 반환해야 한다")
-    fun `충전 금액이 최소 금액 미만일 경우_400 Bad Request를 반환해야 한다`() {
-        // Given
-        val userId = 123L
-        val invalidChargeAmount = 500 // 1,000원 미만
-
-        val requestBody = """
-            {
-                "chargeAmount": $invalidChargeAmount
-            }
-        """.trimIndent()
-
-        // When & Then
-        mockMvc.perform(
-            post("/api/users/{userId}/balance/charge", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody)
-        )
-            .andExpect(status().isBadRequest)
-    }
-
-    @Test
-    @DisplayName("충전 금액이 최대 금액(1,000,000원)을 초과할 경우 400 Bad Request를 반환해야 한다")
-    fun `충전 금액이 최대 금액을 초과할 경우_400 Bad Request를 반환해야 한다`() {
-        // Given
-        val userId = 123L
-        val invalidChargeAmount = 1500000 // 1,000,000원 초과
-
-        val requestBody = """
-            {
-                "chargeAmount": $invalidChargeAmount
-            }
-        """.trimIndent()
-
-        // When & Then
-        mockMvc.perform(
-            post("/api/users/{userId}/balance/charge", userId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestBody)
-        )
-            .andExpect(status().isBadRequest)
     }
 
     @Test

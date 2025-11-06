@@ -26,10 +26,9 @@ class ChargeBalanceUseCase(
      * 사용자 잔액 충전
      *
      * @param userId 사용자 ID
-     * @param chargeAmount 충전 금액 (1,000 ~ 1,000,000원)
+     * @param chargeAmount 충전 금액 (Controller에서 검증됨: 1,000 ~ 1,000,000원)
      * @return 충전 결과 (충전 후 현재 잔액, 충전 시각)
      * @throws ResourceNotFoundException 사용자를 찾을 수 없는 경우
-     * @throws IllegalArgumentException 충전 금액이 유효하지 않은 경우
      */
     @Transactional
     fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse {

@@ -44,15 +44,12 @@ class BalanceServiceImpl(
 
     @Transactional
     override fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse {
-        // 1. 충전 금액 유효성 검증
-        validateChargeAmount(chargeAmount)
-
-        // 2. 비관적 락으로 잔액 조회 (FOR UPDATE)
+        // 1. 비관적 락으로 잔액 조회 (FOR UPDATE)
         val existingBalance = balanceRepository.findByUserIdWithLock(userId)
 
         val now = LocalDateTime.now()
 
-        // 3. UPSERT: 레코드 존재 여부에 따라 UPDATE 또는 INSERT
+        // 2. UPSERT: 레코드 존재 여부에 따라 UPDATE 또는 INSERT
         val savedBalance = if (existingBalance != null) {
             // UPDATE: 기존 잔액에 충전 금액 추가
             val newAmount = existingBalance.amount + chargeAmount
@@ -73,27 +70,12 @@ class BalanceServiceImpl(
             balanceRepository.save(newBalance)
         }
 
-        // 4. ChargeBalanceResponse DTO 생성 및 반환
+        // 3. ChargeBalanceResponse DTO 생성 및 반환
         return ChargeBalanceResponse(
             userId = userId,
             currentBalance = savedBalance.amount,
             chargedAt = now
         )
-    }
-
-    /**
-     * 충전 금액 유효성 검증
-     *
-     * @param chargeAmount 충전 금액
-     * @throws IllegalArgumentException 충전 금액이 유효하지 않은 경우
-     */
-    private fun validateChargeAmount(chargeAmount: Int) {
-        if (chargeAmount < 1000) {
-            throw IllegalArgumentException("충전 금액은 1,000원 이상이어야 합니다.")
-        }
-        if (chargeAmount > 1000000) {
-            throw IllegalArgumentException("1회 최대 충전 금액은 1,000,000원입니다.")
-        }
     }
 
     @Transactional

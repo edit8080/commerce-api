@@ -20,9 +20,8 @@ interface BalanceService {
      * 사용자 잔액 충전 (UPSERT)
      *
      * @param userId 사용자 ID
-     * @param chargeAmount 충전 금액 (1,000 ~ 1,000,000원)
+     * @param chargeAmount 충전 금액 (Controller에서 검증됨: 1,000 ~ 1,000,000원)
      * @return 충전 결과 (충전 후 현재 잔액, 충전 시각)
-     * @throws IllegalArgumentException 충전 금액이 유효하지 않은 경우
      * @note 레코드 없으면 INSERT, 있으면 UPDATE
      */
     fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse
