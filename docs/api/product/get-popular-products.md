@@ -121,13 +121,15 @@ GET /api/products/popular?period=7&limit=10
 
 ### 3.2 유효성 검사
 
+**Controller 계층에서 파라미터 검증을 수행합니다.**
+
 1. **period 검증**
    - 1 이상 90 이하여야 함
-   - 범위를 벗어나면 `INVALID_PARAMETER` 예외 발생
+   - 범위를 벗어나면 400 Bad Request 반환
 
 2. **limit 검증**
    - 1 이상 50 이하여야 함
-   - 범위를 벗어나면 `INVALID_PARAMETER` 예외 발생
+   - 범위를 벗어나면 400 Bad Request 반환
 
 ### 3.3 정렬 규칙
 
@@ -194,27 +196,29 @@ sequenceDiagram
     participant OR as OrderRepository
     participant PR as ProductRepository
 
+    Note over C: 파라미터 유효성 검증<br/>(@Min, @Max)
+
+    alt 검증 실패 (period < 1 or period > 90 or limit < 1 or limit > 50)
+        C-->>C: 400 Bad Request
+    end
+
     C->>U: getPopularProducts(period, limit)
 
-    Note over U: 1. 파라미터 유효성 검증
-    U->>U: validatePeriod(period)
-    U->>U: validateLimit(limit)
-
-    Note over U: 2. OrderService를 통해 활성 상품 주문 수량 조회
+    Note over U: 1. OrderService를 통해 활성 상품 주문 수량 조회
     U->>OS: getTopOrderedProducts(period, limit)
     Note over OS: ORDER_ITEM + PRODUCT_OPTION JOIN<br/>is_active=true 필터링 후 집계
     OS->>OR: findTopOrderedProducts(startDate, limit)
     OR-->>OS: List<ProductOrderCount> (활성 상품만)
     OS-->>U: List<ProductOrderCount>
 
-    Note over U: 3. ProductService를 통해 상품 기본 정보 조회
+    Note over U: 2. ProductService를 통해 상품 기본 정보 조회
     U->>U: productIds = extract IDs from order counts
     U->>PS: getProductsByIds(productIds)
     PS->>PR: findByIdIn(productIds)
     PR-->>PS: List<Product>
     PS-->>U: List<ProductBasicInfo>
 
-    Note over U: 4. 결과 조합 및 정렬 유지
+    Note over U: 3. 결과 조합 및 정렬 유지
     U->>U: mergeOrderCountsWithProductInfo()
     U-->>C: PopularProductsResponse
 ```

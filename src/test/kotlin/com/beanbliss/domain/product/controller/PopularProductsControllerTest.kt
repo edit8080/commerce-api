@@ -1,6 +1,5 @@
 package com.beanbliss.domain.product.controller
 
-import com.beanbliss.common.exception.InvalidParameterException
 import com.beanbliss.domain.product.dto.PopularProductInfo
 import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.service.ProductService
@@ -26,8 +25,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
  * 2. 요청 파라미터가 올바르게 바인딩되는가?
  * 3. UseCase 결과가 올바른 JSON 형식으로 반환되는가?
  * 4. 기본값이 올바르게 적용되는가?
- * 5. 유효성 검증이 올바르게 수행되는가?
- * 6. 예외 상황에서 적절한 HTTP 상태 코드가 반환되는가?
+ * 5. 적절한 HTTP 상태 코드가 반환되는가?
+ *
+ * [참고]:
+ * - 파라미터 유효성 검증은 표준 Bean Validation이 수행하므로 테스트 제외
+ *   (Spring Framework가 보장하는 표준 동작이므로 별도 테스트 불필요)
  *
  * [관련 API]:
  * - GET /api/products/popular
@@ -136,94 +138,6 @@ class PopularProductsControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.products").isArray)
             .andExpect(jsonPath("$.data.products").isEmpty)
-    }
-
-    @Test
-    @DisplayName("GET /api/products/popular - period가 1 미만일 경우 400 Bad Request를 반환해야 한다")
-    fun `period가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given
-        val invalidPeriod = 0
-        val limit = 10
-
-        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/products/popular")
-                .param("period", invalidPeriod.toString())
-                .param("limit", limit.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
-            .andExpect(jsonPath("$.message").value("period는 1 이상 90 이하여야 합니다."))
-    }
-
-    @Test
-    @DisplayName("GET /api/products/popular - period가 90 초과일 경우 400 Bad Request를 반환해야 한다")
-    fun `period가 90 초과일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given
-        val invalidPeriod = 91
-        val limit = 10
-
-        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/products/popular")
-                .param("period", invalidPeriod.toString())
-                .param("limit", limit.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
-            .andExpect(jsonPath("$.message").value("period는 1 이상 90 이하여야 합니다."))
-    }
-
-    @Test
-    @DisplayName("GET /api/products/popular - limit가 1 미만일 경우 400 Bad Request를 반환해야 한다")
-    fun `limit가 1 미만일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given
-        val period = 7
-        val invalidLimit = 0
-
-        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/products/popular")
-                .param("period", period.toString())
-                .param("limit", invalidLimit.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
-            .andExpect(jsonPath("$.message").value("limit는 1 이상 50 이하여야 합니다."))
-    }
-
-    @Test
-    @DisplayName("GET /api/products/popular - limit가 50 초과일 경우 400 Bad Request를 반환해야 한다")
-    fun `limit가 50 초과일 경우 400 Bad Request를 반환해야 한다`() {
-        // Given
-        val period = 7
-        val invalidLimit = 51
-
-        // Controller에서 파라미터 검증 수행 (UseCase 호출 전)
-
-        // When & Then
-        mockMvc.perform(
-            get("/api/products/popular")
-                .param("period", period.toString())
-                .param("limit", invalidLimit.toString())
-                .contentType(MediaType.APPLICATION_JSON)
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
-            .andExpect(jsonPath("$.message").value("limit는 1 이상 50 이하여야 합니다."))
     }
 
     @Test

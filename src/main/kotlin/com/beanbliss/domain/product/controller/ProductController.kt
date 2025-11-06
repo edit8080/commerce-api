@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*
  *
  * [참고]:
  * - 페이징 파라미터 검증은 PageCalculator에서 수행
- * - 인기 상품 파라미터 검증은 Jakarta Validator 사용
+ * - 인기 상품 파라미터 검증은 Controller에서 수행
  * - 상품 목록 조회는 GetProductsUseCase 사용 (멀티 도메인 오케스트레이션)
  * - 상품 상세 조회는 GetProductDetailUseCase 사용 (멀티 도메인 오케스트레이션)
  */
@@ -87,8 +87,15 @@ class ProductController(
      */
     @GetMapping("/popular")
     fun getPopularProducts(
-        @RequestParam(defaultValue = "7") @Min(value = 1, message = "period는 1 이상 90 이하여야 합니다.") @Max(value = 90, message = "period는 1 이상 90 이하여야 합니다.") period: Int,
-        @RequestParam(defaultValue = "10") @Min(value = 1, message = "limit는 1 이상 50 이하여야 합니다.") @Max(value = 50, message = "limit는 1 이상 50 이하여야 합니다.") limit: Int
+        @RequestParam(defaultValue = "7")
+        @Min(value = 1, message = "period는 1 이상 90 이하여야 합니다.")
+        @Max(value = 90, message = "period는 1 이상 90 이하여야 합니다.")
+        period: Int,
+
+        @RequestParam(defaultValue = "10")
+        @Min(value = 1, message = "limit는 1 이상 50 이하여야 합니다.")
+        @Max(value = 50, message = "limit는 1 이상 50 이하여야 합니다.")
+        limit: Int
     ): ApiResponse<PopularProductsResponse> {
         // UseCase 호출
         val result = getPopularProductsUseCase.getPopularProducts(period, limit)
