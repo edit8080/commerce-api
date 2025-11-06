@@ -26,7 +26,7 @@ class UserCouponListServiceTest {
     @BeforeEach
     fun setUp() {
         userCouponRepository = mockk()
-        userCouponService = UserCouponServiceImpl(userCouponRepository)
+        userCouponService = UserCouponService(userCouponRepository)
     }
 
     @Test

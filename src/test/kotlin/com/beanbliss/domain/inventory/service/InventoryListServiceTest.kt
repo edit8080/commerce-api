@@ -37,7 +37,7 @@ class InventoryListServiceTest {
 
     @BeforeEach
     fun setUp() {
-        inventoryService = InventoryServiceImpl(inventoryRepository, inventoryReservationRepository)
+        inventoryService = InventoryService(inventoryRepository, inventoryReservationRepository)
     }
 
     @Test

@@ -40,7 +40,7 @@ class InventoryReserveServiceTest {
 
     @BeforeEach
     fun setUp() {
-        inventoryService = InventoryServiceImpl(inventoryRepository, inventoryReservationRepository)
+        inventoryService = InventoryService(inventoryRepository, inventoryReservationRepository)
     }
 
     private val now = LocalDateTime.now()

@@ -1,29 +1,43 @@
 package com.beanbliss.domain.order.usecase
 
+import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.product.service.ProductService
+import com.beanbliss.domain.user.service.UserService
+import org.springframework.stereotype.Component
 
 /**
- * [책임]: 주문 예약 UseCase의 계약 정의
- * Controller는 이 인터페이스에만 의존합니다 (DIP 준수)
+ * [책임]: 주문 예약 UseCase 구현
+ * - 여러 도메인 Service 조율
+ * - 복합 비즈니스 트랜잭션 오케스트레이션
  *
- * [UseCase 패턴]:
- * - 여러 도메인 Repository를 조율
- * - 복잡한 비즈니스 트랜잭션 처리
+ * [DIP 준수]:
+ * - UserService, CartService, ProductService, InventoryService에만 의존
+ *
+ * [트랜잭션]:
+ * - @Transactional은 InventoryService.reserveInventory()에만 적용
+ * - 재고 예약 실패 시 롤백
  */
-interface ReserveOrderUseCase {
-    /**
-     * 주문 예약 실행
-     * - 장바구니 조회 및 검증
-     * - 중복 예약 방지
-     * - 가용 재고 계산
-     * - 재고 예약 생성
-     *
-     * @param userId 사용자 ID
-     * @return 예약 결과 (도메인 데이터)
-     * @throws CartEmptyException 장바구니가 비어있는 경우
-     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
-     * @throws DuplicateReservationException 이미 진행 중인 예약이 있는 경우
-     * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
-     */
-    fun reserveOrder(userId: Long): List<InventoryService.ReservationItem>
+@Component
+class ReserveOrderUseCase(
+    private val userService: UserService,
+    private val cartService: CartService,
+    private val productService: ProductService,
+    private val inventoryService: InventoryService
+) {
+
+    fun reserveOrder(userId: Long): List<InventoryService.ReservationItem> {
+        // 1. 사용자 존재 여부 검증
+        userService.validateUserExists(userId)
+
+        // 2. 장바구니 조회 및 검증 (CartService에 위임)
+        val cartItems = cartService.getCartItemsWithProducts(userId)
+
+        // 3. 상품 옵션 활성 여부 검증 (ProductService에 위임)
+        val optionIds = cartItems.map { it.productOptionId }
+        productService.validateProductOptionsActive(optionIds)
+
+        // 4. 재고 예약 생성 (InventoryService에 위임) - 도메인 데이터 반환
+        return inventoryService.reserveInventory(userId, cartItems)
+    }
 }

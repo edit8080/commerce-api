@@ -37,7 +37,7 @@ class ProductDetailServiceTest {
 
     @BeforeEach
     fun setUp() {
-        productService = ProductServiceImpl(productRepository, productOptionRepository)
+        productService = ProductService(productRepository, productOptionRepository)
     }
 
     @Test

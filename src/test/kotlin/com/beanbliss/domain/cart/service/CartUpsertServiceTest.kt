@@ -35,7 +35,7 @@ class CartUpsertServiceTest {
 
     @BeforeEach
     fun setUp() {
-        cartService = CartServiceImpl(cartItemRepository, productOptionRepository)
+        cartService = CartService(cartItemRepository, productOptionRepository)
     }
 
     @Test

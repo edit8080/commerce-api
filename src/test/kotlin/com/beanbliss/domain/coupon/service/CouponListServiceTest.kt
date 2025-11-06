@@ -27,7 +27,7 @@ class CouponListServiceTest {
 
     @BeforeEach
     fun setUp() {
-        couponService = CouponServiceImpl(couponRepository, userCouponRepository)
+        couponService = CouponService(couponRepository, userCouponRepository)
     }
 
     @Test

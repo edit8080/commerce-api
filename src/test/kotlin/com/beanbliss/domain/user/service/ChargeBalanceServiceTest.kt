@@ -35,7 +35,7 @@ class ChargeBalanceServiceTest {
     @BeforeEach
     fun setUp() {
         balanceRepository = mockk()
-        balanceService = BalanceServiceImpl(balanceRepository)
+        balanceService = BalanceService(balanceRepository)
     }
 
     @Test

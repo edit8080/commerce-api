@@ -51,7 +51,7 @@ class CreateOrderUseCaseTest {
         orderService = mockk(relaxed = true)
         balanceService = mockk(relaxed = true)
 
-        createOrderUseCase = CreateOrderUseCaseImpl(
+        createOrderUseCase = CreateOrderUseCase(
             userService = userService,
             cartService = cartService,
             couponService = couponService,

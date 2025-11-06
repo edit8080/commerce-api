@@ -28,7 +28,7 @@ class CreateCouponServiceTest {
 
     private val couponRepository: CouponRepository = mockk()
     private val userCouponRepository = mockk<com.beanbliss.domain.coupon.repository.UserCouponRepository>()
-    private val couponService: CouponService = CouponServiceImpl(couponRepository, userCouponRepository)
+    private val couponService: CouponService = CouponService(couponRepository, userCouponRepository)
 
     private val now = LocalDateTime.now()
 

@@ -26,7 +26,7 @@ class ReserveOrderUseCaseTest {
     private val cartService: CartService = mockk()
     private val productService: ProductService = mockk()
     private val inventoryService: InventoryService = mockk()
-    private val reserveOrderUseCase = ReserveOrderUseCaseImpl(
+    private val reserveOrderUseCase = ReserveOrderUseCase(
         userService, cartService, productService, inventoryService
     )
 
