@@ -284,15 +284,17 @@ sequenceDiagram
             deactivate BalanceRepo
         end
 
+        Note over BalanceService: 7. Entity → Service DTO 변환<br/>BalanceEntity → BalanceInfo
+
         Note over BalanceService: 트랜잭션 커밋<br/>(비관적 락 해제)
 
-        BalanceService-->>UseCase: ChargeBalanceResponse
+        BalanceService-->>UseCase: BalanceInfo (Service DTO)
         deactivate BalanceService
 
-        Note over UseCase: 7. DTO 변환 완료
-
-        UseCase-->>Controller: ChargeBalanceResponse
+        UseCase-->>Controller: BalanceInfo (Service DTO)
         deactivate UseCase
+
+        Note over Controller: 8. Service DTO → Response DTO 변환<br/>BalanceInfo → ChargeBalanceResponse
 
         Controller-->>Client: 200 OK + Response Body
     end

@@ -1,7 +1,6 @@
 package com.beanbliss.domain.user.usecase
 
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.domain.user.dto.BalanceResponse
 import com.beanbliss.domain.user.service.BalanceService
 import com.beanbliss.domain.user.service.UserService
 import io.mockk.*
@@ -19,10 +18,11 @@ import java.time.LocalDateTime
  * 1. UserService와 BalanceService를 올바르게 조율하는가?
  * 2. 사용자 존재 확인 + 잔액 조회가 순차적으로 수행되는가?
  * 3. 예외 상황에서 적절히 전파하는가?
+ * 4. Service DTO를 올바르게 반환하는가?
  *
  * [UseCase의 책임]:
  * - UserService: 사용자 존재 여부 확인
- * - BalanceService: 잔액 조회
+ * - BalanceService: 잔액 조회 (Service DTO 반환)
  * - UseCase: 두 Service의 결과를 조율
  *
  * [관련 API]:
@@ -50,17 +50,17 @@ class GetBalanceUseCaseTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = BalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
             amount = 50000,
-            lastUpdatedAt = now
+            updatedAt = now
         )
 
         // UserService Mock 설정
         every { userService.validateUserExists(userId) } just Runs
 
-        // BalanceService Mock 설정
-        every { balanceService.getBalance(userId) } returns mockResponse
+        // BalanceService Mock 설정 (Service DTO 반환)
+        every { balanceService.getBalance(userId) } returns mockBalanceInfo
 
         // When
         val result = getBalanceUseCase.getBalance(userId)
@@ -76,10 +76,11 @@ class GetBalanceUseCaseTest {
             balanceService.getBalance(userId)
         }
 
-        // [검증 3]: 결과가 올바르게 반환되었는가?
-        assertEquals(userId, result.userId)
+        // [검증 3]: Service DTO가 올바르게 반환되었는가?
+        assertNotNull(result)
+        assertEquals(userId, result!!.userId)
         assertEquals(50000, result.amount)
-        assertEquals(now, result.lastUpdatedAt)
+        assertEquals(now, result.updatedAt)
     }
 
     @Test
@@ -108,29 +109,21 @@ class GetBalanceUseCaseTest {
     }
 
     @Test
-    @DisplayName("잔액 레코드가 없을 경우 0원이 반환되어야 한다")
-    fun `잔액 레코드가 없을 경우_0원이 반환되어야 한다`() {
+    @DisplayName("잔액 레코드가 없을 경우 null이 반환되어야 한다")
+    fun `잔액 레코드가 없을 경우_null이 반환되어야 한다`() {
         // Given
         val userId = 123L
 
-        // BalanceService가 레코드 없을 시 0원 반환
-        val mockResponse = BalanceResponse(
-            userId = userId,
-            amount = 0,
-            lastUpdatedAt = null
-        )
-
+        // BalanceService가 레코드 없을 시 null 반환
         every { userService.validateUserExists(userId) } just Runs
-        every { balanceService.getBalance(userId) } returns mockResponse
+        every { balanceService.getBalance(userId) } returns null
 
         // When
         val result = getBalanceUseCase.getBalance(userId)
 
         // Then
-        // [검증]: 0원이 정상적으로 반환되어야 함
-        assertEquals(userId, result.userId)
-        assertEquals(0, result.amount)
-        assertNull(result.lastUpdatedAt)
+        // [검증]: null이 정상적으로 반환되어야 함
+        assertNull(result)
 
         // [검증]: UserService와 BalanceService 모두 호출되어야 함
         verify(exactly = 1) {
@@ -148,20 +141,21 @@ class GetBalanceUseCaseTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = BalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
             amount = 0,
-            lastUpdatedAt = now
+            updatedAt = now
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { balanceService.getBalance(userId) } returns mockResponse
+        every { balanceService.getBalance(userId) } returns mockBalanceInfo
 
         // When
         val result = getBalanceUseCase.getBalance(userId)
 
         // Then
         // [검증]: 0원 잔액도 정상적으로 반환되어야 함
-        assertEquals(0, result.amount)
+        assertNotNull(result)
+        assertEquals(0, result!!.amount)
     }
 }

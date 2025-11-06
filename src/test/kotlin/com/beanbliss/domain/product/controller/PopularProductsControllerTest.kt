@@ -59,26 +59,24 @@ class PopularProductsControllerTest {
         // Given
         val period = 7
         val limit = 10
-        val mockResponse = PopularProductsResponse(
-            products = listOf(
-                PopularProductInfo(
-                    productId = 1L,
-                    productName = "에티오피아 예가체프 G1",
-                    brand = "Bean Bliss",
-                    totalOrderCount = 150,
-                    description = "플로럴하고 과일향이 풍부한 에티오피아 대표 원두"
-                ),
-                PopularProductInfo(
-                    productId = 2L,
-                    productName = "콜롬비아 수프리모",
-                    brand = "Bean Bliss",
-                    totalOrderCount = 120,
-                    description = "부드러운 맛과 균형잡힌 바디감"
-                )
+        val mockUseCaseResult = listOf(
+            GetPopularProductsUseCase.PopularProduct(
+                productId = 1L,
+                productName = "에티오피아 예가체프 G1",
+                brand = "Bean Bliss",
+                totalOrderCount = 150,
+                description = "플로럴하고 과일향이 풍부한 에티오피아 대표 원두"
+            ),
+            GetPopularProductsUseCase.PopularProduct(
+                productId = 2L,
+                productName = "콜롬비아 수프리모",
+                brand = "Bean Bliss",
+                totalOrderCount = 120,
+                description = "부드러운 맛과 균형잡힌 바디감"
             )
         )
 
-        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockResponse
+        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -105,9 +103,9 @@ class PopularProductsControllerTest {
         // Given
         val defaultPeriod = 7
         val defaultLimit = 10
-        val mockResponse = PopularProductsResponse(products = emptyList())
+        val mockUseCaseResult = emptyList<GetPopularProductsUseCase.PopularProduct>()
 
-        every { getPopularProductsUseCase.getPopularProducts(defaultPeriod, defaultLimit) } returns mockResponse
+        every { getPopularProductsUseCase.getPopularProducts(defaultPeriod, defaultLimit) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -124,9 +122,9 @@ class PopularProductsControllerTest {
         // Given
         val period = 7
         val limit = 10
-        val mockResponse = PopularProductsResponse(products = emptyList())
+        val mockUseCaseResult = emptyList<GetPopularProductsUseCase.PopularProduct>()
 
-        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockResponse
+        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -146,9 +144,9 @@ class PopularProductsControllerTest {
         // Given
         val period = 30
         val limit = 20
-        val mockResponse = PopularProductsResponse(products = emptyList())
+        val mockUseCaseResult = emptyList<GetPopularProductsUseCase.PopularProduct>()
 
-        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockResponse
+        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockUseCaseResult
 
         // When
         mockMvc.perform(
@@ -169,15 +167,13 @@ class PopularProductsControllerTest {
         // Given
         val period = 7
         val limit = 3
-        val mockResponse = PopularProductsResponse(
-            products = listOf(
-                PopularProductInfo(1L, "상품1", "브랜드1", 150, "설명1"),
-                PopularProductInfo(2L, "상품2", "브랜드2", 120, "설명2"),
-                PopularProductInfo(3L, "상품3", "브랜드3", 100, "설명3")
-            )
+        val mockUseCaseResult = listOf(
+            GetPopularProductsUseCase.PopularProduct(1L, "상품1", "브랜드1", 150, "설명1"),
+            GetPopularProductsUseCase.PopularProduct(2L, "상품2", "브랜드2", 120, "설명2"),
+            GetPopularProductsUseCase.PopularProduct(3L, "상품3", "브랜드3", 100, "설명3")
         )
 
-        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockResponse
+        every { getPopularProductsUseCase.getPopularProducts(period, limit) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(

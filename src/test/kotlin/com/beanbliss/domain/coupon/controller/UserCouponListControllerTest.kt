@@ -21,7 +21,7 @@ import java.time.LocalDateTime
  * [책임]: UserCouponController의 쿠폰 목록 조회 API 검증
  * - HTTP 요청/응답 검증
  * - 페이징 파라미터 검증
- * - 공통 응답 구조 검증 (data, pageable)
+ * - Service DTO → Response DTO 변환 검증
  */
 @WebMvcTest(UserCouponController::class)
 @DisplayName("사용자 쿠폰 목록 조회 Controller 테스트")
@@ -40,52 +40,47 @@ class UserCouponListControllerTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = UserCouponListResponse(
-            data = UserCouponListData(
-                content = listOf(
-                    UserCouponResponse(
-                        userCouponId = 456L,
-                        couponId = 1L,
-                        couponName = "오픈 기념! 선착순 100명 10% 할인 쿠폰",
-                        discountType = "PERCENTAGE",
-                        discountValue = 10,
-                        minOrderAmount = 10000,
-                        maxDiscountAmount = 5000,
-                        status = UserCouponStatus.ISSUED,
-                        validFrom = now.minusDays(1),
-                        validUntil = now.plusDays(30),
-                        issuedAt = now.minusHours(2),
-                        usedAt = null,
-                        usedOrderId = null,
-                        isAvailable = true
-                    ),
-                    UserCouponResponse(
-                        userCouponId = 457L,
-                        couponId = 2L,
-                        couponName = "신규 회원 5000원 할인 쿠폰",
-                        discountType = "FIXED_AMOUNT",
-                        discountValue = 5000,
-                        minOrderAmount = 30000,
-                        maxDiscountAmount = 5000,
-                        status = UserCouponStatus.USED,
-                        validFrom = now.minusDays(10),
-                        validUntil = now.plusDays(20),
-                        issuedAt = now.minusDays(5),
-                        usedAt = now.minusDays(3),
-                        usedOrderId = 789L,
-                        isAvailable = false
-                    )
+        val mockServiceResult = UserCouponService.UserCouponsResult(
+            userCoupons = listOf(
+                com.beanbliss.domain.coupon.repository.UserCouponWithCoupon(
+                    userCouponId = 456L,
+                    userId = userId,
+                    couponId = 1L,
+                    status = UserCouponStatus.ISSUED,
+                    usedOrderId = null,
+                    usedAt = null,
+                    issuedAt = now.minusHours(2),
+                    couponName = "오픈 기념! 선착순 100명 10% 할인 쿠폰",
+                    discountType = "PERCENTAGE",
+                    discountValue = 10,
+                    minOrderAmount = 10000,
+                    maxDiscountAmount = 5000,
+                    validFrom = now.minusDays(1),
+                    validUntil = now.plusDays(30),
+                    isAvailable = true
                 ),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 2,
-                    totalPages = 1
+                com.beanbliss.domain.coupon.repository.UserCouponWithCoupon(
+                    userCouponId = 457L,
+                    userId = userId,
+                    couponId = 2L,
+                    status = UserCouponStatus.USED,
+                    usedOrderId = 789L,
+                    usedAt = now.minusDays(3),
+                    issuedAt = now.minusDays(5),
+                    couponName = "신규 회원 5000원 할인 쿠폰",
+                    discountType = "FIXED_AMOUNT",
+                    discountValue = 5000,
+                    minOrderAmount = 30000,
+                    maxDiscountAmount = 5000,
+                    validFrom = now.minusDays(10),
+                    validUntil = now.plusDays(20),
+                    isAvailable = false
                 )
-            )
+            ),
+            totalCount = 2L
         )
 
-        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockResponse
+        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(
@@ -115,19 +110,12 @@ class UserCouponListControllerTest {
     fun `페이징 파라미터가 없으면_기본값을 사용해야 한다`() {
         // Given
         val userId = 123L
-        val mockResponse = UserCouponListResponse(
-            data = UserCouponListData(
-                content = emptyList(),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 0,
-                    totalPages = 0
-                )
-            )
+        val mockServiceResult = UserCouponService.UserCouponsResult(
+            userCoupons = emptyList(),
+            totalCount = 0L
         )
 
-        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockResponse
+        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(get("/api/users/$userId/coupons"))
@@ -141,19 +129,12 @@ class UserCouponListControllerTest {
     fun `쿠폰이 없을 경우_빈 배열과 페이징 정보를 반환해야 한다`() {
         // Given
         val userId = 123L
-        val mockResponse = UserCouponListResponse(
-            data = UserCouponListData(
-                content = emptyList(),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 0,
-                    totalPages = 0
-                )
-            )
+        val mockServiceResult = UserCouponService.UserCouponsResult(
+            userCoupons = emptyList(),
+            totalCount = 0L
         )
 
-        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockResponse
+        every { userCouponService.getUserCoupons(userId, 1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(

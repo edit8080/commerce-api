@@ -1,7 +1,9 @@
 package com.beanbliss.domain.product.controller
 
 import com.beanbliss.common.dto.ApiResponse
+import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.pagination.PageCalculator
+import com.beanbliss.domain.product.dto.PopularProductInfo
 import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
 import com.beanbliss.domain.product.dto.ProductResponse
@@ -50,14 +52,27 @@ class ProductController(
         @RequestParam(defaultValue = "1") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<ProductListResponse> {
-        // 파라미터 검증 (PageCalculator에 위임)
+        // 1. 파라미터 검증 (PageCalculator에 위임)
         PageCalculator.validatePageParameters(page, size)
 
-        // UseCase 호출 (ProductService + InventoryService 오케스트레이션)
+        // 2. UseCase 호출 (ProductService + InventoryService 오케스트레이션)
         val result = getProductsUseCase.getProducts(page, size)
 
-        // 응답 반환
-        return ApiResponse(data = result)
+        // 3. 도메인 데이터 → DTO 변환 (Controller 책임)
+        val totalPages = PageCalculator.calculateTotalPages(result.totalElements, size)
+        val pageable = PageableResponse(
+            pageNumber = page,
+            pageSize = size,
+            totalElements = result.totalElements,
+            totalPages = totalPages
+        )
+        val response = ProductListResponse(
+            content = result.products,
+            pageable = pageable
+        )
+
+        // 4. 응답 반환
+        return ApiResponse(data = response)
     }
 
     /**
@@ -97,10 +112,22 @@ class ProductController(
         @Max(value = 50, message = "limit는 1 이상 50 이하여야 합니다.")
         limit: Int
     ): ApiResponse<PopularProductsResponse> {
-        // UseCase 호출
-        val result = getPopularProductsUseCase.getPopularProducts(period, limit)
+        // 1. UseCase 호출
+        val popularProducts = getPopularProductsUseCase.getPopularProducts(period, limit)
 
-        // 응답 반환
-        return ApiResponse(data = result)
+        // 2. 도메인 데이터 → DTO 변환 (Controller 책임)
+        val productInfos = popularProducts.map { product ->
+            PopularProductInfo(
+                productId = product.productId,
+                productName = product.productName,
+                brand = product.brand,
+                totalOrderCount = product.totalOrderCount,
+                description = product.description
+            )
+        }
+        val response = PopularProductsResponse(products = productInfos)
+
+        // 3. 응답 반환
+        return ApiResponse(data = response)
     }
 }

@@ -16,8 +16,7 @@ import java.time.LocalDateTime
  * [책임]: CouponService의 쿠폰 목록 조회 비즈니스 로직 검증
  * - Repository 호출 검증
  * - isIssuable 계산 로직 검증
- * - DTO 변환 검증
- * - 페이징 정보 구성 검증
+ * - Service DTO 반환 검증
  */
 @DisplayName("쿠폰 목록 조회 Service 테스트")
 class CouponListServiceTest {
@@ -66,6 +65,8 @@ class CouponListServiceTest {
         verify(exactly = 1) { couponRepository.findAllCoupons(page, size, "created_at", "DESC") }
         verify(exactly = 1) { couponRepository.countAllCoupons() }
         assertNotNull(result)
+        assertEquals(1, result.coupons.size)
+        assertEquals(1L, result.totalCount)
     }
 
     @Test
@@ -97,7 +98,7 @@ class CouponListServiceTest {
         val result = couponService.getCoupons(1, 10)
 
         // Then
-        val coupon = result.data.content[0]
+        val coupon = result.coupons[0]
         assertTrue(coupon.isIssuable)
     }
 
@@ -130,7 +131,7 @@ class CouponListServiceTest {
         val result = couponService.getCoupons(1, 10)
 
         // Then
-        val coupon = result.data.content[0]
+        val coupon = result.coupons[0]
         assertFalse(coupon.isIssuable) // 유효기간 지남 → false
     }
 
@@ -163,7 +164,7 @@ class CouponListServiceTest {
         val result = couponService.getCoupons(1, 10)
 
         // Then
-        val coupon = result.data.content[0]
+        val coupon = result.coupons[0]
         assertFalse(coupon.isIssuable) // 남은 수량 0 → false
     }
 
@@ -196,7 +197,7 @@ class CouponListServiceTest {
         val result = couponService.getCoupons(1, 10)
 
         // Then
-        val coupon = result.data.content[0]
+        val coupon = result.coupons[0]
         assertFalse(coupon.isIssuable) // 유효기간 전 → false
     }
 
@@ -211,6 +212,6 @@ class CouponListServiceTest {
         val result = couponService.getCoupons(1, 10)
 
         // Then
-        assertTrue(result.data.content.isEmpty())
+        assertTrue(result.coupons.isEmpty())
     }
 }

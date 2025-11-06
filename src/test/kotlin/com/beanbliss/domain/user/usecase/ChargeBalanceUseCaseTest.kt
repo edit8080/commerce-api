@@ -1,7 +1,6 @@
 package com.beanbliss.domain.user.usecase
 
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.domain.user.dto.ChargeBalanceResponse
 import com.beanbliss.domain.user.service.BalanceService
 import com.beanbliss.domain.user.service.UserService
 import io.mockk.*
@@ -19,10 +18,11 @@ import java.time.LocalDateTime
  * 1. UserService와 BalanceService를 올바르게 조율하는가?
  * 2. 사용자 존재 확인 + 잔액 충전이 순차적으로 수행되는가?
  * 3. 예외 상황에서 적절히 전파하는가?
+ * 4. Service DTO를 올바르게 반환하는가?
  *
  * [UseCase의 책임]:
  * - UserService: 사용자 존재 여부 확인
- * - BalanceService: 잔액 충전 수행
+ * - BalanceService: 잔액 충전 수행 (Service DTO 반환)
  * - UseCase: 두 Service의 결과를 조율
  *
  * [관련 API]:
@@ -51,17 +51,17 @@ class ChargeBalanceUseCaseTest {
         val chargeAmount = 50000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = 80000,
-            chargedAt = now
+            amount = 80000,
+            updatedAt = now
         )
 
         // UserService Mock 설정
         every { userService.validateUserExists(userId) } just Runs
 
-        // BalanceService Mock 설정
-        every { balanceService.chargeBalance(userId, chargeAmount) } returns mockResponse
+        // BalanceService Mock 설정 (Service DTO 반환)
+        every { balanceService.chargeBalance(userId, chargeAmount) } returns mockBalanceInfo
 
         // When
         val result = chargeBalanceUseCase.chargeBalance(userId, chargeAmount)
@@ -77,10 +77,10 @@ class ChargeBalanceUseCaseTest {
             balanceService.chargeBalance(userId, chargeAmount)
         }
 
-        // [검증 3]: 결과가 올바르게 반환되었는가?
+        // [검증 3]: Service DTO가 올바르게 반환되었는가?
         assertEquals(userId, result.userId)
-        assertEquals(80000, result.currentBalance)
-        assertEquals(now, result.chargedAt)
+        assertEquals(80000, result.amount)
+        assertEquals(now, result.updatedAt)
     }
 
     @Test
@@ -144,21 +144,21 @@ class ChargeBalanceUseCaseTest {
         val minChargeAmount = 1000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = minChargeAmount,
-            chargedAt = now
+            amount = minChargeAmount,
+            updatedAt = now
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { balanceService.chargeBalance(userId, minChargeAmount) } returns mockResponse
+        every { balanceService.chargeBalance(userId, minChargeAmount) } returns mockBalanceInfo
 
         // When
         val result = chargeBalanceUseCase.chargeBalance(userId, minChargeAmount)
 
         // Then
         // [검증]: 최소 금액도 정상적으로 충전되어야 함
-        assertEquals(minChargeAmount, result.currentBalance)
+        assertEquals(minChargeAmount, result.amount)
     }
 
     @Test
@@ -169,20 +169,20 @@ class ChargeBalanceUseCaseTest {
         val maxChargeAmount = 1000000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = 1500000,
-            chargedAt = now
+            amount = 1500000,
+            updatedAt = now
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { balanceService.chargeBalance(userId, maxChargeAmount) } returns mockResponse
+        every { balanceService.chargeBalance(userId, maxChargeAmount) } returns mockBalanceInfo
 
         // When
         val result = chargeBalanceUseCase.chargeBalance(userId, maxChargeAmount)
 
         // Then
         // [검증]: 최대 금액도 정상적으로 충전되어야 함
-        assertEquals(1500000, result.currentBalance)
+        assertEquals(1500000, result.amount)
     }
 }

@@ -2,9 +2,9 @@ package com.beanbliss.domain.order.usecase
 
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.cart.service.CartService
+import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.user.service.UserService
 import io.mockk.*
@@ -55,17 +55,23 @@ class ReserveOrderUseCaseTest {
             )
         )
 
+        val reservationEntity = InventoryReservationEntity(
+            id = 1001L,
+            productOptionId = 10L,
+            userId = userId,
+            quantity = 2,
+            status = InventoryReservationStatus.RESERVED,
+            reservedAt = now,
+            expiresAt = now.plusMinutes(30),
+            updatedAt = now
+        )
+
         val reservations = listOf(
-            InventoryReservationItemResponse(
-                reservationId = 1001L,
-                productOptionId = 10L,
+            InventoryService.ReservationItem(
+                reservationEntity = reservationEntity,
                 productName = "에티오피아 예가체프 G1",
                 optionCode = "ETH-HD-200",
-                quantity = 2,
-                status = InventoryReservationStatus.RESERVED,
-                availableStock = 8,
-                reservedAt = now,
-                expiresAt = now.plusMinutes(30)
+                availableStockAfterReservation = 8
             )
         )
 
@@ -96,10 +102,10 @@ class ReserveOrderUseCaseTest {
         verify(exactly = 1) { inventoryService.reserveInventory(userId, cartItems) }
 
         // [검증 5]: 응답 DTO 반환 검증
-        assertEquals(1, result.reservations.size)
-        assertEquals(1001L, result.reservations[0].reservationId)
-        assertEquals(10L, result.reservations[0].productOptionId)
-        assertEquals("에티오피아 예가체프 G1", result.reservations[0].productName)
-        assertEquals(2, result.reservations[0].quantity)
+        assertEquals(1, result.size)
+        assertEquals(1001L, result[0].reservationEntity.id)
+        assertEquals(10L, result[0].reservationEntity.productOptionId)
+        assertEquals("에티오피아 예가체프 G1", result[0].productName)
+        assertEquals(2, result[0].reservationEntity.quantity)
     }
 }

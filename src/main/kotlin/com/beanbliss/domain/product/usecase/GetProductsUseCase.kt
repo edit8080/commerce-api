@@ -1,9 +1,7 @@
 package com.beanbliss.domain.product.usecase
 
-import com.beanbliss.common.dto.PageableResponse
-import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.product.dto.ProductListResponse
+import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -14,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional
  * [책임]:
  * - ProductService와 InventoryService를 오케스트레이션
  * - 상품 데이터와 재고 데이터 병합
- * - 응답 DTO 조립
  *
  * [DIP 준수]:
  * - ProductService, InventoryService 인터페이스에만 의존
@@ -31,14 +28,22 @@ class GetProductsUseCase(
 ) {
 
     /**
+     * 상품 목록 조회 결과 (도메인 데이터)
+     */
+    data class ProductsResult(
+        val products: List<ProductResponse>,
+        val totalElements: Long
+    )
+
+    /**
      * 상품 목록 조회 (페이징)
      *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
-     * @return 상품 목록 + 가용 재고 + 페이징 정보
+     * @return 상품 목록 + 가용 재고 + 총 개수
      */
     @Transactional(readOnly = true)
-    fun getProducts(page: Int, size: Int): ProductListResponse {
+    fun getProducts(page: Int, size: Int): ProductsResult {
         // 1. ProductService를 통해 활성 상품 조회 (created_at DESC 정렬)
         val products = productService.getActiveProducts(
             page = page,
@@ -52,16 +57,9 @@ class GetProductsUseCase(
 
         // 3. 빈 목록인 경우 조기 반환
         if (products.isEmpty()) {
-            val totalPages = PageCalculator.calculateTotalPages(totalElements, size)
-            val pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = totalElements,
-                totalPages = totalPages
-            )
-            return ProductListResponse(
-                content = emptyList(),
-                pageable = pageable
+            return ProductsResult(
+                products = emptyList(),
+                totalElements = totalElements
             )
         }
 
@@ -81,19 +79,10 @@ class GetProductsUseCase(
             product.copy(options = optionsWithStock)
         }
 
-        // 7. 페이징 정보 조립
-        val totalPages = PageCalculator.calculateTotalPages(totalElements, size)
-        val pageable = PageableResponse(
-            pageNumber = page,
-            pageSize = size,
-            totalElements = totalElements,
-            totalPages = totalPages
-        )
-
-        // 8. 응답 반환
-        return ProductListResponse(
-            content = productsWithStock,
-            pageable = pageable
+        // 7. 도메인 데이터 반환
+        return ProductsResult(
+            products = productsWithStock,
+            totalElements = totalElements
         )
     }
 }

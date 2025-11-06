@@ -55,7 +55,7 @@ class CouponIssueUseCaseTest {
         val userId = 100L
         val now = LocalDateTime.now()
 
-        val validCoupon = CouponEntity(
+        val mockCouponInfo = CouponService.CouponInfo(
             id = couponId,
             name = "테스트 쿠폰",
             discountType = "PERCENTAGE",
@@ -65,8 +65,7 @@ class CouponIssueUseCaseTest {
             totalQuantity = 100,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(7),
-            createdAt = now.minusDays(2),
-            updatedAt = now.minusDays(2)
+            createdAt = now.minusDays(2)
         )
 
         val availableTicket = CouponTicketEntity(
@@ -93,7 +92,7 @@ class CouponIssueUseCaseTest {
 
         // Service Mock 설정
         every { userService.validateUserExists(userId) } just Runs
-        every { couponService.getValidCoupon(couponId) } returns validCoupon
+        every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
         every { couponTicketService.reserveAvailableTicket(couponId) } returns availableTicket
         every { userCouponService.createUserCoupon(userId, couponId) } returns savedUserCoupon
@@ -206,7 +205,7 @@ class CouponIssueUseCaseTest {
         val userId = 100L
         val now = LocalDateTime.now()
 
-        val validCoupon = CouponEntity(
+        val mockCouponInfo = CouponService.CouponInfo(
             id = couponId,
             name = "테스트 쿠폰",
             discountType = "PERCENTAGE",
@@ -216,12 +215,11 @@ class CouponIssueUseCaseTest {
             totalQuantity = 100,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(7),
-            createdAt = now.minusDays(2),
-            updatedAt = now.minusDays(2)
+            createdAt = now.minusDays(2)
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { couponService.getValidCoupon(couponId) } returns validCoupon
+        every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } throws CouponAlreadyIssuedException("이미 발급받은 쿠폰입니다.")
 
         // When & Then
@@ -242,7 +240,7 @@ class CouponIssueUseCaseTest {
         val userId = 100L
         val now = LocalDateTime.now()
 
-        val validCoupon = CouponEntity(
+        val mockCouponInfo = CouponService.CouponInfo(
             id = couponId,
             name = "품절 쿠폰",
             discountType = "PERCENTAGE",
@@ -252,12 +250,11 @@ class CouponIssueUseCaseTest {
             totalQuantity = 100,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(7),
-            createdAt = now.minusDays(2),
-            updatedAt = now.minusDays(2)
+            createdAt = now.minusDays(2)
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { couponService.getValidCoupon(couponId) } returns validCoupon
+        every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
         every { couponTicketService.reserveAvailableTicket(couponId) } throws CouponOutOfStockException("쿠폰 재고가 부족합니다.")
 
@@ -278,7 +275,7 @@ class CouponIssueUseCaseTest {
         val userId = 100L
         val now = LocalDateTime.now()
 
-        val validCoupon = CouponEntity(
+        val mockCouponInfo = CouponService.CouponInfo(
             id = couponId,
             name = "테스트 쿠폰",
             discountType = "PERCENTAGE",
@@ -288,8 +285,7 @@ class CouponIssueUseCaseTest {
             totalQuantity = 100,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(7),
-            createdAt = now.minusDays(2),
-            updatedAt = now.minusDays(2)
+            createdAt = now.minusDays(2)
         )
 
         val availableTicket = CouponTicketEntity(
@@ -315,7 +311,7 @@ class CouponIssueUseCaseTest {
         )
 
         every { userService.validateUserExists(userId) } just Runs
-        every { couponService.getValidCoupon(couponId) } returns validCoupon
+        every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
         every { couponTicketService.reserveAvailableTicket(couponId) } returns availableTicket
         every { userCouponService.createUserCoupon(userId, couponId) } returns savedUserCoupon

@@ -1,14 +1,23 @@
 package com.beanbliss.domain.order.service
 
 import com.beanbliss.domain.order.dto.OrderCreationData
-import com.beanbliss.domain.order.dto.OrderCreationResult
 import com.beanbliss.domain.order.dto.ProductOrderCount
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
 
 /**
  * [책임]: 주문 비즈니스 로직의 계약 정의
  * UseCase는 이 인터페이스에만 의존합니다 (DIP 준수)
  */
 interface OrderService {
+    /**
+     * 주문 생성 결과 (도메인 데이터)
+     */
+    data class OrderCreationResult(
+        val orderEntity: OrderEntity,
+        val orderItemEntities: List<OrderItemEntity>
+    )
+
     /**
      * 지정된 기간 동안 가장 많이 주문된 상품 조회
      *
@@ -31,13 +40,12 @@ interface OrderService {
      * [비즈니스 로직]:
      * 1. OrderEntity 생성 (결제 완료 상태)
      * 2. OrderItemEntity 목록 생성 (배치 Insert)
-     * 3. OrderCreationResult로 변환
      *
      * [트랜잭션]:
      * - @Transactional로 원자성 보장
      *
      * @param data 주문 생성 데이터
-     * @return 생성된 주문 정보
+     * @return 생성된 주문 엔티티 + 주문 아이템 엔티티 목록
      */
     fun createOrderWithItems(data: OrderCreationData): OrderCreationResult
 }

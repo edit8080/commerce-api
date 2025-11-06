@@ -16,8 +16,8 @@ import java.time.LocalDateTime
  * - BalanceService의 잔액 조회 비즈니스 규칙 검증
  *
  * [비즈니스 로직]:
- * 1. 잔액 레코드가 있을 경우 실제 잔액 반환
- * 2. 잔액 레코드가 없을 경우 0원 반환 (예외 발생 X)
+ * 1. 잔액 레코드가 있을 경우 실제 잔액 반환 (Service DTO)
+ * 2. 잔액 레코드가 없을 경우 null 반환
  *
  * [관련 API]:
  * - GET /api/users/{userId}/balance
@@ -35,8 +35,8 @@ class GetBalanceServiceTest {
     }
 
     @Test
-    @DisplayName("잔액 레코드가 있을 경우 실제 잔액을 반환해야 한다")
-    fun `잔액 레코드가 있을 경우_실제 잔액을 반환해야 한다`() {
+    @DisplayName("잔액 레코드가 있을 경우 Service DTO를 반환해야 한다")
+    fun `잔액 레코드가 있을 경우_Service DTO를 반환해야 한다`() {
         // Given
         val userId = 123L
         val now = LocalDateTime.now()
@@ -52,32 +52,30 @@ class GetBalanceServiceTest {
         every { balanceRepository.findByUserId(userId) } returns mockBalance
 
         // When
-        val response = balanceService.getBalance(userId)
+        val balanceInfo = balanceService.getBalance(userId)
 
-        // Then
-        assertEquals(userId, response.userId)
-        assertEquals(50000, response.amount)
-        assertEquals(now, response.lastUpdatedAt)
+        // Then: Service DTO 검증
+        assertNotNull(balanceInfo)
+        assertEquals(userId, balanceInfo!!.userId)
+        assertEquals(50000, balanceInfo.amount)
+        assertEquals(now, balanceInfo.updatedAt)
 
         verify(exactly = 1) { balanceRepository.findByUserId(userId) }
     }
 
     @Test
-    @DisplayName("잔액 레코드가 없을 경우 0원과 null lastUpdatedAt을 반환해야 한다")
-    fun `잔액 레코드가 없을 경우_0원과 null lastUpdatedAt을 반환해야 한다`() {
+    @DisplayName("잔액 레코드가 없을 경우 null을 반환해야 한다")
+    fun `잔액 레코드가 없을 경우_null을 반환해야 한다`() {
         // Given
         val userId = 999L
 
         every { balanceRepository.findByUserId(userId) } returns null
 
         // When
-        val response = balanceService.getBalance(userId)
+        val balanceInfo = balanceService.getBalance(userId)
 
-        // Then
-        // [비즈니스 로직 검증]: 레코드 없을 시 0원 반환 (예외 발생 X)
-        assertEquals(userId, response.userId)
-        assertEquals(0, response.amount)
-        assertNull(response.lastUpdatedAt)
+        // Then: null 반환 검증
+        assertNull(balanceInfo)
 
         verify(exactly = 1) { balanceRepository.findByUserId(userId) }
     }

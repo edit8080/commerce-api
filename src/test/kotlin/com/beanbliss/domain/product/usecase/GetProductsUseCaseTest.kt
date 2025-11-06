@@ -93,27 +93,24 @@ class GetProductsUseCaseTest {
         }
 
         // [검증 3]: 상품 데이터와 재고 데이터가 올바르게 병합되었는가?
-        assertEquals(2, result.content.size)
+        assertEquals(2, result.products.size)
 
         // 첫 번째 상품 검증
-        val product1 = result.content[0]
+        val product1 = result.products[0]
         assertEquals(1L, product1.productId)
         assertEquals("에티오피아 예가체프", product1.name)
         assertEquals(50, product1.options[0].availableStock)
         assertEquals(30, product1.options[1].availableStock)
 
         // 두 번째 상품 검증
-        val product2 = result.content[1]
+        val product2 = result.products[1]
         assertEquals(2L, product2.productId)
         assertEquals("콜롬비아 수프리모", product2.name)
         assertEquals(20, product2.options[0].availableStock)
         assertEquals(10, product2.options[1].availableStock)
 
-        // [검증 4]: 페이징 정보가 올바르게 조립되었는가?
-        assertEquals(page, result.pageable.pageNumber)
-        assertEquals(size, result.pageable.pageSize)
-        assertEquals(totalElements, result.pageable.totalElements)
-        assertEquals(5, result.pageable.totalPages) // 42 / 10 = 5 pages
+        // [검증 4]: totalElements가 올바르게 반환되었는가?
+        assertEquals(totalElements, result.totalElements)
     }
 
     @Test
@@ -149,12 +146,9 @@ class GetProductsUseCaseTest {
             inventoryService.calculateAvailableStockBatch(any())
         }
 
-        // [검증 3]: 빈 목록과 올바른 페이징 정보를 반환해야 한다
-        assertTrue(result.content.isEmpty())
-        assertEquals(page, result.pageable.pageNumber)
-        assertEquals(size, result.pageable.pageSize)
-        assertEquals(totalElements, result.pageable.totalElements)
-        assertEquals(0, result.pageable.totalPages)
+        // [검증 3]: 빈 목록과 올바른 totalElements를 반환해야 한다
+        assertTrue(result.products.isEmpty())
+        assertEquals(totalElements, result.totalElements)
     }
 
     @Test
@@ -189,7 +183,7 @@ class GetProductsUseCaseTest {
 
         // Then
         // [검증]: 재고 정보가 없는 옵션은 0으로 설정되어야 한다
-        val product = result.content[0]
+        val product = result.products[0]
         assertEquals(50, product.options[0].availableStock) // 재고 있음
         assertEquals(0, product.options[1].availableStock)  // 재고 없음 -> 0
         assertEquals(0, product.options[2].availableStock)  // 재고 없음 -> 0
@@ -256,8 +250,8 @@ class GetProductsUseCaseTest {
         val result = getProductsUseCase.getProducts(page, size)
 
         // Then
-        // [검증]: 총 페이지 수가 올바르게 계산되어야 한다 (3 / 1 = 3 pages)
-        assertEquals(3, result.pageable.totalPages)
+        // [검증]: totalElements가 올바르게 반환되어야 한다
+        assertEquals(totalElements, result.totalElements)
     }
 
     @Test
@@ -287,10 +281,8 @@ class GetProductsUseCaseTest {
         val result = getProductsUseCase.getProducts(page, size)
 
         // Then
-        assertEquals(page, result.pageable.pageNumber)
-        assertEquals(size, result.pageable.pageSize)
-        assertEquals(totalElements, result.pageable.totalElements)
-        assertEquals(5, result.pageable.totalPages)
+        // [검증]: totalElements가 올바르게 반환되어야 한다
+        assertEquals(totalElements, result.totalElements)
     }
 
     // === Helper Methods ===

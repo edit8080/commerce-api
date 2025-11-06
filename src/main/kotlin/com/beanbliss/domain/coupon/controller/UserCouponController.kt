@@ -1,7 +1,10 @@
 package com.beanbliss.domain.coupon.controller
 
+import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.pagination.PageCalculator
+import com.beanbliss.domain.coupon.dto.UserCouponListData
 import com.beanbliss.domain.coupon.dto.UserCouponListResponse
+import com.beanbliss.domain.coupon.dto.UserCouponResponse
 import com.beanbliss.domain.coupon.service.UserCouponService
 import org.springframework.web.bind.annotation.*
 
@@ -37,10 +40,46 @@ class UserCouponController(
         @RequestParam(defaultValue = "1") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): UserCouponListResponse {
-        // 파라미터 검증 (PageCalculator에 위임)
+        // 1. 파라미터 검증 (PageCalculator에 위임)
         PageCalculator.validatePageParameters(page, size)
 
-        // Service 호출 및 응답 반환
-        return userCouponService.getUserCoupons(userId, page, size)
+        // 2. Service 호출
+        val result = userCouponService.getUserCoupons(userId, page, size)
+
+        // 3. 도메인 데이터 → DTO 변환 (Controller 책임)
+        val totalPages = PageCalculator.calculateTotalPages(result.totalCount, size)
+        val userCouponResponses = result.userCoupons.map { userCoupon ->
+            UserCouponResponse(
+                userCouponId = userCoupon.userCouponId,
+                couponId = userCoupon.couponId,
+                couponName = userCoupon.couponName,
+                discountType = userCoupon.discountType,
+                discountValue = userCoupon.discountValue,
+                minOrderAmount = userCoupon.minOrderAmount,
+                maxDiscountAmount = userCoupon.maxDiscountAmount,
+                status = userCoupon.status,
+                validFrom = userCoupon.validFrom,
+                validUntil = userCoupon.validUntil,
+                issuedAt = userCoupon.issuedAt,
+                usedAt = userCoupon.usedAt,
+                usedOrderId = userCoupon.usedOrderId,
+                isAvailable = userCoupon.isAvailable
+            )
+        }
+
+        val pageable = PageableResponse(
+            pageNumber = page,
+            pageSize = size,
+            totalElements = result.totalCount,
+            totalPages = totalPages
+        )
+
+        // 4. 응답 반환
+        return UserCouponListResponse(
+            data = UserCouponListData(
+                content = userCouponResponses,
+                pageable = pageable
+            )
+        )
     }
 }

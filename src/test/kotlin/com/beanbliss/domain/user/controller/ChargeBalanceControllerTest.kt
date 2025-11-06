@@ -1,6 +1,6 @@
 package com.beanbliss.domain.user.controller
 
-import com.beanbliss.domain.user.dto.ChargeBalanceResponse
+import com.beanbliss.domain.user.service.BalanceService
 import com.beanbliss.domain.user.usecase.ChargeBalanceUseCase
 import com.beanbliss.domain.user.usecase.GetBalanceUseCase
 import com.ninjasquad.springmockk.MockkBean
@@ -19,10 +19,7 @@ import java.time.LocalDateTime
  * [책임]: UserController의 잔액 충전 API 검증
  * - HTTP 요청/응답 검증
  * - UseCase 호출 검증
- *
- * [참고]:
- * - 파라미터 유효성 검증은 표준 Bean Validation이 수행하므로 테스트 제외
- *   (Spring Framework가 보장하는 표준 동작이므로 별도 테스트 불필요)
+ * - Service DTO → Response DTO 변환 검증
  */
 @WebMvcTest(UserController::class)
 @DisplayName("사용자 잔액 충전 Controller 테스트")
@@ -45,13 +42,13 @@ class ChargeBalanceControllerTest {
         val chargeAmount = 50000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = 80000,
-            chargedAt = now
+            amount = 80000,
+            updatedAt = now
         )
 
-        every { chargeBalanceUseCase.chargeBalance(userId, chargeAmount) } returns mockResponse
+        every { chargeBalanceUseCase.chargeBalance(userId, chargeAmount) } returns mockBalanceInfo
 
         val requestBody = """
             {
@@ -79,13 +76,13 @@ class ChargeBalanceControllerTest {
         val minChargeAmount = 1000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = minChargeAmount,
-            chargedAt = now
+            amount = minChargeAmount,
+            updatedAt = now
         )
 
-        every { chargeBalanceUseCase.chargeBalance(userId, minChargeAmount) } returns mockResponse
+        every { chargeBalanceUseCase.chargeBalance(userId, minChargeAmount) } returns mockBalanceInfo
 
         val requestBody = """
             {
@@ -111,13 +108,13 @@ class ChargeBalanceControllerTest {
         val maxChargeAmount = 1000000
         val now = LocalDateTime.now()
 
-        val mockResponse = ChargeBalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
-            currentBalance = 1500000,
-            chargedAt = now
+            amount = 1500000,
+            updatedAt = now
         )
 
-        every { chargeBalanceUseCase.chargeBalance(userId, maxChargeAmount) } returns mockResponse
+        every { chargeBalanceUseCase.chargeBalance(userId, maxChargeAmount) } returns mockBalanceInfo
 
         val requestBody = """
             {

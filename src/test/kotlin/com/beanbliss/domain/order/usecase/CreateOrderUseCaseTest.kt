@@ -3,12 +3,11 @@ package com.beanbliss.domain.order.usecase
 import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.coupon.dto.CouponValidationResult
-import com.beanbliss.domain.coupon.entity.CouponEntity
 import com.beanbliss.domain.coupon.service.CouponService
 import com.beanbliss.domain.inventory.service.InventoryReservationService
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.order.dto.OrderCreationResult
-import com.beanbliss.domain.order.dto.OrderItemResponse
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
 import com.beanbliss.domain.order.entity.OrderStatus
 import com.beanbliss.domain.order.exception.*
 import com.beanbliss.domain.order.service.OrderService
@@ -96,9 +95,9 @@ class CreateOrderUseCaseTest {
         totalQuantity: Int = 100,
         validFrom: LocalDateTime = LocalDateTime.now().minusDays(7),
         validUntil: LocalDateTime = LocalDateTime.now().plusDays(7)
-    ): CouponEntity {
+    ): CouponService.CouponInfo {
         val now = LocalDateTime.now()
-        return CouponEntity(
+        return CouponService.CouponInfo(
             id = couponId,
             name = "10% 할인 쿠폰",
             discountType = discountType,
@@ -108,8 +107,7 @@ class CreateOrderUseCaseTest {
             totalQuantity = totalQuantity,
             validFrom = validFrom,
             validUntil = validUntil,
-            createdAt = now.minusDays(7),
-            updatedAt = now.minusDays(7)
+            createdAt = now.minusDays(7)
         )
     }
 
@@ -133,20 +131,28 @@ class CreateOrderUseCaseTest {
         every { couponService.calculateDiscount(coupon, 30000) } returns 3000 // 10% 할인 = 3000원
         every { inventoryReservationService.validateReservations(userId, any()) } just Runs
         every { inventoryService.reduceStockForOrder(any()) } just Runs
-        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
-            orderId = 1L,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderItems = listOf(
-                OrderItemResponse(
+        every { orderService.createOrderWithItems(any()) } returns OrderService.OrderCreationResult(
+            orderEntity = OrderEntity(
+                id = 1L,
+                userId = userId,
+                totalAmount = 30000,
+                discountAmount = 3000,
+                finalAmount = 27000,
+                shippingAddress = shippingAddress,
+                orderStatus = OrderStatus.PAYMENT_COMPLETED,
+                orderedAt = now,
+                updatedAt = now
+            ),
+            orderItemEntities = listOf(
+                OrderItemEntity(
+                    id = 1L,
+                    orderId = 1L,
                     productOptionId = 1L,
-                    productName = "에티오피아 예가체프",
-                    optionCode = "ETH-YRG-WH-200g",
                     quantity = 2,
                     unitPrice = 15000,
                     totalPrice = 30000
                 )
-            ),
-            orderedAt = now
+            )
         )
         every { balanceService.deductBalance(userId, 27000) } just Runs
         every { inventoryReservationService.confirmReservations(userId, any()) } just Runs
@@ -158,14 +164,14 @@ class CreateOrderUseCaseTest {
 
         // Then
         assertNotNull(response)
-        assertEquals(1L, response.orderId)
-        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderStatus)
-        assertEquals(1, response.orderItems.size)
-        assertEquals(30000, response.priceInfo.totalProductAmount)
-        assertEquals(3000, response.priceInfo.discountAmount)
-        assertEquals(27000, response.priceInfo.finalAmount)
-        assertNotNull(response.appliedCoupon)
-        assertEquals("10% 할인 쿠폰", response.appliedCoupon?.couponName)
+        assertEquals(1L, response.orderEntity.id)
+        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.orderStatus)
+        assertEquals(1, response.orderItemEntities.size)
+        assertEquals(30000, response.originalAmount)
+        assertEquals(3000, response.discountAmount)
+        assertEquals(27000, response.finalAmount)
+        assertNotNull(response.couponInfo)
+        assertEquals("10% 할인 쿠폰", response.couponInfo?.name)
 
         // Verify: 각 Service 메서드가 호출되었는지 검증
         verify(exactly = 1) { userService.validateUserExists(userId) }
@@ -199,20 +205,28 @@ class CreateOrderUseCaseTest {
         every { cartService.validateCartItems(any()) } just Runs
         every { inventoryReservationService.validateReservations(userId, any()) } just Runs
         every { inventoryService.reduceStockForOrder(any()) } just Runs
-        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
-            orderId = 1L,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderItems = listOf(
-                OrderItemResponse(
+        every { orderService.createOrderWithItems(any()) } returns OrderService.OrderCreationResult(
+            orderEntity = OrderEntity(
+                id = 1L,
+                userId = userId,
+                totalAmount = 30000,
+                discountAmount = 0,
+                finalAmount = 30000,
+                shippingAddress = shippingAddress,
+                orderStatus = OrderStatus.PAYMENT_COMPLETED,
+                orderedAt = now,
+                updatedAt = now
+            ),
+            orderItemEntities = listOf(
+                OrderItemEntity(
+                    id = 1L,
+                    orderId = 1L,
                     productOptionId = 1L,
-                    productName = "에티오피아 예가체프",
-                    optionCode = "ETH-YRG-WH-200g",
                     quantity = 2,
                     unitPrice = 15000,
                     totalPrice = 30000
                 )
-            ),
-            orderedAt = now
+            )
         )
         every { balanceService.deductBalance(userId, 30000) } just Runs
         every { inventoryReservationService.confirmReservations(userId, any()) } just Runs
@@ -223,13 +237,13 @@ class CreateOrderUseCaseTest {
 
         // Then
         assertNotNull(response)
-        assertEquals(1L, response.orderId)
-        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderStatus)
-        assertEquals(1, response.orderItems.size)
-        assertEquals(30000, response.priceInfo.totalProductAmount)
-        assertEquals(0, response.priceInfo.discountAmount)
-        assertEquals(30000, response.priceInfo.finalAmount)
-        assertNull(response.appliedCoupon) // 쿠폰을 사용하지 않음
+        assertEquals(1L, response.orderEntity.id)
+        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.orderStatus)
+        assertEquals(1, response.orderItemEntities.size)
+        assertEquals(30000, response.originalAmount)
+        assertEquals(0, response.discountAmount)
+        assertEquals(30000, response.finalAmount)
+        assertNull(response.couponInfo) // 쿠폰을 사용하지 않음
 
         // Verify: 쿠폰 관련 Service는 호출되지 않아야 함
         verify(exactly = 1) { userService.validateUserExists(userId) }
@@ -404,20 +418,28 @@ class CreateOrderUseCaseTest {
         every { cartService.validateCartItems(any()) } just Runs
         every { inventoryReservationService.validateReservations(userId, any()) } just Runs
         every { inventoryService.reduceStockForOrder(any()) } just Runs
-        every { orderService.createOrderWithItems(any()) } returns OrderCreationResult(
-            orderId = 1L,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderItems = listOf(
-                OrderItemResponse(
+        every { orderService.createOrderWithItems(any()) } returns OrderService.OrderCreationResult(
+            orderEntity = OrderEntity(
+                id = 1L,
+                userId = userId,
+                totalAmount = 30000,
+                discountAmount = 0,
+                finalAmount = 30000,
+                shippingAddress = shippingAddress,
+                orderStatus = OrderStatus.PAYMENT_COMPLETED,
+                orderedAt = now,
+                updatedAt = now
+            ),
+            orderItemEntities = listOf(
+                OrderItemEntity(
+                    id = 1L,
+                    orderId = 1L,
                     productOptionId = 1L,
-                    productName = "에티오피아 예가체프",
-                    optionCode = "ETH-YRG-WH-200g",
                     quantity = 2,
                     unitPrice = 15000,
                     totalPrice = 30000
                 )
-            ),
-            orderedAt = now
+            )
         )
         every { balanceService.deductBalance(userId, 30000) } throws InsufficientBalanceException("사용자 잔액이 부족합니다.")
 

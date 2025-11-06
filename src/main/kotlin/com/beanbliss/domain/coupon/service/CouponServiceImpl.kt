@@ -1,12 +1,7 @@
 package com.beanbliss.domain.coupon.service
 
-import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.coupon.domain.DiscountType
-import com.beanbliss.domain.coupon.dto.CouponListData
-import com.beanbliss.domain.coupon.dto.CouponListResponse
-import com.beanbliss.domain.coupon.dto.CouponResponse
 import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.dto.CreateCouponRequest
 import com.beanbliss.domain.coupon.entity.CouponEntity
@@ -17,7 +12,6 @@ import com.beanbliss.domain.coupon.exception.InvalidCouponException
 import com.beanbliss.domain.coupon.repository.CouponRepository
 import com.beanbliss.domain.coupon.repository.CouponWithQuantity
 import com.beanbliss.domain.coupon.repository.UserCouponRepository
-import com.beanbliss.domain.order.exception.InvalidCouponOrderAmountException
 import com.beanbliss.domain.order.exception.UserCouponAlreadyUsedException
 import com.beanbliss.domain.order.exception.UserCouponExpiredException
 import com.beanbliss.domain.order.exception.UserCouponNotFoundException
@@ -42,7 +36,7 @@ class CouponServiceImpl(
 ) : CouponService {
 
     @Transactional
-    override fun createCoupon(request: CreateCouponRequest): CouponEntity {
+    override fun createCoupon(request: CreateCouponRequest): CouponService.CouponInfo {
         // 1. 비즈니스 규칙 검증
         validateMaxDiscountAmountRule(request)
 
@@ -50,7 +44,21 @@ class CouponServiceImpl(
         val couponEntity = createCouponEntity(request)
 
         // 3. Repository에 저장
-        return couponRepository.save(couponEntity)
+        val savedEntity = couponRepository.save(couponEntity)
+
+        // 4. Entity → Service DTO 변환
+        return CouponService.CouponInfo(
+            id = savedEntity.id!!,
+            name = savedEntity.name,
+            discountType = savedEntity.discountType,
+            discountValue = savedEntity.discountValue,
+            minOrderAmount = savedEntity.minOrderAmount,
+            maxDiscountAmount = savedEntity.maxDiscountAmount,
+            totalQuantity = savedEntity.totalQuantity,
+            validFrom = savedEntity.validFrom,
+            validUntil = savedEntity.validUntil,
+            createdAt = savedEntity.createdAt
+        )
     }
 
     /**
@@ -88,7 +96,7 @@ class CouponServiceImpl(
         )
     }
 
-    override fun getCoupons(page: Int, size: Int): CouponListResponse {
+    override fun getCoupons(page: Int, size: Int): CouponService.CouponsResult {
         // 1. Repository에서 쿠폰 목록 조회 (정렬: created_at DESC)
         val coupons = couponRepository.findAllCoupons(
             page = page,
@@ -100,32 +108,20 @@ class CouponServiceImpl(
         // 2. Repository에서 전체 쿠폰 개수 조회
         val totalCount = couponRepository.countAllCoupons()
 
-        // 3. CouponWithQuantity -> CouponResponse 변환 및 isIssuable 계산
+        // 3. CouponWithQuantity -> 도메인 데이터로 변환 및 isIssuable 계산
         val now = LocalDateTime.now()
-        val couponResponses = coupons.map { coupon ->
-            toCouponResponse(coupon, now)
+        val couponData = coupons.map { coupon ->
+            toCouponWithAvailability(coupon, now)
         }
 
-        // 4. 페이징 정보 구성 (PageCalculator 사용)
-        val totalPages = PageCalculator.calculateTotalPages(totalCount, size)
-
-        val pageable = PageableResponse(
-            pageNumber = page,
-            pageSize = size,
-            totalElements = totalCount,
-            totalPages = totalPages
-        )
-
-        // 5. 최종 응답 구성
-        return CouponListResponse(
-            data = CouponListData(
-                content = couponResponses,
-                pageable = pageable
-            )
+        // 4. 도메인 데이터 반환
+        return CouponService.CouponsResult(
+            coupons = couponData,
+            totalCount = totalCount
         )
     }
 
-    override fun getValidCoupon(couponId: Long): CouponEntity {
+    override fun getValidCoupon(couponId: Long): CouponService.CouponInfo {
         // 1. 쿠폰 조회
         val coupon = couponRepository.findById(couponId)
             ?: throw ResourceNotFoundException("쿠폰을 찾을 수 없습니다.")
@@ -139,7 +135,19 @@ class CouponServiceImpl(
             throw CouponExpiredException("유효기간이 만료된 쿠폰입니다.")
         }
 
-        return coupon
+        // 3. Entity → Service DTO 변환
+        return CouponService.CouponInfo(
+            id = coupon.id!!,
+            name = coupon.name,
+            discountType = coupon.discountType,
+            discountValue = coupon.discountValue,
+            minOrderAmount = coupon.minOrderAmount,
+            maxDiscountAmount = coupon.maxDiscountAmount,
+            totalQuantity = coupon.totalQuantity,
+            validFrom = coupon.validFrom,
+            validUntil = coupon.validUntil,
+            createdAt = coupon.createdAt
+        )
     }
 
     override fun validateAndGetCoupon(userId: Long, userCouponId: Long): CouponValidationResult {
@@ -167,7 +175,21 @@ class CouponServiceImpl(
             throw UserCouponExpiredException("쿠폰이 만료되었습니다.")
         }
 
-        return CouponValidationResult(coupon)
+        // 6. Entity → Service DTO 변환
+        val couponInfo = CouponService.CouponInfo(
+            id = coupon.id!!,
+            name = coupon.name,
+            discountType = coupon.discountType,
+            discountValue = coupon.discountValue,
+            minOrderAmount = coupon.minOrderAmount,
+            maxDiscountAmount = coupon.maxDiscountAmount,
+            totalQuantity = coupon.totalQuantity,
+            validFrom = coupon.validFrom,
+            validUntil = coupon.validUntil,
+            createdAt = coupon.createdAt
+        )
+
+        return CouponValidationResult(couponInfo)
     }
 
     @Transactional
@@ -189,7 +211,7 @@ class CouponServiceImpl(
         userCouponRepository.save(updatedCoupon.userId, updatedCoupon.couponId)
     }
 
-    override fun calculateDiscount(coupon: CouponEntity, originalAmount: Int): Int {
+    override fun calculateDiscount(coupon: CouponService.CouponInfo, originalAmount: Int): Int {
         // 할인 금액 계산 로직
         return when (coupon.discountType) {
             "PERCENTAGE" -> {
@@ -204,18 +226,18 @@ class CouponServiceImpl(
     }
 
     /**
-     * CouponWithQuantity를 CouponResponse로 변환하고 isIssuable 계산
+     * CouponWithQuantity를 도메인 데이터로 변환하고 isIssuable 계산
      *
      * isIssuable 조건:
      * - 현재 시각이 유효 기간 내 (now BETWEEN validFrom AND validUntil)
      * - 남은 수량이 1개 이상 (remainingQuantity > 0)
      */
-    private fun toCouponResponse(coupon: CouponWithQuantity, now: LocalDateTime): CouponResponse {
+    private fun toCouponWithAvailability(coupon: CouponWithQuantity, now: LocalDateTime): CouponService.CouponWithAvailability {
         val isInValidPeriod = now.isAfter(coupon.validFrom) && now.isBefore(coupon.validUntil)
         val hasRemainingQuantity = coupon.remainingQuantity > 0
         val isIssuable = isInValidPeriod && hasRemainingQuantity
 
-        return CouponResponse(
+        return CouponService.CouponWithAvailability(
             couponId = coupon.id,
             name = coupon.name,
             discountType = coupon.discountType,

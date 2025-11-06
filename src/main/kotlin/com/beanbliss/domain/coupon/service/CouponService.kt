@@ -1,15 +1,30 @@
 package com.beanbliss.domain.coupon.service
 
-import com.beanbliss.domain.coupon.dto.CouponListResponse
 import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.dto.CreateCouponRequest
-import com.beanbliss.domain.coupon.entity.CouponEntity
+import java.time.LocalDateTime
 
 /**
  * [책임]: 쿠폰 비즈니스 로직의 계약 정의
  * Controller는 이 인터페이스에만 의존합니다 (DIP 준수)
  */
 interface CouponService {
+    /**
+     * 쿠폰 정보 (Service DTO)
+     */
+    data class CouponInfo(
+        val id: Long,
+        val name: String,
+        val discountType: String,
+        val discountValue: Int,
+        val minOrderAmount: Int,
+        val maxDiscountAmount: Int,
+        val totalQuantity: Int,
+        val validFrom: LocalDateTime,
+        val validUntil: LocalDateTime,
+        val createdAt: LocalDateTime
+    )
+
     /**
      * 쿠폰 생성
      *
@@ -18,30 +33,55 @@ interface CouponService {
      * - CouponEntity 생성 및 저장
      *
      * @param request 쿠폰 생성 요청
-     * @return 생성된 쿠폰 Entity
+     * @return 생성된 쿠폰 정보
      * @throws InvalidCouponException 비즈니스 규칙 위반 시
      */
-    fun createCoupon(request: CreateCouponRequest): CouponEntity
+    fun createCoupon(request: CreateCouponRequest): CouponInfo
+
+    /**
+     * 쿠폰 목록 조회 결과 (도메인 데이터)
+     */
+    data class CouponsResult(
+        val coupons: List<CouponWithAvailability>,
+        val totalCount: Long
+    )
+
+    /**
+     * 쿠폰 정보 + 발급 가능 여부 (도메인 데이터)
+     */
+    data class CouponWithAvailability(
+        val couponId: Long,
+        val name: String,
+        val discountType: String,
+        val discountValue: Int,
+        val minOrderAmount: Int,
+        val maxDiscountAmount: Int,
+        val remainingQuantity: Int,
+        val totalQuantity: Int,
+        val validFrom: LocalDateTime,
+        val validUntil: LocalDateTime,
+        val isIssuable: Boolean
+    )
 
     /**
      * 쿠폰 목록 조회
      *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
-     * @return 쿠폰 목록 응답 (페이징 정보 포함)
+     * @return 쿠폰 목록 + 총 개수
      */
-    fun getCoupons(page: Int, size: Int): CouponListResponse
+    fun getCoupons(page: Int, size: Int): CouponsResult
 
     /**
      * 유효한 쿠폰 조회
      *
      * @param couponId 쿠폰 ID
-     * @return 쿠폰 Entity
+     * @return 쿠폰 정보
      * @throws ResourceNotFoundException 쿠폰을 찾을 수 없는 경우
      * @throws CouponNotStartedException 쿠폰 유효 기간이 시작되지 않은 경우
      * @throws CouponExpiredException 쿠폰 유효 기간이 만료된 경우
      */
-    fun getValidCoupon(couponId: Long): CouponEntity
+    fun getValidCoupon(couponId: Long): CouponInfo
 
     /**
      * 쿠폰 유효성 검증 및 조회
@@ -83,5 +123,5 @@ interface CouponService {
      * @param originalAmount 원래 주문 금액
      * @return 할인 금액
      */
-    fun calculateDiscount(coupon: CouponEntity, originalAmount: Int): Int
+    fun calculateDiscount(coupon: CouponInfo, originalAmount: Int): Int
 }

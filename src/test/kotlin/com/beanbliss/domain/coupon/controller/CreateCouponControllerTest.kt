@@ -27,6 +27,7 @@ import java.time.LocalDateTime
  *
  * [테스트 목적]:
  * - 커스텀 Bean Validator 검증 (ValidDiscountValue, ValidDateRange)
+ * - Service DTO → Response DTO 변환 검증
  * - 표준 Bean Validation (@Min, @Max)은 Spring Framework가 보장하므로 테스트 불필요
  */
 @WebMvcTest(CouponController::class)
@@ -121,10 +122,10 @@ class CreateCouponControllerTest {
             validUntil = now.plusDays(30)
         )
 
-        val response = CreateCouponResponse(
-            couponId = 1L,
+        val mockCouponInfo = CouponService.CouponInfo(
+            id = 1L,
             name = request.name,
-            discountType = request.discountType,
+            discountType = "PERCENTAGE",
             discountValue = request.discountValue,
             minOrderAmount = request.minOrderAmount,
             maxDiscountAmount = 5000,
@@ -134,7 +135,7 @@ class CreateCouponControllerTest {
             createdAt = now
         )
 
-        every { createCouponUseCase.createCoupon(request) } returns response
+        every { createCouponUseCase.createCoupon(request) } returns mockCouponInfo
 
         // When & Then
         mockMvc.perform(

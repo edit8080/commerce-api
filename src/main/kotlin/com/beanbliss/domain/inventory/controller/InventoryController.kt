@@ -1,6 +1,8 @@
 package com.beanbliss.domain.inventory.controller
 
 import com.beanbliss.common.dto.ApiResponse
+import com.beanbliss.common.dto.PageableResponse
+import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.dto.InventoryAddStockRequest
 import com.beanbliss.domain.inventory.dto.InventoryAddStockResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
@@ -50,11 +52,24 @@ class InventoryController(
         @Max(value = 100, message = "페이지 크기는 100 이하여야 합니다.")
         size: Int
     ): ResponseEntity<ApiResponse<InventoryListResponse>> {
-        // Service 계층에 위임
-        val result = inventoryService.getInventories(page, size)
+        // Service 계층에 위임 (도메인 데이터 반환)
+        val serviceResult = inventoryService.getInventories(page, size)
+
+        // 도메인 데이터 → Response DTO 변환
+        val totalPages = PageCalculator.calculateTotalPages(serviceResult.totalElements, size)
+        val pageable = PageableResponse(
+            pageNumber = page,
+            pageSize = size,
+            totalElements = serviceResult.totalElements,
+            totalPages = totalPages
+        )
+        val response = InventoryListResponse(
+            content = serviceResult.inventories,
+            pageable = pageable
+        )
 
         // 200 OK 응답
-        return ResponseEntity.ok(ApiResponse(data = result))
+        return ResponseEntity.ok(ApiResponse(data = response))
     }
 
     /**

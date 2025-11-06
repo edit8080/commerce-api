@@ -1,16 +1,11 @@
 package com.beanbliss.domain.inventory.service
 
-import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.inventory.dto.InventoryListResponse
-import com.beanbliss.domain.inventory.entity.InventoryEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
-import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
 import com.beanbliss.domain.order.exception.DuplicateReservationException
 import com.beanbliss.domain.order.exception.InsufficientAvailableStockException
 import org.springframework.stereotype.Service
@@ -37,7 +32,7 @@ class InventoryServiceImpl(
     private val inventoryReservationRepository: InventoryReservationRepository
 ) : InventoryService {
 
-    override fun getInventories(page: Int, size: Int): InventoryListResponse {
+    override fun getInventories(page: Int, size: Int): InventoryService.InventoriesResult {
         // 1. 재고 목록 조회 (created_at DESC 정렬)
         val inventories = inventoryRepository.findAllWithProductInfo(
             page = page,
@@ -49,18 +44,10 @@ class InventoryServiceImpl(
         // 2. 전체 재고 개수 조회
         val totalElements = inventoryRepository.count()
 
-        // 3. 전체 페이지 수 계산 (공통 유틸리티 사용)
-        val totalPages = PageCalculator.calculateTotalPages(totalElements, size)
-
-        // 4. 응답 데이터 조립
-        return InventoryListResponse(
-            content = inventories,
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = totalElements,
-                totalPages = totalPages
-            )
+        // 3. 도메인 데이터 반환
+        return InventoryService.InventoriesResult(
+            inventories = inventories,
+            totalElements = totalElements
         )
     }
 
@@ -99,7 +86,6 @@ class InventoryServiceImpl(
      * 1. 중복 예약 방지: 사용자의 활성 예약 존재 여부 확인
      * 2. 가용 재고 계산 및 충분성 검증
      * 3. 예약 엔티티 생성 (30분 만료)
-     * 4. 예약 정보 응답 DTO 변환
      *
      * [트랜잭션]:
      * - @Transactional로 원자성 보장
@@ -107,12 +93,12 @@ class InventoryServiceImpl(
      *
      * @param userId 사용자 ID
      * @param cartItems 장바구니 아이템 목록 (상품 정보 포함)
-     * @return 생성된 재고 예약 정보 목록
+     * @return 생성된 재고 예약 정보 목록 (도메인 데이터)
      * @throws DuplicateReservationException 이미 활성 예약이 존재하는 경우
      * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
      */
     @Transactional
-    override fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<InventoryReservationItemResponse> {
+    override fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<InventoryService.ReservationItem> {
         // 1. 중복 예약 방지
         val activeReservationCount = inventoryReservationRepository.countActiveReservations(userId)
         if (activeReservationCount > 0) {
@@ -153,25 +139,18 @@ class InventoryServiceImpl(
         // [성능 최적화]: N번의 INSERT를 단일 Batch INSERT로 처리
         val savedReservations = inventoryReservationRepository.saveAll(reservationEntities)
 
-        // 6. 응답 DTO 변환
-        val reservations = savedReservations.mapIndexed { index, savedReservation ->
+        // 6. 도메인 데이터 반환
+        return savedReservations.mapIndexed { index, savedReservation ->
             val cartItem = cartItems[index]
             val availableStock = availableStocks[cartItem.productOptionId]!!
 
-            InventoryReservationItemResponse(
-                reservationId = savedReservation.id,
-                productOptionId = savedReservation.productOptionId,
+            InventoryService.ReservationItem(
+                reservationEntity = savedReservation,
                 productName = cartItem.productName,
                 optionCode = cartItem.optionCode,
-                quantity = savedReservation.quantity,
-                status = savedReservation.status,
-                availableStock = availableStock - cartItem.quantity,
-                reservedAt = savedReservation.reservedAt,
-                expiresAt = savedReservation.expiresAt
+                availableStockAfterReservation = availableStock - cartItem.quantity
             )
         }
-
-        return reservations
     }
 
     @Transactional

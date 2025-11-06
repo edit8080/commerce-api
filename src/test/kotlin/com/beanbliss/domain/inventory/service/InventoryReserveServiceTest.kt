@@ -87,13 +87,13 @@ class InventoryReserveServiceTest {
 
         // [검증 2]: 응답 DTO 변환 검증
         assertEquals(1, result.size)
-        assertEquals(1001L, result[0].reservationId)
-        assertEquals(10L, result[0].productOptionId)
+        assertEquals(1001L, result[0].reservationEntity.id)
+        assertEquals(10L, result[0].reservationEntity.productOptionId)
         assertEquals("에티오피아 예가체프 G1", result[0].productName)
         assertEquals("ETH-HD-200", result[0].optionCode)
-        assertEquals(2, result[0].quantity)
-        assertEquals(InventoryReservationStatus.RESERVED, result[0].status)
-        assertEquals(8, result[0].availableStock) // 10 - 2 = 8
+        assertEquals(2, result[0].reservationEntity.quantity)
+        assertEquals(InventoryReservationStatus.RESERVED, result[0].reservationEntity.status)
+        assertEquals(8, result[0].availableStockAfterReservation) // 10 - 2 = 8
     }
 
     @Test
@@ -196,10 +196,10 @@ class InventoryReserveServiceTest {
 
         // [검증]: 2개의 예약 결과가 반환되어야 함
         assertEquals(2, result.size)
-        assertEquals(1001L, result[0].reservationId)
-        assertEquals(10L, result[0].productOptionId)
-        assertEquals(1002L, result[1].reservationId)
-        assertEquals(20L, result[1].productOptionId)
+        assertEquals(1001L, result[0].reservationEntity.id)
+        assertEquals(10L, result[0].reservationEntity.productOptionId)
+        assertEquals(1002L, result[1].reservationEntity.id)
+        assertEquals(20L, result[1].reservationEntity.productOptionId)
     }
 
     @Test
@@ -234,9 +234,9 @@ class InventoryReserveServiceTest {
 
         // Then
         // [비즈니스 규칙 검증]: 예약 만료 시각이 30분 후로 설정되어야 함
-        assertEquals(reservedAt, result[0].reservedAt)
-        assertEquals(expiresAt, result[0].expiresAt)
-        assertEquals(reservedAt.plusMinutes(30), result[0].expiresAt)
+        assertEquals(reservedAt, result[0].reservationEntity.reservedAt)
+        assertEquals(expiresAt, result[0].reservationEntity.expiresAt)
+        assertEquals(reservedAt.plusMinutes(30), result[0].reservationEntity.expiresAt)
     }
 
     @Test
@@ -270,8 +270,8 @@ class InventoryReserveServiceTest {
         // [데이터 매핑 검증]: CartItem 정보가 Response DTO에 올바르게 복사되었는가?
         assertEquals("콜롬비아 수프리모", result[0].productName)
         assertEquals("COL-ESP-500", result[0].optionCode)
-        assertEquals(3, result[0].quantity)
-        assertEquals(17, result[0].availableStock) // 20 - 3 = 17
+        assertEquals(3, result[0].reservationEntity.quantity)
+        assertEquals(17, result[0].availableStockAfterReservation) // 20 - 3 = 17
     }
 
     // === Helper Method ===

@@ -1,6 +1,6 @@
 package com.beanbliss.domain.user.controller
 
-import com.beanbliss.domain.user.dto.BalanceResponse
+import com.beanbliss.domain.user.service.BalanceService
 import com.beanbliss.domain.user.usecase.ChargeBalanceUseCase
 import com.beanbliss.domain.user.usecase.GetBalanceUseCase
 import com.ninjasquad.springmockk.MockkBean
@@ -18,6 +18,7 @@ import java.time.LocalDateTime
  * [책임]: UserController의 잔액 조회 API 검증
  * - HTTP 요청/응답 검증
  * - UseCase 호출 검증
+ * - Service DTO → Response DTO 변환 검증
  */
 @WebMvcTest(UserController::class)
 @DisplayName("사용자 잔액 조회 Controller 테스트")
@@ -39,13 +40,13 @@ class GetBalanceControllerTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = BalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
             amount = 50000,
-            lastUpdatedAt = now
+            updatedAt = now
         )
 
-        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
+        every { getBalanceUseCase.getBalance(userId) } returns mockBalanceInfo
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))
@@ -61,13 +62,7 @@ class GetBalanceControllerTest {
         // Given
         val userId = 456L
 
-        val mockResponse = BalanceResponse(
-            userId = userId,
-            amount = 0,
-            lastUpdatedAt = null
-        )
-
-        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
+        every { getBalanceUseCase.getBalance(userId) } returns null
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))
@@ -84,13 +79,13 @@ class GetBalanceControllerTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = BalanceResponse(
+        val mockBalanceInfo = BalanceService.BalanceInfo(
             userId = userId,
             amount = 0,
-            lastUpdatedAt = now
+            updatedAt = now
         )
 
-        every { getBalanceUseCase.getBalance(userId) } returns mockResponse
+        every { getBalanceUseCase.getBalance(userId) } returns mockBalanceInfo
 
         // When & Then
         mockMvc.perform(get("/api/users/{userId}/balance", userId))

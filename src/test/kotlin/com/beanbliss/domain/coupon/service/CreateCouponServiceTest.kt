@@ -21,6 +21,7 @@ import java.time.LocalDateTime
  * [테스트 목적]:
  * - Service 계층의 비즈니스 규칙 검증이 올바르게 동작하는지 검증
  * - 정액 할인에 최대 할인 금액 설정 불가 규칙 검증
+ * - Entity → Service DTO 변환 검증
  */
 @DisplayName("쿠폰 생성 Service 테스트")
 class CreateCouponServiceTest {
@@ -32,7 +33,7 @@ class CreateCouponServiceTest {
     private val now = LocalDateTime.now()
 
     @Test
-    fun `정률 할인 쿠폰 생성 성공 시_Repository save가 호출되어야 한다`() {
+    fun `정률 할인 쿠폰 생성 성공 시_Repository save가 호출되고 Service DTO를 반환해야 한다`() {
         // Given
         val request = CreateCouponRequest(
             name = "오픈 기념 10% 할인 쿠폰",
@@ -64,25 +65,28 @@ class CreateCouponServiceTest {
         every { couponRepository.save(capture(couponSlot)) } returns savedCoupon
 
         // When
-        val result = couponService.createCoupon(request)
+        val couponInfo = couponService.createCoupon(request)
 
         // Then
         // [검증 1]: Repository.save()가 호출되었는가?
         verify(exactly = 1) { couponRepository.save(any()) }
 
-        // [검증 2]: 저장된 쿠폰 정보가 올바른가?
+        // [검증 2]: 저장된 쿠폰 Entity 정보가 올바른가?
         assertEquals(request.name, couponSlot.captured.name)
         assertEquals("PERCENTAGE", couponSlot.captured.discountType)
         assertEquals(request.discountValue, couponSlot.captured.discountValue)
         assertEquals(5000, couponSlot.captured.maxDiscountAmount)
 
-        // [검증 3]: 반환된 Entity가 올바른가?
-        assertEquals(savedCoupon.id, result.id)
-        assertEquals(savedCoupon.name, result.name)
+        // [검증 3]: 반환된 Service DTO가 올바른가?
+        assertEquals(1L, couponInfo.id)
+        assertEquals("오픈 기념 10% 할인 쿠폰", couponInfo.name)
+        assertEquals("PERCENTAGE", couponInfo.discountType)
+        assertEquals(10, couponInfo.discountValue)
+        assertEquals(5000, couponInfo.maxDiscountAmount)
     }
 
     @Test
-    fun `정액 할인 쿠폰 생성 성공 시_Repository save가 호출되어야 한다`() {
+    fun `정액 할인 쿠폰 생성 성공 시_Repository save가 호출되고 Service DTO를 반환해야 한다`() {
         // Given
         val request = CreateCouponRequest(
             name = "신규 회원 5000원 할인 쿠폰",
@@ -113,12 +117,14 @@ class CreateCouponServiceTest {
         every { couponRepository.save(any()) } returns savedCoupon
 
         // When
-        val result = couponService.createCoupon(request)
+        val couponInfo = couponService.createCoupon(request)
 
         // Then
         verify(exactly = 1) { couponRepository.save(any()) }
-        assertEquals(savedCoupon.id, result.id)
-        assertEquals("FIXED_AMOUNT", result.discountType)
+        assertEquals(2L, couponInfo.id)
+        assertEquals("신규 회원 5000원 할인 쿠폰", couponInfo.name)
+        assertEquals("FIXED_AMOUNT", couponInfo.discountType)
+        assertEquals(5000, couponInfo.discountValue)
     }
 
     @Test
@@ -147,7 +153,7 @@ class CreateCouponServiceTest {
     }
 
     @Test
-    fun `정률 할인에 maxDiscountAmount가 null인 경우_정상 처리되어야 한다`() {
+    fun `정률 할인에 maxDiscountAmount가 null인 경우_정상 처리되고 Service DTO를 반환해야 한다`() {
         // Given
         val request = CreateCouponRequest(
             name = "최대 할인 금액 없는 정률 할인 쿠폰",
@@ -178,10 +184,12 @@ class CreateCouponServiceTest {
         every { couponRepository.save(any()) } returns savedCoupon
 
         // When
-        val result = couponService.createCoupon(request)
+        val couponInfo = couponService.createCoupon(request)
 
         // Then
         verify(exactly = 1) { couponRepository.save(any()) }
-        assertEquals(0, result.maxDiscountAmount) // null은 0으로 저장
+        assertEquals(3L, couponInfo.id)
+        assertEquals("최대 할인 금액 없는 정률 할인 쿠폰", couponInfo.name)
+        assertEquals(0, couponInfo.maxDiscountAmount) // null은 0으로 저장
     }
 }

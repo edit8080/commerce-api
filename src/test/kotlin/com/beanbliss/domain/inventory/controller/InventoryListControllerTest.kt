@@ -51,9 +51,9 @@ class InventoryListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockResponse = InventoryListResponse(
-            content = listOf(
-                InventoryResponse(
+        val mockServiceResult = InventoryService.InventoriesResult(
+            inventories = listOf(
+                com.beanbliss.domain.inventory.dto.InventoryResponse(
                     inventoryId = 1L,
                     productId = 1L,
                     productName = "에티오피아 예가체프 G1",
@@ -64,7 +64,7 @@ class InventoryListControllerTest {
                     stockQuantity = 50,
                     createdAt = LocalDateTime.of(2025, 11, 4, 10, 30, 0)
                 ),
-                InventoryResponse(
+                com.beanbliss.domain.inventory.dto.InventoryResponse(
                     inventoryId = 2L,
                     productId = 1L,
                     productName = "에티오피아 예가체프 G1",
@@ -76,15 +76,10 @@ class InventoryListControllerTest {
                     createdAt = LocalDateTime.of(2025, 11, 4, 9, 15, 0)
                 )
             ),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 45L,
-                totalPages = 5
-            )
+            totalElements = 45L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockResponse
+        every { inventoryService.getInventories(page, size) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(
@@ -118,17 +113,12 @@ class InventoryListControllerTest {
         // Given
         val defaultPage = 1
         val defaultSize = 10
-        val mockResponse = InventoryListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = defaultPage,
-                pageSize = defaultSize,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockServiceResult = InventoryService.InventoriesResult(
+            inventories = emptyList(),
+            totalElements = 0L
         )
 
-        every { inventoryService.getInventories(defaultPage, defaultSize) } returns mockResponse
+        every { inventoryService.getInventories(defaultPage, defaultSize) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(
@@ -146,17 +136,12 @@ class InventoryListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockResponse = InventoryListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockServiceResult = InventoryService.InventoriesResult(
+            inventories = emptyList(),
+            totalElements = 0L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockResponse
+        every { inventoryService.getInventories(page, size) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(
@@ -177,17 +162,12 @@ class InventoryListControllerTest {
         // Given
         val page = 2
         val size = 15
-        val mockResponse = InventoryListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockServiceResult = InventoryService.InventoriesResult(
+            inventories = emptyList(),
+            totalElements = 0L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockResponse
+        every { inventoryService.getInventories(page, size) } returns mockServiceResult
 
         // When
         mockMvc.perform(

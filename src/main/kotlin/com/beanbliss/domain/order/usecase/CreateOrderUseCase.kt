@@ -1,6 +1,9 @@
 package com.beanbliss.domain.order.usecase
 
-import com.beanbliss.domain.order.dto.CreateOrderResponse
+import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.coupon.service.CouponService
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
 
 /**
  * [책임]: 주문 생성 UseCase의 계약 정의
@@ -12,6 +15,20 @@ import com.beanbliss.domain.order.dto.CreateOrderResponse
  * - 하이브리드 재고 관리 (예약 확정 + 실재고 차감)
  */
 interface CreateOrderUseCase {
+    /**
+     * 주문 생성 결과 (도메인 데이터)
+     */
+    data class OrderCreationResult(
+        val orderEntity: OrderEntity,
+        val orderItemEntities: List<OrderItemEntity>,
+        val cartItems: List<CartItemResponse>,
+        val couponInfo: CouponService.CouponInfo?,
+        val userCouponId: Long?,
+        val originalAmount: Int,
+        val discountAmount: Int,
+        val finalAmount: Int,
+        val shippingAddress: String
+    )
     /**
      * 주문 생성 및 결제 처리 실행
      *
@@ -48,5 +65,5 @@ interface CreateOrderUseCase {
         userId: Long,
         userCouponId: Long?,
         shippingAddress: String
-    ): CreateOrderResponse
+    ): OrderCreationResult
 }

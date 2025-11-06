@@ -52,7 +52,24 @@ class CouponController(
     fun createCoupon(
         @Valid @RequestBody request: CreateCouponRequest
     ): ResponseEntity<CreateCouponResponse> {
-        val response = createCouponUseCase.createCoupon(request)
+        // 1. UseCase 호출 (Service DTO 반환)
+        val couponInfo = createCouponUseCase.createCoupon(request)
+
+        // 2. Service DTO → Response DTO 변환 (Controller 책임)
+        val response = CreateCouponResponse(
+            couponId = couponInfo.id,
+            name = couponInfo.name,
+            discountType = com.beanbliss.domain.coupon.domain.DiscountType.valueOf(couponInfo.discountType),
+            discountValue = couponInfo.discountValue,
+            minOrderAmount = couponInfo.minOrderAmount,
+            maxDiscountAmount = couponInfo.maxDiscountAmount,
+            totalQuantity = couponInfo.totalQuantity,
+            validFrom = couponInfo.validFrom,
+            validUntil = couponInfo.validUntil,
+            createdAt = couponInfo.createdAt
+        )
+
+        // 3. HTTP 응답 반환
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
@@ -69,11 +86,44 @@ class CouponController(
         @RequestParam(defaultValue = "1") page: Int,
         @RequestParam(defaultValue = "10") size: Int
     ): CouponListResponse {
-        // 파라미터 검증 (PageCalculator에 위임)
+        // 1. 파라미터 검증 (PageCalculator에 위임)
         PageCalculator.validatePageParameters(page, size)
 
-        // Service 호출 및 응답 반환
-        return couponService.getCoupons(page, size)
+        // 2. Service 호출
+        val result = couponService.getCoupons(page, size)
+
+        // 3. 도메인 데이터 → DTO 변환 (Controller 책임)
+        val totalPages = PageCalculator.calculateTotalPages(result.totalCount, size)
+        val couponResponses = result.coupons.map { coupon ->
+            com.beanbliss.domain.coupon.dto.CouponResponse(
+                couponId = coupon.couponId,
+                name = coupon.name,
+                discountType = coupon.discountType,
+                discountValue = coupon.discountValue,
+                minOrderAmount = coupon.minOrderAmount,
+                maxDiscountAmount = coupon.maxDiscountAmount,
+                remainingQuantity = coupon.remainingQuantity,
+                totalQuantity = coupon.totalQuantity,
+                validFrom = coupon.validFrom,
+                validUntil = coupon.validUntil,
+                isIssuable = coupon.isIssuable
+            )
+        }
+
+        val pageable = com.beanbliss.common.dto.PageableResponse(
+            pageNumber = page,
+            pageSize = size,
+            totalElements = result.totalCount,
+            totalPages = totalPages
+        )
+
+        // 4. 응답 반환
+        return CouponListResponse(
+            data = com.beanbliss.domain.coupon.dto.CouponListData(
+                content = couponResponses,
+                pageable = pageable
+            )
+        )
     }
 
     /**

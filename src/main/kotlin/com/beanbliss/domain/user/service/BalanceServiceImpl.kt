@@ -1,7 +1,5 @@
 package com.beanbliss.domain.user.service
 
-import com.beanbliss.domain.user.dto.BalanceResponse
-import com.beanbliss.domain.user.dto.ChargeBalanceResponse
 import com.beanbliss.domain.user.entity.BalanceEntity
 import com.beanbliss.domain.user.exception.BalanceNotFoundException
 import com.beanbliss.domain.user.exception.InsufficientBalanceException
@@ -12,7 +10,7 @@ import java.time.LocalDateTime
 
 /**
  * [책임]: 사용자 잔액 비즈니스 로직 처리
- * - 잔액 조회 (레코드 없으면 0원 반환)
+ * - 잔액 조회 (레코드 없으면 null 반환)
  * - 잔액 충전 (UPSERT: 없으면 INSERT, 있으면 UPDATE)
  */
 @Service
@@ -21,29 +19,20 @@ class BalanceServiceImpl(
     private val balanceRepository: BalanceRepository
 ) : BalanceService {
 
-    override fun getBalance(userId: Long): BalanceResponse {
-        // 1. Repository에서 잔액 조회
-        val balance = balanceRepository.findByUserId(userId)
+    override fun getBalance(userId: Long): BalanceService.BalanceInfo? {
+        // Repository에서 잔액 조회 (레코드 없으면 null 반환)
+        val balanceEntity = balanceRepository.findByUserId(userId) ?: return null
 
-        // 2. Entity를 DTO(Response)로 변환
-        // 레코드가 없으면 0원 반환 (예외 발생 X)
-        return if (balance != null) {
-            BalanceResponse(
-                userId = balance.userId,
-                amount = balance.amount,
-                lastUpdatedAt = balance.updatedAt
-            )
-        } else {
-            BalanceResponse(
-                userId = userId,
-                amount = 0,
-                lastUpdatedAt = null
-            )
-        }
+        // Entity → Service DTO 변환
+        return BalanceService.BalanceInfo(
+            userId = balanceEntity.userId,
+            amount = balanceEntity.amount,
+            updatedAt = balanceEntity.updatedAt
+        )
     }
 
     @Transactional
-    override fun chargeBalance(userId: Long, chargeAmount: Int): ChargeBalanceResponse {
+    override fun chargeBalance(userId: Long, chargeAmount: Int): BalanceService.BalanceInfo {
         // 1. 비관적 락으로 잔액 조회 (FOR UPDATE)
         val existingBalance = balanceRepository.findByUserIdWithLock(userId)
 
@@ -70,11 +59,11 @@ class BalanceServiceImpl(
             balanceRepository.save(newBalance)
         }
 
-        // 3. ChargeBalanceResponse DTO 생성 및 반환
-        return ChargeBalanceResponse(
-            userId = userId,
-            currentBalance = savedBalance.amount,
-            chargedAt = now
+        // 3. Entity → Service DTO 변환 후 반환
+        return BalanceService.BalanceInfo(
+            userId = savedBalance.userId,
+            amount = savedBalance.amount,
+            updatedAt = savedBalance.updatedAt
         )
     }
 

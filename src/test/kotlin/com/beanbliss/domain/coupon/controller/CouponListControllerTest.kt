@@ -21,7 +21,7 @@ import java.time.LocalDateTime
  * [책임]: CouponController의 쿠폰 목록 조회 API 검증
  * - HTTP 요청/응답 검증
  * - 페이징 파라미터 검증
- * - 공통 응답 구조 검증 (data, pageable)
+ * - Service DTO → Response DTO 변환 검증
  */
 @WebMvcTest(CouponController::class)
 @DisplayName("쿠폰 목록 조회 Controller 테스트")
@@ -44,46 +44,39 @@ class CouponListControllerTest {
     fun `GET api coupons 요청 시 200 OK와 쿠폰 목록을 반환해야 한다`() {
         // Given
         val now = LocalDateTime.now()
-        val mockResponse = CouponListResponse(
-            data = CouponListData(
-                content = listOf(
-                    CouponResponse(
-                        couponId = 1L,
-                        name = "오픈 기념 쿠폰",
-                        discountType = "PERCENTAGE",
-                        discountValue = 10,
-                        minOrderAmount = 10000,
-                        maxDiscountAmount = 5000,
-                        remainingQuantity = 47,
-                        totalQuantity = 100,
-                        validFrom = now.minusDays(1),
-                        validUntil = now.plusDays(30),
-                        isIssuable = true
-                    ),
-                    CouponResponse(
-                        couponId = 2L,
-                        name = "신규 회원 쿠폰",
-                        discountType = "FIXED_AMOUNT",
-                        discountValue = 5000,
-                        minOrderAmount = 30000,
-                        maxDiscountAmount = 5000,
-                        remainingQuantity = 0,
-                        totalQuantity = 500,
-                        validFrom = now.minusDays(1),
-                        validUntil = now.plusDays(60),
-                        isIssuable = false
-                    )
+        val mockServiceResult = CouponService.CouponsResult(
+            coupons = listOf(
+                CouponService.CouponWithAvailability(
+                    couponId = 1L,
+                    name = "오픈 기념 쿠폰",
+                    discountType = "PERCENTAGE",
+                    discountValue = 10,
+                    minOrderAmount = 10000,
+                    maxDiscountAmount = 5000,
+                    remainingQuantity = 47,
+                    totalQuantity = 100,
+                    validFrom = now.minusDays(1),
+                    validUntil = now.plusDays(30),
+                    isIssuable = true
                 ),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 2,
-                    totalPages = 1
+                CouponService.CouponWithAvailability(
+                    couponId = 2L,
+                    name = "신규 회원 쿠폰",
+                    discountType = "FIXED_AMOUNT",
+                    discountValue = 5000,
+                    minOrderAmount = 30000,
+                    maxDiscountAmount = 5000,
+                    remainingQuantity = 0,
+                    totalQuantity = 500,
+                    validFrom = now.minusDays(1),
+                    validUntil = now.plusDays(60),
+                    isIssuable = false
                 )
-            )
+            ),
+            totalCount = 2L
         )
 
-        every { couponService.getCoupons(1, 10) } returns mockResponse
+        every { couponService.getCoupons(1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(get("/api/coupons")
@@ -111,19 +104,12 @@ class CouponListControllerTest {
     @DisplayName("페이징 파라미터가 없으면 기본값(page=1, size=10)을 사용해야 한다")
     fun `페이징 파라미터가 없으면 기본값을 사용해야 한다`() {
         // Given
-        val mockResponse = CouponListResponse(
-            data = CouponListData(
-                content = emptyList(),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 0,
-                    totalPages = 0
-                )
-            )
+        val mockServiceResult = CouponService.CouponsResult(
+            coupons = emptyList(),
+            totalCount = 0L
         )
 
-        every { couponService.getCoupons(1, 10) } returns mockResponse
+        every { couponService.getCoupons(1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(get("/api/coupons"))
@@ -136,19 +122,12 @@ class CouponListControllerTest {
     @DisplayName("쿠폰이 없을 경우 빈 배열과 페이징 정보를 반환해야 한다")
     fun `쿠폰이 없을 경우_빈 배열과 페이징 정보를 반환해야 한다`() {
         // Given
-        val mockResponse = CouponListResponse(
-            data = CouponListData(
-                content = emptyList(),
-                pageable = PageableResponse(
-                    pageNumber = 1,
-                    pageSize = 10,
-                    totalElements = 0,
-                    totalPages = 0
-                )
-            )
+        val mockServiceResult = CouponService.CouponsResult(
+            coupons = emptyList(),
+            totalCount = 0L
         )
 
-        every { couponService.getCoupons(1, 10) } returns mockResponse
+        every { couponService.getCoupons(1, 10) } returns mockServiceResult
 
         // When & Then
         mockMvc.perform(get("/api/coupons")

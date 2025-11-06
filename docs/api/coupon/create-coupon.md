@@ -215,9 +215,10 @@ sequenceDiagram
     CouponRepo->>DB: INSERT INTO COUPON
     DB-->>CouponRepo: coupon (with ID)
     CouponRepo-->>CouponService: saved coupon
-    CouponService-->>UseCase: CouponEntity
+    Note over CouponService: Entity → Service DTO 변환<br/>CouponEntity → CouponInfo
+    CouponService-->>UseCase: CouponInfo (Service DTO)
 
-    UseCase->>TicketService: createTickets(couponId, totalQuantity)
+    UseCase->>TicketService: createTickets(couponInfo.id, totalQuantity)
     TicketService->>TicketService: totalQuantity만큼<br/>CouponTicketEntity 생성
     TicketService->>TicketRepo: saveAll(tickets)
     Note over TicketRepo,DB: Batch Insert
@@ -228,8 +229,8 @@ sequenceDiagram
 
     Note over UseCase: @Transactional 커밋
 
-    UseCase->>UseCase: Entity → DTO 변환
-    UseCase-->>Controller: CreateCouponResponse
+    UseCase-->>Controller: CouponInfo (Service DTO)
+    Note over Controller: Service DTO → Response DTO 변환<br/>CouponInfo → CreateCouponResponse
     Controller-->>Client: 201 Created<br/>CreateCouponResponse
 ```
 

@@ -1,9 +1,9 @@
 package com.beanbliss.domain.order.controller
 
-import com.beanbliss.domain.order.dto.AppliedCouponInfo
-import com.beanbliss.domain.order.dto.CreateOrderResponse
-import com.beanbliss.domain.order.dto.OrderItemResponse
-import com.beanbliss.domain.order.dto.PriceInfo
+import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.coupon.service.CouponService
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
 import com.beanbliss.domain.order.entity.OrderStatus
 import com.beanbliss.domain.order.exception.*
 import com.beanbliss.domain.order.usecase.CreateOrderUseCase
@@ -47,36 +47,72 @@ class CreateOrderControllerTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
         val now = LocalDateTime.now()
 
-        val mockResponse = CreateOrderResponse(
-            orderId = 1001L,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderItems = listOf(
-                OrderItemResponse(
-                    productOptionId = 1L,
-                    productName = "에티오피아 예가체프 G1",
-                    optionCode = "ETH-HD-200",
-                    quantity = 2,
-                    unitPrice = 15000,
-                    totalPrice = 30000
-                )
-            ),
-            appliedCoupon = AppliedCouponInfo(
-                couponId = 1L,
-                couponCode = "WELCOME2024",
-                couponName = "신규 가입 쿠폰",
-                discountAmount = 3000,
-                expiresAt = now.plusDays(7)
-            ),
-            priceInfo = PriceInfo(
-                totalProductAmount = 30000,
-                discountAmount = 3000,
-                finalAmount = 27000
-            ),
+        val mockOrderEntity = OrderEntity(
+            id = 1001L,
+            userId = userId,
+            totalAmount = 30000,
+            discountAmount = 3000,
+            finalAmount = 27000,
             shippingAddress = shippingAddress,
-            orderedAt = now
+            orderStatus = OrderStatus.PAYMENT_COMPLETED,
+            orderedAt = now,
+            updatedAt = now
         )
 
-        every { createOrderUseCase.createOrder(userId, userCouponId, shippingAddress) } returns mockResponse
+        val mockOrderItemEntities = listOf(
+            OrderItemEntity(
+                id = 1L,
+                orderId = 1001L,
+                productOptionId = 1L,
+                quantity = 2,
+                unitPrice = 15000,
+                totalPrice = 30000
+            )
+        )
+
+        val mockCartItems = listOf(
+            CartItemResponse(
+                cartItemId = 1L,
+                productOptionId = 1L,
+                productName = "에티오피아 예가체프 G1",
+                optionCode = "ETH-HD-200",
+                origin = "Ethiopia",
+                grindType = "WHOLE_BEANS",
+                weightGrams = 200,
+                price = 15000,
+                quantity = 2,
+                totalPrice = 30000,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+
+        val mockCouponInfo = CouponService.CouponInfo(
+            id = 1L,
+            name = "신규 가입 쿠폰",
+            discountType = "FIXED",
+            discountValue = 3000,
+            minOrderAmount = 10000,
+            maxDiscountAmount = 5000,
+            totalQuantity = 100,
+            validFrom = now.minusDays(7),
+            validUntil = now.plusDays(30),
+            createdAt = now.minusDays(10)
+        )
+
+        val mockUseCaseResult = CreateOrderUseCase.OrderCreationResult(
+            orderEntity = mockOrderEntity,
+            orderItemEntities = mockOrderItemEntities,
+            cartItems = mockCartItems,
+            couponInfo = mockCouponInfo,
+            userCouponId = userCouponId,
+            originalAmount = 30000,
+            discountAmount = 3000,
+            finalAmount = 27000,
+            shippingAddress = shippingAddress
+        )
+
+        every { createOrderUseCase.createOrder(userId, userCouponId, shippingAddress) } returns mockUseCaseResult
 
         val requestBody = """
             {
@@ -100,8 +136,10 @@ class CreateOrderControllerTest {
             .andExpect(jsonPath("$.data.orderItems[0].quantity").value(2))
             .andExpect(jsonPath("$.data.orderItems[0].unitPrice").value(15000))
             .andExpect(jsonPath("$.data.orderItems[0].totalPrice").value(30000))
-            .andExpect(jsonPath("$.data.appliedCoupon.couponId").value(1))
-            .andExpect(jsonPath("$.data.appliedCoupon.discountAmount").value(3000))
+            .andExpect(jsonPath("$.data.appliedCoupon.userCouponId").value(456))
+            .andExpect(jsonPath("$.data.appliedCoupon.couponName").value("신규 가입 쿠폰"))
+            .andExpect(jsonPath("$.data.appliedCoupon.discountType").value("FIXED"))
+            .andExpect(jsonPath("$.data.appliedCoupon.discountValue").value(3000))
             .andExpect(jsonPath("$.data.priceInfo.totalProductAmount").value(30000))
             .andExpect(jsonPath("$.data.priceInfo.discountAmount").value(3000))
             .andExpect(jsonPath("$.data.priceInfo.finalAmount").value(27000))
@@ -116,30 +154,59 @@ class CreateOrderControllerTest {
         val shippingAddress = "서울시 강남구 테헤란로 123"
         val now = LocalDateTime.now()
 
-        val mockResponse = CreateOrderResponse(
-            orderId = 1001L,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderItems = listOf(
-                OrderItemResponse(
-                    productOptionId = 1L,
-                    productName = "에티오피아 예가체프 G1",
-                    optionCode = "ETH-HD-200",
-                    quantity = 2,
-                    unitPrice = 15000,
-                    totalPrice = 30000
-                )
-            ),
-            appliedCoupon = null,  // 쿠폰 미사용
-            priceInfo = PriceInfo(
-                totalProductAmount = 30000,
-                discountAmount = 0,
-                finalAmount = 30000
-            ),
+        val mockOrderEntity = OrderEntity(
+            id = 1001L,
+            userId = userId,
+            totalAmount = 30000,
+            discountAmount = 0,
+            finalAmount = 30000,
             shippingAddress = shippingAddress,
-            orderedAt = now
+            orderStatus = OrderStatus.PAYMENT_COMPLETED,
+            orderedAt = now,
+            updatedAt = now
         )
 
-        every { createOrderUseCase.createOrder(userId, null, shippingAddress) } returns mockResponse
+        val mockOrderItemEntities = listOf(
+            OrderItemEntity(
+                id = 1L,
+                orderId = 1001L,
+                productOptionId = 1L,
+                quantity = 2,
+                unitPrice = 15000,
+                totalPrice = 30000
+            )
+        )
+
+        val mockCartItems = listOf(
+            CartItemResponse(
+                cartItemId = 1L,
+                productOptionId = 1L,
+                productName = "에티오피아 예가체프 G1",
+                optionCode = "ETH-HD-200",
+                origin = "Ethiopia",
+                grindType = "WHOLE_BEANS",
+                weightGrams = 200,
+                price = 15000,
+                quantity = 2,
+                totalPrice = 30000,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+
+        val mockUseCaseResult = CreateOrderUseCase.OrderCreationResult(
+            orderEntity = mockOrderEntity,
+            orderItemEntities = mockOrderItemEntities,
+            cartItems = mockCartItems,
+            couponInfo = null,  // 쿠폰 미사용
+            userCouponId = null,
+            originalAmount = 30000,
+            discountAmount = 0,
+            finalAmount = 30000,
+            shippingAddress = shippingAddress
+        )
+
+        every { createOrderUseCase.createOrder(userId, null, shippingAddress) } returns mockUseCaseResult
 
         val requestBody = """
             {

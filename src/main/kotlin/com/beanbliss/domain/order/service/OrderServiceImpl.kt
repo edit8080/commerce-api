@@ -1,8 +1,6 @@
 package com.beanbliss.domain.order.service
 
 import com.beanbliss.domain.order.dto.OrderCreationData
-import com.beanbliss.domain.order.dto.OrderCreationResult
-import com.beanbliss.domain.order.dto.OrderItemResponse
 import com.beanbliss.domain.order.dto.ProductOrderCount
 import com.beanbliss.domain.order.entity.OrderEntity
 import com.beanbliss.domain.order.entity.OrderItemEntity
@@ -56,16 +54,16 @@ class OrderServiceImpl(
      * 2. OrderRepository를 통해 주문 저장
      * 3. OrderItemEntity 목록 생성 (장바구니 아이템 기반)
      * 4. OrderItemRepository를 통해 주문 아이템 배치 저장
-     * 5. OrderCreationResult로 변환 및 반환
+     * 5. 도메인 엔티티 반환
      *
      * [트랜잭션]:
      * - @Transactional로 원자성 보장
      *
      * @param data 주문 생성 데이터
-     * @return 생성된 주문 정보
+     * @return 생성된 주문 엔티티 + 주문 아이템 엔티티 목록
      */
     @Transactional
-    override fun createOrderWithItems(data: OrderCreationData): OrderCreationResult {
+    override fun createOrderWithItems(data: OrderCreationData): OrderService.OrderCreationResult {
         val now = LocalDateTime.now()
 
         // 1. OrderEntity 생성
@@ -97,25 +95,12 @@ class OrderServiceImpl(
         }
 
         // 4. 주문 아이템 배치 저장
-        orderItemRepository.saveAll(orderItems)
+        val savedOrderItems = orderItemRepository.saveAll(orderItems)
 
-        // 5. OrderCreationResult로 변환
-        val orderItemResponses = data.cartItems.map { cartItem ->
-            OrderItemResponse(
-                productOptionId = cartItem.productOptionId,
-                productName = cartItem.productName,
-                optionCode = cartItem.optionCode,
-                quantity = cartItem.quantity,
-                unitPrice = cartItem.price,
-                totalPrice = cartItem.totalPrice
-            )
-        }
-
-        return OrderCreationResult(
-            orderId = savedOrder.id,
-            orderStatus = savedOrder.orderStatus,
-            orderItems = orderItemResponses,
-            orderedAt = savedOrder.orderedAt
+        // 5. 도메인 엔티티 반환
+        return OrderService.OrderCreationResult(
+            orderEntity = savedOrder,
+            orderItemEntities = savedOrderItems
         )
     }
 }

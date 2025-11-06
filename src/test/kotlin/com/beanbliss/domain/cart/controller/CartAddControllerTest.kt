@@ -1,5 +1,6 @@
 package com.beanbliss.domain.cart.controller
 
+import com.beanbliss.common.exception.CommonExceptionHandler
 import com.beanbliss.domain.cart.usecase.AddToCartUseCase
 import com.beanbliss.domain.cart.usecase.AddToCartUseCaseResult
 import com.beanbliss.domain.cart.dto.AddToCartRequest
@@ -35,7 +36,7 @@ import java.time.LocalDateTime
  * - POST /api/cart/items
  */
 @WebMvcTest(controllers = [CartController::class])
-@Import(com.beanbliss.common.exception.CommonExceptionHandler::class)
+@Import(CommonExceptionHandler::class)
 @DisplayName("장바구니 추가 Controller 테스트")
 class CartAddControllerTest {
 

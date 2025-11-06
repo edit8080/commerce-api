@@ -2,7 +2,6 @@ package com.beanbliss.domain.order.usecase
 
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.order.dto.ReserveOrderResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.user.service.UserService
 import org.springframework.stereotype.Component
@@ -27,7 +26,7 @@ class ReserveOrderUseCaseImpl(
     private val inventoryService: InventoryService
 ) : ReserveOrderUseCase {
 
-    override fun reserveOrder(userId: Long): ReserveOrderResponse {
+    override fun reserveOrder(userId: Long): List<InventoryService.ReservationItem> {
         // 1. 사용자 존재 여부 검증
         userService.validateUserExists(userId)
 
@@ -38,10 +37,7 @@ class ReserveOrderUseCaseImpl(
         val optionIds = cartItems.map { it.productOptionId }
         productService.validateProductOptionsActive(optionIds)
 
-        // 4. 재고 예약 생성 (InventoryService에 위임)
-        val reservations = inventoryService.reserveInventory(userId, cartItems)
-
-        // 5. 응답 반환
-        return ReserveOrderResponse(reservations)
+        // 4. 재고 예약 생성 (InventoryService에 위임) - 도메인 데이터 반환
+        return inventoryService.reserveInventory(userId, cartItems)
     }
 }

@@ -2,8 +2,6 @@ package com.beanbliss.domain.product.usecase
 
 import com.beanbliss.domain.order.dto.ProductOrderCount
 import com.beanbliss.domain.order.service.OrderService
-import com.beanbliss.domain.product.dto.PopularProductInfo
-import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.dto.ProductBasicInfo
 import com.beanbliss.domain.product.service.ProductService
 import io.mockk.every
@@ -71,11 +69,11 @@ class GetPopularProductsUseCaseTest {
         verify(exactly = 1) { productService.getProductsByIds(listOf(1L, 2L)) }
 
         // [TDD 검증 목표 3]: 결과가 올바르게 병합되었는가?
-        assertEquals(2, result.products.size)
-        assertEquals(1L, result.products[0].productId)
-        assertEquals(150, result.products[0].totalOrderCount)
-        assertEquals("에티오피아 예가체프 G1", result.products[0].productName)
-        assertEquals("Bean Bliss", result.products[0].brand)
+        assertEquals(2, result.size)
+        assertEquals(1L, result[0].productId)
+        assertEquals(150, result[0].totalOrderCount)
+        assertEquals("에티오피아 예가체프 G1", result[0].productName)
+        assertEquals("Bean Bliss", result[0].brand)
     }
 
     @Test
@@ -105,9 +103,9 @@ class GetPopularProductsUseCaseTest {
 
         // Then
         // [TDD 검증 목표 4]: 주문 수 내림차순이 유지되는가?
-        assertEquals(150, result.products[0].totalOrderCount)
-        assertEquals(120, result.products[1].totalOrderCount)
-        assertEquals(100, result.products[2].totalOrderCount)
+        assertEquals(150, result[0].totalOrderCount)
+        assertEquals(120, result[1].totalOrderCount)
+        assertEquals(100, result[2].totalOrderCount)
     }
 
     @Test
@@ -124,7 +122,7 @@ class GetPopularProductsUseCaseTest {
 
         // Then
         // [TDD 검증 목표 6]: 빈 결과가 반환되는가?
-        assertEquals(0, result.products.size)
+        assertEquals(0, result.size)
 
         // [TDD 검증 목표 7]: ProductService는 호출되지 않아야 한다 (빈 목록이므로)
         verify(exactly = 1) { orderService.getTopOrderedProducts(period, limit) }

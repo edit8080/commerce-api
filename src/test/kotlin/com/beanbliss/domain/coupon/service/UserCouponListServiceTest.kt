@@ -68,8 +68,8 @@ class UserCouponListServiceTest {
         verify(exactly = 1) { userCouponRepository.countByUserId(userId) }
 
         assertNotNull(response)
-        assertEquals(1, response.data.content.size)
-        assertEquals(1L, response.data.pageable.totalElements)
+        assertEquals(1, response.userCoupons.size)
+        assertEquals(1L, response.totalCount)
     }
 
     @Test
@@ -103,7 +103,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertTrue(coupon.isAvailable, "status가 ISSUED이고 유효기간 내이므로 isAvailable은 true여야 합니다")
     }
 
@@ -138,7 +138,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertFalse(coupon.isAvailable, "status가 USED이므로 isAvailable은 false여야 합니다")
     }
 
@@ -173,7 +173,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertFalse(coupon.isAvailable, "status가 EXPIRED이므로 isAvailable은 false여야 합니다")
     }
 
@@ -208,7 +208,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertFalse(coupon.isAvailable, "status가 ISSUED이지만 유효기간 전이므로 isAvailable은 false여야 합니다")
     }
 
@@ -243,7 +243,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertFalse(coupon.isAvailable, "status가 ISSUED이지만 유효기간이 지났으므로 isAvailable은 false여야 합니다")
     }
 
@@ -259,9 +259,8 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        assertTrue(response.data.content.isEmpty())
-        assertEquals(0L, response.data.pageable.totalElements)
-        assertEquals(0, response.data.pageable.totalPages)
+        assertTrue(response.userCoupons.isEmpty())
+        assertEquals(0L, response.totalCount)
     }
 
     @Test
@@ -295,7 +294,7 @@ class UserCouponListServiceTest {
         val response = userCouponService.getUserCoupons(userId, 1, 10)
 
         // Then
-        val coupon = response.data.content[0]
+        val coupon = response.userCoupons[0]
         assertEquals(456L, coupon.userCouponId)
         assertEquals(789L, coupon.couponId)
         assertEquals("테스트 쿠폰", coupon.couponName)

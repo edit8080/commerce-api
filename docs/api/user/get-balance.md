@@ -205,19 +205,19 @@ sequenceDiagram
         deactivate BalanceRepo
 
         alt 잔액 레코드 없음
-            Note over BalanceService: 0원으로 간주
-            Note over BalanceService: 3. DTO 변환<br/>amount = 0<br/>lastUpdatedAt = null
+            BalanceService-->>UseCase: null
         else 잔액 레코드 존재
-            Note over BalanceService: 3. DTO 변환<br/>Balance → BalanceResponse
+            Note over BalanceService: 3. Entity → Service DTO 변환<br/>BalanceEntity → BalanceInfo
+            BalanceService-->>UseCase: BalanceInfo (Service DTO)
         end
-
-        BalanceService-->>UseCase: BalanceResponse
         deactivate BalanceService
 
         Note over UseCase: 트랜잭션 커밋
 
-        UseCase-->>Controller: BalanceResponse
+        UseCase-->>Controller: BalanceInfo? (Service DTO)
         deactivate UseCase
+
+        Note over Controller: 4. Service DTO → Response DTO 변환<br/>BalanceInfo → BalanceResponse<br/>(null이면 amount=0, lastUpdatedAt=null)
 
         Controller-->>Client: 200 OK + Response Body
     end

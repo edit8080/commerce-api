@@ -20,7 +20,8 @@ import java.time.LocalDateTime
  * 쿠폰 생성 UseCase 테스트
  *
  * [테스트 목적]:
- * - Service 조율 책임 검증 (CouponService → CouponTicketService → DTO 변환)
+ * - Service 조율 책임 검증 (CouponService → CouponTicketService)
+ * - Service DTO → Response DTO 변환 검증
  * - 비즈니스 로직 검증은 Service 테스트에서 수행하므로 여기서는 불필요
  */
 @DisplayName("쿠폰 생성 UseCase 테스트")
@@ -33,7 +34,7 @@ class CreateCouponUseCaseTest {
     private val now = LocalDateTime.now()
 
     @Test
-    fun `쿠폰 생성 시_CouponService와 CouponTicketService를 올바른 순서로 호출하고_DTO를 반환해야 한다`() {
+    fun `쿠폰 생성 시_CouponService와 CouponTicketService를 올바른 순서로 호출하고_Response DTO를 반환해야 한다`() {
         // Given
         val request = CreateCouponRequest(
             name = "오픈 기념 10% 할인 쿠폰",
@@ -46,7 +47,7 @@ class CreateCouponUseCaseTest {
             validUntil = now.plusDays(30)
         )
 
-        val savedCoupon = CouponEntity(
+        val mockCouponInfo = CouponService.CouponInfo(
             id = 1L,
             name = request.name,
             discountType = "PERCENTAGE",
@@ -56,28 +57,27 @@ class CreateCouponUseCaseTest {
             totalQuantity = request.totalQuantity,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
-            createdAt = now,
-            updatedAt = now
+            createdAt = now
         )
 
         // Mocking
-        every { couponService.createCoupon(request) } returns savedCoupon
+        every { couponService.createCoupon(request) } returns mockCouponInfo
         every { couponTicketService.createTickets(1L, 100) } returns emptyList()
 
         // When
-        val response = createCouponUseCase.createCoupon(request)
+        val couponInfo = createCouponUseCase.createCoupon(request)
 
         // Then
         // [검증 1]: Service 호출 순서 - CouponService.createCoupon() 먼저 호출
         verify(exactly = 1) { couponService.createCoupon(request) }
 
         // [검증 2]: Service 호출 순서 - CouponTicketService.createTickets() 다음 호출
-        verify(exactly = 1) { couponTicketService.createTickets(savedCoupon.id!!, request.totalQuantity) }
+        verify(exactly = 1) { couponTicketService.createTickets(mockCouponInfo.id, request.totalQuantity) }
 
-        // [검증 3]: DTO 변환 - Entity → Response DTO로 올바르게 변환
-        assertEquals(savedCoupon.id, response.couponId)
-        assertEquals(request.name, response.name)
-        assertEquals(request.totalQuantity, response.totalQuantity)
-        assertEquals(DiscountType.PERCENTAGE, response.discountType)
+        // [검증 3]: UseCase가 Service DTO를 그대로 반환하는지 검증
+        assertEquals(mockCouponInfo.id, couponInfo.id)
+        assertEquals(request.name, couponInfo.name)
+        assertEquals(request.totalQuantity, couponInfo.totalQuantity)
+        assertEquals("PERCENTAGE", couponInfo.discountType)
     }
 }

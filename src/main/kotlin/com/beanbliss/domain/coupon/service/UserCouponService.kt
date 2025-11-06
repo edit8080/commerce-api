@@ -1,7 +1,7 @@
 package com.beanbliss.domain.coupon.service
 
-import com.beanbliss.domain.coupon.dto.UserCouponListResponse
 import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.coupon.repository.UserCouponWithCoupon
 
 /**
  * [책임]: 사용자 쿠폰 관리 기능의 '계약' 정의
@@ -9,14 +9,22 @@ import com.beanbliss.domain.coupon.entity.UserCouponEntity
  */
 interface UserCouponService {
     /**
+     * 사용자 쿠폰 목록 조회 결과 (도메인 데이터)
+     */
+    data class UserCouponsResult(
+        val userCoupons: List<UserCouponWithCoupon>,
+        val totalCount: Long
+    )
+
+    /**
      * 사용자 발급 쿠폰 목록 조회
      *
      * @param userId 사용자 ID
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
-     * @return 사용자 쿠폰 목록 및 페이징 정보
+     * @return 사용자 쿠폰 목록 + 총 개수
      */
-    fun getUserCoupons(userId: Long, page: Int, size: Int): UserCouponListResponse
+    fun getUserCoupons(userId: Long, page: Int, size: Int): UserCouponsResult
 
     /**
      * 중복 발급 방지 검증

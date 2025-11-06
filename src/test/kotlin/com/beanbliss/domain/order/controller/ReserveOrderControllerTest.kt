@@ -1,8 +1,8 @@
 package com.beanbliss.domain.order.controller
 
+import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
-import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
-import com.beanbliss.domain.order.dto.ReserveOrderResponse
+import com.beanbliss.domain.inventory.service.InventoryService
 import com.beanbliss.domain.order.exception.CartEmptyException
 import com.beanbliss.domain.order.exception.DuplicateReservationException
 import com.beanbliss.domain.order.exception.InsufficientAvailableStockException
@@ -44,23 +44,27 @@ class ReserveOrderControllerTest {
         val userId = 123L
         val now = LocalDateTime.now()
 
-        val mockResponse = ReserveOrderResponse(
-            reservations = listOf(
-                InventoryReservationItemResponse(
-                    reservationId = 1001L,
-                    productOptionId = 1L,
-                    productName = "에티오피아 예가체프 G1",
-                    optionCode = "ETH-HD-200",
-                    quantity = 2,
-                    status = InventoryReservationStatus.RESERVED,
-                    availableStock = 8,
-                    reservedAt = now,
-                    expiresAt = now.plusMinutes(30)
-                )
+        val mockReservationEntity = InventoryReservationEntity(
+            id = 1001L,
+            productOptionId = 1L,
+            userId = userId,
+            quantity = 2,
+            status = InventoryReservationStatus.RESERVED,
+            reservedAt = now,
+            expiresAt = now.plusMinutes(30),
+            updatedAt = now
+        )
+
+        val mockUseCaseResult = listOf(
+            InventoryService.ReservationItem(
+                reservationEntity = mockReservationEntity,
+                productName = "에티오피아 예가체프 G1",
+                optionCode = "ETH-HD-200",
+                availableStockAfterReservation = 8
             )
         )
 
-        every { reserveOrderUseCase.reserveOrder(userId) } returns mockResponse
+        every { reserveOrderUseCase.reserveOrder(userId) } returns mockUseCaseResult
 
         val requestBody = """
             {

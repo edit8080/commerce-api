@@ -1,8 +1,8 @@
 package com.beanbliss.domain.inventory.service
 
 import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.inventory.dto.InventoryListResponse
-import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
+import com.beanbliss.domain.inventory.dto.InventoryResponse
+import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 
 /**
  * [책임]: 재고 관리 기능의 계약 정의
@@ -10,21 +10,38 @@ import com.beanbliss.domain.order.dto.InventoryReservationItemResponse
  */
 interface InventoryService {
     /**
+     * 재고 목록 조회 결과 (도메인 데이터)
+     */
+    data class InventoriesResult(
+        val inventories: List<InventoryResponse>,
+        val totalElements: Long
+    )
+
+    /**
+     * 재고 예약 정보 (도메인 데이터)
+     */
+    data class ReservationItem(
+        val reservationEntity: InventoryReservationEntity,
+        val productName: String,
+        val optionCode: String,
+        val availableStockAfterReservation: Int
+    )
+
+    /**
      * 재고 목록 조회
      *
      * [비즈니스 로직]:
      * 1. Repository에서 재고 목록 조회 (created_at DESC 정렬)
      * 2. Repository에서 전체 재고 개수 조회
-     * 3. 페이지 정보 조립 (totalPages 계산)
      *
      * [참고]:
      * - 파라미터 유효성 검증은 Controller에서 Jakarta Validator로 수행됨
      *
      * @param page 페이지 번호 (1부터 시작, Controller에서 검증됨)
      * @param size 페이지 크기 (1~100, Controller에서 검증됨)
-     * @return 재고 목록 + 페이징 정보
+     * @return 재고 목록 + 총 개수
      */
-    fun getInventories(page: Int, size: Int): InventoryListResponse
+    fun getInventories(page: Int, size: Int): InventoriesResult
 
     /**
      * 재고 추가
@@ -66,7 +83,6 @@ interface InventoryService {
      * 1. 중복 예약 방지: 사용자의 활성 예약 존재 여부 확인
      * 2. 가용 재고 계산 및 충분성 검증
      * 3. 예약 엔티티 생성 (30분 만료)
-     * 4. 예약 정보 응답 DTO 변환
      *
      * [트랜잭션]:
      * - @Transactional로 원자성 보장
@@ -74,11 +90,11 @@ interface InventoryService {
      *
      * @param userId 사용자 ID
      * @param cartItems 장바구니 아이템 목록 (상품 정보 포함)
-     * @return 생성된 재고 예약 정보 목록
+     * @return 생성된 재고 예약 정보 목록 (도메인 데이터)
      * @throws DuplicateReservationException 이미 활성 예약이 존재하는 경우
      * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
      */
-    fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<InventoryReservationItemResponse>
+    fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<ReservationItem>
 
     /**
      * 주문을 위한 재고 확인 및 차감 (비관적 락)

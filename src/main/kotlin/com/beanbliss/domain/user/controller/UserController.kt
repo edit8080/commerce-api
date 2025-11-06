@@ -32,11 +32,27 @@ class UserController(
      */
     @GetMapping("/{userId}/balance")
     fun getBalance(@PathVariable userId: Long): ResponseEntity<Map<String, BalanceResponse>> {
-        // UseCase 계층에 위임
-        val balance = getBalanceUseCase.getBalance(userId)
+        // 1. UseCase 계층에 위임 (Service DTO 반환)
+        val balanceInfo = getBalanceUseCase.getBalance(userId)
 
-        // data envelope 형태로 응답 반환
-        return ResponseEntity.ok(mapOf("data" to balance))
+        // 2. Service DTO → Response DTO 변환 (Controller 책임)
+        val response = if (balanceInfo != null) {
+            BalanceResponse(
+                userId = balanceInfo.userId,
+                amount = balanceInfo.amount,
+                lastUpdatedAt = balanceInfo.updatedAt
+            )
+        } else {
+            // 레코드 없으면 0원 반환
+            BalanceResponse(
+                userId = userId,
+                amount = 0,
+                lastUpdatedAt = null
+            )
+        }
+
+        // 3. data envelope 형태로 응답 반환
+        return ResponseEntity.ok(mapOf("data" to response))
     }
 
     /**
@@ -51,10 +67,17 @@ class UserController(
         @PathVariable userId: Long,
         @Valid @RequestBody request: ChargeBalanceRequest
     ): ResponseEntity<Map<String, ChargeBalanceResponse>> {
-        // UseCase 계층에 위임
-        val result = chargeBalanceUseCase.chargeBalance(userId, request.chargeAmount)
+        // 1. UseCase 계층에 위임 (Service DTO 반환)
+        val balanceInfo = chargeBalanceUseCase.chargeBalance(userId, request.chargeAmount)
 
-        // data envelope 형태로 응답 반환
-        return ResponseEntity.ok(mapOf("data" to result))
+        // 2. Service DTO → Response DTO 변환 (Controller 책임)
+        val response = ChargeBalanceResponse(
+            userId = balanceInfo.userId,
+            currentBalance = balanceInfo.amount,
+            chargedAt = balanceInfo.updatedAt
+        )
+
+        // 3. data envelope 형태로 응답 반환
+        return ResponseEntity.ok(mapOf("data" to response))
     }
 }

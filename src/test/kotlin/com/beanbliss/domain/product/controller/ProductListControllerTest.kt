@@ -61,8 +61,8 @@ class ProductListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockResponse = ProductListResponse(
-            content = listOf(
+        val mockUseCaseResult = GetProductsUseCase.ProductsResult(
+            products = listOf(
                 ProductResponse(
                     productId = 1L,
                     name = "에티오피아 예가체프",
@@ -82,15 +82,10 @@ class ProductListControllerTest {
                     )
                 )
             ),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 1L,
-                totalPages = 1
-            )
+            totalElements = 1L
         )
 
-        every { getProductsUseCase.getProducts(page, size) } returns mockResponse
+        every { getProductsUseCase.getProducts(page, size) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -118,17 +113,12 @@ class ProductListControllerTest {
         // Given
         val defaultPage = 1
         val defaultSize = 10
-        val mockResponse = ProductListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = defaultPage,
-                pageSize = defaultSize,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockUseCaseResult = GetProductsUseCase.ProductsResult(
+            products = emptyList(),
+            totalElements = 0L
         )
 
-        every { getProductsUseCase.getProducts(defaultPage, defaultSize) } returns mockResponse
+        every { getProductsUseCase.getProducts(defaultPage, defaultSize) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -146,17 +136,12 @@ class ProductListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockResponse = ProductListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockUseCaseResult = GetProductsUseCase.ProductsResult(
+            products = emptyList(),
+            totalElements = 0L
         )
 
-        every { getProductsUseCase.getProducts(page, size) } returns mockResponse
+        every { getProductsUseCase.getProducts(page, size) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -237,17 +222,12 @@ class ProductListControllerTest {
         // Given
         val page = 2
         val size = 15
-        val mockResponse = ProductListResponse(
-            content = emptyList(),
-            pageable = PageableResponse(
-                pageNumber = page,
-                pageSize = size,
-                totalElements = 0L,
-                totalPages = 0
-            )
+        val mockUseCaseResult = GetProductsUseCase.ProductsResult(
+            products = emptyList(),
+            totalElements = 0L
         )
 
-        every { getProductsUseCase.getProducts(page, size) } returns mockResponse
+        every { getProductsUseCase.getProducts(page, size) } returns mockUseCaseResult
 
         // When
         mockMvc.perform(

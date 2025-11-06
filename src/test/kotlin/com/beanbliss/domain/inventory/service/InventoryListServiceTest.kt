@@ -65,12 +65,12 @@ class InventoryListServiceTest {
         verify(exactly = 1) { inventoryRepository.count() }
 
         // [비즈니스 로직 검증]: 조회된 데이터가 올바르게 반환되는가?
-        assertEquals(2, result.content.size)
-        assertEquals(1L, result.content[0].inventoryId)
-        assertEquals("에티오피아 예가체프 G1", result.content[0].productName)
-        assertEquals(50, result.content[0].stockQuantity)
-        assertEquals(2L, result.content[1].inventoryId)
-        assertEquals(30, result.content[1].stockQuantity)
+        assertEquals(2, result.inventories.size)
+        assertEquals(1L, result.inventories[0].inventoryId)
+        assertEquals("에티오피아 예가체프 G1", result.inventories[0].productName)
+        assertEquals(50, result.inventories[0].stockQuantity)
+        assertEquals(2L, result.inventories[1].inventoryId)
+        assertEquals(30, result.inventories[1].stockQuantity)
     }
 
     @Test
@@ -93,11 +93,8 @@ class InventoryListServiceTest {
         val result = inventoryService.getInventories(page, size)
 
         // Then
-        // [비즈니스 로직 검증]: 페이지 정보가 올바르게 조립되는가?
-        assertEquals(page, result.pageable.pageNumber, "현재 페이지 번호가 일치해야 함")
-        assertEquals(size, result.pageable.pageSize, "페이지 크기가 일치해야 함")
-        assertEquals(totalElements, result.pageable.totalElements, "전체 재고 개수가 일치해야 함")
-        assertEquals(3, result.pageable.totalPages, "전체 페이지 수가 올바르게 계산되어야 함 (ceil(45/20) = 3)")
+        // [비즈니스 로직 검증]: 전체 개수가 올바르게 반환되는가?
+        assertEquals(totalElements, result.totalElements, "전체 재고 개수가 일치해야 함")
     }
 
     @Test
@@ -137,9 +134,8 @@ class InventoryListServiceTest {
         val result = inventoryService.getInventories(page, size)
 
         // Then
-        assertTrue(result.content.isEmpty())
-        assertEquals(0L, result.pageable.totalElements)
-        assertEquals(0, result.pageable.totalPages)
+        assertTrue(result.inventories.isEmpty())
+        assertEquals(0L, result.totalElements)
     }
 
 
@@ -160,8 +156,8 @@ class InventoryListServiceTest {
         val result = inventoryService.getInventories(page, size)
 
         // Then
-        // totalPages = ceil(50 / 20) = ceil(2.5) = 3
-        assertEquals(3, result.pageable.totalPages, "50개 재고를 20개씩 페이지네이션하면 3페이지가 되어야 함")
+        // totalElements 검증
+        assertEquals(50L, result.totalElements, "전체 재고 개수가 50개여야 함")
     }
 
     // === Helper Methods ===

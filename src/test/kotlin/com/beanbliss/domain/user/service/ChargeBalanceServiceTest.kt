@@ -63,17 +63,17 @@ class ChargeBalanceServiceTest {
         every { balanceRepository.save(any()) } returns updatedBalance
 
         // When
-        val response = balanceService.chargeBalance(userId, chargeAmount)
+        val balanceInfo = balanceService.chargeBalance(userId, chargeAmount)
 
         // Then
         // [비즈니스 로직 검증 1]: Repository 호출 확인
         verify(exactly = 1) { balanceRepository.findByUserIdWithLock(userId) }
         verify(exactly = 1) { balanceRepository.save(any()) }
 
-        // [비즈니스 로직 검증 2]: 잔액 계산이 올바르게 수행되었는가? (30000 + 50000 = 80000)
-        assertEquals(userId, response.userId)
-        assertEquals(80000, response.currentBalance)
-        assertNotNull(response.chargedAt)
+        // [비즈니스 로직 검증 2]: Service DTO - 잔액 계산이 올바르게 수행되었는가? (30000 + 50000 = 80000)
+        assertEquals(userId, balanceInfo.userId)
+        assertEquals(80000, balanceInfo.amount)
+        assertNotNull(balanceInfo.updatedAt)
     }
 
     @Test
@@ -96,16 +96,16 @@ class ChargeBalanceServiceTest {
         every { balanceRepository.save(any()) } returns newBalance
 
         // When
-        val response = balanceService.chargeBalance(userId, chargeAmount)
+        val balanceInfo = balanceService.chargeBalance(userId, chargeAmount)
 
         // Then
         // [비즈니스 로직 검증]: UPSERT - INSERT 케이스 (0 + 50000 = 50000)
         verify(exactly = 1) { balanceRepository.findByUserIdWithLock(userId) }
         verify(exactly = 1) { balanceRepository.save(any()) }
 
-        assertEquals(userId, response.userId)
-        assertEquals(chargeAmount, response.currentBalance)
-        assertNotNull(response.chargedAt)
+        assertEquals(userId, balanceInfo.userId)
+        assertEquals(chargeAmount, balanceInfo.amount)
+        assertNotNull(balanceInfo.updatedAt)
     }
 
     @Test
@@ -133,11 +133,11 @@ class ChargeBalanceServiceTest {
         every { balanceRepository.save(any()) } returns updatedBalance
 
         // When
-        val response = balanceService.chargeBalance(userId, minChargeAmount)
+        val balanceInfo = balanceService.chargeBalance(userId, minChargeAmount)
 
         // Then
         // [비즈니스 로직 검증]: 경계값 테스트 (최소값) - 0 + 1000 = 1000
-        assertEquals(minChargeAmount, response.currentBalance)
+        assertEquals(minChargeAmount, balanceInfo.amount)
     }
 
     @Test
@@ -165,10 +165,10 @@ class ChargeBalanceServiceTest {
         every { balanceRepository.save(any()) } returns updatedBalance
 
         // When
-        val response = balanceService.chargeBalance(userId, maxChargeAmount)
+        val balanceInfo = balanceService.chargeBalance(userId, maxChargeAmount)
 
         // Then
         // [비즈니스 로직 검증]: 경계값 테스트 (최대값) - 500000 + 1000000 = 1500000
-        assertEquals(1500000, response.currentBalance)
+        assertEquals(1500000, balanceInfo.amount)
     }
 }
