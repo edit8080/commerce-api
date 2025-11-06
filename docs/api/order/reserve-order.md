@@ -353,37 +353,35 @@ sequenceDiagram
         UseCase-->>Controller: DUPLICATE_RESERVATION (409)
     end
 
-    Note over InventorySvc: 4-2. 가용 재고 계산 및 예약 생성
+    Note over InventorySvc: 4-2. 가용 재고 일괄 조회 (Bulk 쿼리)
+
+    InventorySvc->>InventoryRepo: calculateAvailableStockBatch(productOptionIds)
+    activate InventoryRepo
+    Note over InventoryRepo: 단일 쿼리로 모든 상품의<br/>가용 재고 계산<br/>(N+1 문제 방지)
+    InventoryRepo-->>InventorySvc: Map<productOptionId, availableStock>
+    deactivate InventoryRepo
+
+    Note over InventorySvc: 4-3. 가용 재고 충분성 검증 (Loop)
 
     loop 각 장바구니 아이템
-        InventorySvc->>InventoryRepo: findByProductOptionIdWithLock(productOptionId)
-        activate InventoryRepo
-        Note over InventoryRepo: 비관적 락 획득<br/>(FOR UPDATE)
-        InventoryRepo-->>InventorySvc: Inventory (🔒 Locked)
-        deactivate InventoryRepo
-
-        InventorySvc->>ReservationRepo: sumQuantityByProductOptionIdAndStatusIn(productOptionId, ['RESERVED', 'CONFIRMED'])
-        activate ReservationRepo
-        Note over ReservationRepo: 예약된 수량 합계 계산
-        ReservationRepo-->>InventorySvc: reservedQuantity
-        deactivate ReservationRepo
-
-        Note over InventorySvc: availableStock = actualStock - reservedQuantity
+        Note over InventorySvc: availableStock = availableStocks[productOptionId]
 
         alt 가용 재고 부족
             Note over InventorySvc: 트랜잭션 롤백
             InventorySvc-->>UseCase: INSUFFICIENT_AVAILABLE_STOCK (409)
             UseCase-->>Controller: INSUFFICIENT_AVAILABLE_STOCK (409)
         end
-
-        Note over InventorySvc: 예약 정보 생성<br/>status = 'RESERVED'<br/>expires_at = NOW() + 30분
-
-        InventorySvc->>ReservationRepo: save(reservation)
-        activate ReservationRepo
-        Note over ReservationRepo: INSERT INTO INVENTORY_RESERVATION
-        ReservationRepo-->>InventorySvc: Reservation
-        deactivate ReservationRepo
     end
+
+    Note over InventorySvc: 4-4. 예약 엔티티 일괄 생성
+
+    Note over InventorySvc: 모든 예약 엔티티 생성<br/>status = 'RESERVED'<br/>expires_at = NOW() + 30분
+
+    InventorySvc->>ReservationRepo: saveAll(reservations)
+    activate ReservationRepo
+    Note over ReservationRepo: Batch INSERT<br/>(N번 INSERT → 1번 Batch INSERT)
+    ReservationRepo-->>InventorySvc: List<Reservation>
+    deactivate ReservationRepo
 
     Note over InventorySvc: @Transactional 커밋 (락 해제)
 
