@@ -5,7 +5,7 @@
 
 ## 0. 🎯 핵심 개발 원칙 및 목표
 
-1. **레이어드 아키텍처 준수**: `Controller`, `Service`, `Repository` 계층의 명확한 분리. Presentation Layer → Business Layer → Persistence Layer → Infrastructure Layer  계층 순으로 상위 계층은 하위 계층에만 의존하고, 하위 계층은 상위 계층을 알지 말아야 점에 유의합니다.
+1. **레이어드 아키텍처 준수**: `Controller`, `Service`, `Repository` 계층의 명확한 분리. 계층 구조는 Presentation Layer → Business Layer → Persistence Layer → Infrastructure Layer 순서이며, 상위 계층은 하위 계층에만 의존하고, 하위 계층은 상위 계층을 알지 말아야 하는 점에 유의합니다.
 2. **DIP 적용**: 모든 계층 간의 의존성은 **인터페이스**를 통해 역전됩니다.
 3. **TDD 접근**: 단위 테스트를 통해 비즈니스 로직과 책임 분산을 검증합니다. 기능 로직이 올바르게 구현되었는지를 검증하는 것보다 클래스의 책임이 올바르게 분산되고, 로직이 올바르게 추상화되었는지 설계를 검증하는 목적에 집중합니다.
 4. **패키지 경로**: `com.beanbliss.domain`, `com.beanbliss.common` 을 사용합니다. 자세한 내용은 프로젝트 구조 내용을 참고하세요.
@@ -422,7 +422,7 @@ class CommonExceptionHandler {
 ### **7.3 베스트 프랙티스**
 
 1. **공통 예외는 common 패키지**, 도메인 예외는 도메인 패키지에 정의
-2. **@Order로 우선순위 관리**: 도메인(`@Order(10)`), 공통(`@Order(100)`)
+2. **@Order 로 우선순위 관리**: 도메인(`@Order(10)`), 공통(`@Order(100)`)
 3. **일관된 에러 응답**: `ErrorResponse(status, code, message)` 사용
 
 ## 8. 📄 페이지네이션 공통 처리 (Common Layer)
