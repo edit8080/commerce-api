@@ -53,7 +53,7 @@ class InventoryListControllerTest {
         val size = 10
         val mockServiceResult = InventoryService.InventoriesResult(
             inventories = listOf(
-                com.beanbliss.domain.inventory.dto.InventoryResponse(
+                com.beanbliss.domain.inventory.repository.InventoryDetail(
                     inventoryId = 1L,
                     productId = 1L,
                     productName = "에티오피아 예가체프 G1",
@@ -64,7 +64,7 @@ class InventoryListControllerTest {
                     stockQuantity = 50,
                     createdAt = LocalDateTime.of(2025, 11, 4, 10, 30, 0)
                 ),
-                com.beanbliss.domain.inventory.dto.InventoryResponse(
+                com.beanbliss.domain.inventory.repository.InventoryDetail(
                     inventoryId = 2L,
                     productId = 1L,
                     productName = "에티오피아 예가체프 G1",

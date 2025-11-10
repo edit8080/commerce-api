@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.usecase
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.service.CouponService
@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 /**
@@ -68,9 +69,9 @@ class CreateOrderUseCaseTest {
         productOptionId: Long = 1L,
         quantity: Int = 2,
         price: Int = 15000
-    ): CartItemResponse {
+    ): CartItemDetail {
         val now = LocalDateTime.now()
-        return CartItemResponse(
+        return CartItemDetail(
             cartItemId = 1L,
             productOptionId = productOptionId,
             productName = "에티오피아 예가체프",
@@ -135,12 +136,12 @@ class CreateOrderUseCaseTest {
             orderEntity = OrderEntity(
                 id = 1L,
                 userId = userId,
-                totalAmount = 30000,
-                discountAmount = 3000,
-                finalAmount = 27000,
+                originalAmount = 30000.toBigDecimal(),
+                discountAmount = 3000.toBigDecimal(),
+                finalAmount = 27000.toBigDecimal(),
                 shippingAddress = shippingAddress,
-                orderStatus = OrderStatus.PAYMENT_COMPLETED,
-                orderedAt = now,
+                status = OrderStatus.PAYMENT_COMPLETED,
+                createdAt = now,
                 updatedAt = now
             ),
             orderItemEntities = listOf(
@@ -149,8 +150,8 @@ class CreateOrderUseCaseTest {
                     orderId = 1L,
                     productOptionId = 1L,
                     quantity = 2,
-                    unitPrice = 15000,
-                    totalPrice = 30000
+                    unitPrice = 15000.toBigDecimal(),
+                    totalPrice = 30000.toBigDecimal()
                 )
             )
         )
@@ -165,7 +166,7 @@ class CreateOrderUseCaseTest {
         // Then
         assertNotNull(response)
         assertEquals(1L, response.orderEntity.id)
-        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.orderStatus)
+        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.status)
         assertEquals(1, response.orderItemEntities.size)
         assertEquals(30000, response.originalAmount)
         assertEquals(3000, response.discountAmount)
@@ -209,12 +210,12 @@ class CreateOrderUseCaseTest {
             orderEntity = OrderEntity(
                 id = 1L,
                 userId = userId,
-                totalAmount = 30000,
-                discountAmount = 0,
-                finalAmount = 30000,
+                originalAmount = 30000.toBigDecimal(),
+                discountAmount = 0.toBigDecimal(),
+                finalAmount = 30000.toBigDecimal(),
                 shippingAddress = shippingAddress,
-                orderStatus = OrderStatus.PAYMENT_COMPLETED,
-                orderedAt = now,
+                status = OrderStatus.PAYMENT_COMPLETED,
+                createdAt = now,
                 updatedAt = now
             ),
             orderItemEntities = listOf(
@@ -223,8 +224,8 @@ class CreateOrderUseCaseTest {
                     orderId = 1L,
                     productOptionId = 1L,
                     quantity = 2,
-                    unitPrice = 15000,
-                    totalPrice = 30000
+                    unitPrice = 15000.toBigDecimal(),
+                    totalPrice = 30000.toBigDecimal()
                 )
             )
         )
@@ -238,7 +239,7 @@ class CreateOrderUseCaseTest {
         // Then
         assertNotNull(response)
         assertEquals(1L, response.orderEntity.id)
-        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.orderStatus)
+        assertEquals(OrderStatus.PAYMENT_COMPLETED, response.orderEntity.status)
         assertEquals(1, response.orderItemEntities.size)
         assertEquals(30000, response.originalAmount)
         assertEquals(0, response.discountAmount)
@@ -422,12 +423,12 @@ class CreateOrderUseCaseTest {
             orderEntity = OrderEntity(
                 id = 1L,
                 userId = userId,
-                totalAmount = 30000,
-                discountAmount = 0,
-                finalAmount = 30000,
+                originalAmount = 30000.toBigDecimal(),
+                discountAmount = 0.toBigDecimal(),
+                finalAmount = 30000.toBigDecimal(),
                 shippingAddress = shippingAddress,
-                orderStatus = OrderStatus.PAYMENT_COMPLETED,
-                orderedAt = now,
+                status = OrderStatus.PAYMENT_COMPLETED,
+                createdAt = now,
                 updatedAt = now
             ),
             orderItemEntities = listOf(
@@ -436,8 +437,8 @@ class CreateOrderUseCaseTest {
                     orderId = 1L,
                     productOptionId = 1L,
                     quantity = 2,
-                    unitPrice = 15000,
-                    totalPrice = 30000
+                    unitPrice = 15000.toBigDecimal(),
+                    totalPrice = 30000.toBigDecimal()
                 )
             )
         )

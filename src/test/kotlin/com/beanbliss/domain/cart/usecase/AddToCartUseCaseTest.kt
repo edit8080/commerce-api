@@ -1,7 +1,7 @@
 package com.beanbliss.domain.cart.usecase
 
 import com.beanbliss.domain.cart.dto.AddToCartRequest
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.cart.service.UpsertCartItemResult
 import com.beanbliss.domain.product.repository.ProductOptionDetail
@@ -237,8 +237,8 @@ class AddToCartUseCaseTest {
         cartItemId: Long,
         productOptionId: Long,
         quantity: Int
-    ): CartItemResponse {
-        return CartItemResponse(
+    ): CartItemDetail {
+        return CartItemDetail(
             cartItemId = cartItemId,
             productOptionId = productOptionId,
             productName = "에티오피아 예가체프 G1",

@@ -49,13 +49,16 @@ class ChargeBalanceServiceTest {
         val mockBalance = BalanceEntity(
             id = 1L,
             userId = userId,
-            amount = 30000,
+            amount = 30000.toBigDecimal(),
             createdAt = now.minusDays(10),
             updatedAt = now.minusDays(1)
         )
 
-        val updatedBalance = mockBalance.copy(
-            amount = 80000,
+        val updatedBalance = BalanceEntity(
+            id = mockBalance.id,
+            userId = mockBalance.userId,
+            amount = 80000.toBigDecimal(),
+            createdAt = mockBalance.createdAt,
             updatedAt = now
         )
 
@@ -87,7 +90,7 @@ class ChargeBalanceServiceTest {
         val newBalance = BalanceEntity(
             id = 1L,
             userId = userId,
-            amount = chargeAmount,
+            amount = chargeAmount.toBigDecimal(),
             createdAt = now,
             updatedAt = now
         )
@@ -119,13 +122,16 @@ class ChargeBalanceServiceTest {
         val mockBalance = BalanceEntity(
             id = 1L,
             userId = userId,
-            amount = 0,
+            amount = 0.toBigDecimal(),
             createdAt = now.minusDays(10),
             updatedAt = now.minusDays(10)
         )
 
-        val updatedBalance = mockBalance.copy(
-            amount = minChargeAmount,
+        val updatedBalance = BalanceEntity(
+            id = mockBalance.id,
+            userId = mockBalance.userId,
+            amount = minChargeAmount.toBigDecimal(),
+            createdAt = mockBalance.createdAt,
             updatedAt = now
         )
 
@@ -151,13 +157,16 @@ class ChargeBalanceServiceTest {
         val mockBalance = BalanceEntity(
             id = 1L,
             userId = userId,
-            amount = 500000,
+            amount = 500000.toBigDecimal(),
             createdAt = now.minusDays(10),
             updatedAt = now.minusDays(1)
         )
 
-        val updatedBalance = mockBalance.copy(
-            amount = 1500000,
+        val updatedBalance = BalanceEntity(
+            id = mockBalance.id,
+            userId = mockBalance.userId,
+            amount = 1500000.toBigDecimal(),
+            createdAt = mockBalance.createdAt,
             updatedAt = now
         )
 

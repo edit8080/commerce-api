@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.controller
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.coupon.service.CouponService
 import com.beanbliss.domain.order.entity.OrderEntity
 import com.beanbliss.domain.order.entity.OrderItemEntity
@@ -17,6 +17,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 /**
@@ -50,12 +51,12 @@ class CreateOrderControllerTest {
         val mockOrderEntity = OrderEntity(
             id = 1001L,
             userId = userId,
-            totalAmount = 30000,
-            discountAmount = 3000,
-            finalAmount = 27000,
+            originalAmount = 30000.toBigDecimal(),
+            discountAmount = 3000.toBigDecimal(),
+            finalAmount = 27000.toBigDecimal(),
             shippingAddress = shippingAddress,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderedAt = now,
+            status = OrderStatus.PAYMENT_COMPLETED,
+            createdAt = now,
             updatedAt = now
         )
 
@@ -65,13 +66,13 @@ class CreateOrderControllerTest {
                 orderId = 1001L,
                 productOptionId = 1L,
                 quantity = 2,
-                unitPrice = 15000,
-                totalPrice = 30000
+                unitPrice = 15000.toBigDecimal(),
+                totalPrice = 30000.toBigDecimal()
             )
         )
 
         val mockCartItems = listOf(
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 1L,
                 productOptionId = 1L,
                 productName = "에티오피아 예가체프 G1",
@@ -157,12 +158,12 @@ class CreateOrderControllerTest {
         val mockOrderEntity = OrderEntity(
             id = 1001L,
             userId = userId,
-            totalAmount = 30000,
-            discountAmount = 0,
-            finalAmount = 30000,
+            originalAmount = 30000.toBigDecimal(),
+            discountAmount = 0.toBigDecimal(),
+            finalAmount = 30000.toBigDecimal(),
             shippingAddress = shippingAddress,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderedAt = now,
+            status = OrderStatus.PAYMENT_COMPLETED,
+            createdAt = now,
             updatedAt = now
         )
 
@@ -172,13 +173,13 @@ class CreateOrderControllerTest {
                 orderId = 1001L,
                 productOptionId = 1L,
                 quantity = 2,
-                unitPrice = 15000,
-                totalPrice = 30000
+                unitPrice = 15000.toBigDecimal(),
+                totalPrice = 30000.toBigDecimal()
             )
         )
 
         val mockCartItems = listOf(
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 1L,
                 productOptionId = 1L,
                 productName = "에티오피아 예가체프 G1",

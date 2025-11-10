@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.usecase
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
@@ -39,7 +39,7 @@ class ReserveOrderUseCaseTest {
         val userId = 123L
 
         val cartItems = listOf(
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 1L,
                 productOptionId = 10L,
                 productName = "에티오피아 예가체프 G1",

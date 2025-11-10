@@ -1,6 +1,6 @@
 package com.beanbliss.domain.cart.service
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.repository.CartItemRepository
 import com.beanbliss.domain.product.repository.ProductOptionDetail
 import com.beanbliss.common.exception.InvalidParameterException
@@ -210,7 +210,7 @@ class CartUpsertServiceTest {
         )
         val quantity = 3
 
-        val savedCartItem = CartItemResponse(
+        val savedCartItem = CartItemDetail(
             cartItemId = 200L,
             productOptionId = 10L,
             productName = "콜롬비아 수프리모",
@@ -272,8 +272,8 @@ class CartUpsertServiceTest {
         cartItemId: Long,
         productOptionId: Long,
         quantity: Int
-    ): CartItemResponse {
-        return CartItemResponse(
+    ): CartItemDetail {
+        return CartItemDetail(
             cartItemId = cartItemId,
             productOptionId = productOptionId,
             productName = "에티오피아 예가체프 G1",

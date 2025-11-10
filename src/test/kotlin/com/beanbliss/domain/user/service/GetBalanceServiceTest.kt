@@ -44,7 +44,7 @@ class GetBalanceServiceTest {
         val mockBalance = BalanceEntity(
             id = 1L,
             userId = userId,
-            amount = 50000,
+            amount = 50000.toBigDecimal(),
             createdAt = now.minusDays(10),
             updatedAt = now
         )

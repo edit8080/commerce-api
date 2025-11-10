@@ -1,6 +1,6 @@
 package com.beanbliss.domain.cart.service
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.repository.CartItemRepository
 import com.beanbliss.domain.order.exception.CartEmptyException
 import io.mockk.*
@@ -45,7 +45,7 @@ class CartGetServiceTest {
         val now = LocalDateTime.now()
 
         val cartItems = listOf(
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 1L,
                 productOptionId = 10L,
                 productName = "에티오피아 예가체프 G1",
@@ -59,7 +59,7 @@ class CartGetServiceTest {
                 createdAt = now,
                 updatedAt = now
             ),
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 2L,
                 productOptionId = 20L,
                 productName = "콜롬비아 수프리모",
@@ -122,7 +122,7 @@ class CartGetServiceTest {
         val now = LocalDateTime.now()
 
         val singleCartItem = listOf(
-            CartItemResponse(
+            CartItemDetail(
                 cartItemId = 1L,
                 productOptionId = 10L,
                 productName = "에티오피아 예가체프 G1",

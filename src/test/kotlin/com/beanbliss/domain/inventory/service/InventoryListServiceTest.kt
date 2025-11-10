@@ -1,6 +1,6 @@
 package com.beanbliss.domain.inventory.service
 
-import com.beanbliss.domain.inventory.dto.InventoryResponse
+import com.beanbliss.domain.inventory.repository.InventoryDetail
 import com.beanbliss.domain.inventory.repository.InventoryRepository
 import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
 import io.mockk.*
@@ -174,8 +174,8 @@ class InventoryListServiceTest {
         optionName: String,
         price: Int,
         stockQuantity: Int
-    ): InventoryResponse {
-        return InventoryResponse(
+    ): InventoryDetail {
+        return InventoryDetail(
             inventoryId = inventoryId,
             productId = productId,
             productName = productName,

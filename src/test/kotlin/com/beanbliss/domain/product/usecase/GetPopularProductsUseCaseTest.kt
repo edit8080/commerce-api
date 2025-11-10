@@ -1,8 +1,8 @@
 package com.beanbliss.domain.product.usecase
 
-import com.beanbliss.domain.order.dto.ProductOrderCount
+import com.beanbliss.domain.order.repository.ProductOrderCount
 import com.beanbliss.domain.order.service.OrderService
-import com.beanbliss.domain.product.dto.ProductBasicInfo
+import com.beanbliss.domain.product.repository.ProductBasicInfo
 import com.beanbliss.domain.product.service.ProductService
 import io.mockk.every
 import io.mockk.mockk
