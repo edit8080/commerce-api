@@ -1,46 +1,64 @@
 package com.beanbliss.domain.product.entity
 
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import jakarta.persistence.*
 import java.time.LocalDateTime
 
 /**
- * [책임]: 상품 Entity (ERD PRODUCT 테이블에 대응)
+ * [책임]: 커피 원두 상품 기본 정보를 DB에 저장하기 위한 JPA Entity
+ * Infrastructure Layer에 속하며, 기술 종속적인 코드 포함
  *
  * [테이블 구조]:
  * - id: bigint (PK)
- * - name: varchar
- * - description: varchar
- * - brand: varchar
+ * - name: varchar (상품명)
+ * - description: varchar (상품 설명)
+ * - brand: varchar (커피 브랜드)
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [설계 원칙]:
- * - Entity는 DB 테이블 구조와 1:1 매핑
- * - DTO 변환 메서드 제공 (toResponse)
+ * [관계]:
  * - PRODUCT_OPTION과 1:N 관계
  */
-data class ProductEntity(
-    val id: Long,
+@Entity
+@Table(name = "products")
+class ProductEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
+
+    @Column(nullable = false)
     val name: String,
+
+    @Column(nullable = false, columnDefinition = "TEXT")
     val description: String,
+
+    @Column(nullable = false)
     val brand: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
-    /**
-     * Entity를 DTO(Response)로 변환
-     *
-     * @param options 상품에 속한 옵션 목록 (활성 옵션만 포함)
-     */
-    fun toResponse(options: List<ProductOptionResponse>): ProductResponse {
-        return ProductResponse(
-            productId = id,
-            name = name,
-            description = description,
-            brand = brand,
-            createdAt = createdAt,
-            options = options
-        )
+    @PreUpdate
+    fun onPreUpdate() {
+        updatedAt = LocalDateTime.now()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ProductEntity
+
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+
+    override fun toString(): String {
+        return "ProductEntity(id=$id, name='$name', brand='$brand')"
     }
 }

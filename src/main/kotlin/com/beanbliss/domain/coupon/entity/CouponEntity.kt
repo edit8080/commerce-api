@@ -1,64 +1,88 @@
 package com.beanbliss.domain.coupon.entity
 
-import com.beanbliss.domain.coupon.dto.CouponResponse
+import com.beanbliss.domain.coupon.domain.DiscountType
+import jakarta.persistence.*
+import java.math.BigDecimal
 import java.time.LocalDateTime
 
 /**
- * [책임]: 쿠폰 Entity (ERD COUPON 테이블에 대응)
+ * [책임]: 쿠폰 마스터 정보를 DB에 저장하기 위한 JPA Entity
+ * Infrastructure Layer에 속하며, 기술 종속적인 코드 포함
  *
  * [테이블 구조]:
  * - id: bigint (PK)
- * - name: varchar
- * - discount_type: varchar (PERCENTAGE, FIXED_AMOUNT)
- * - discount_value: decimal
- * - min_order_amount: decimal
- * - max_discount_amount: decimal
- * - total_quantity: int
- * - valid_from: datetime
- * - valid_until: datetime
+ * - name: varchar (쿠폰명)
+ * - discount_type: varchar (할인 타입: PERCENTAGE, FIXED_AMOUNT)
+ * - discount_value: decimal (할인값)
+ * - min_order_amount: decimal (최소 주문 금액)
+ * - max_discount_amount: decimal (최대 할인 금액)
+ * - total_quantity: int (총 발행 수량)
+ * - valid_from: datetime (유효 시작)
+ * - valid_until: datetime (유효 종료)
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [설계 원칙]:
- * - Entity는 DB 테이블 구조와 1:1 매핑
- * - DTO 변환 메서드 제공 (toResponse)
+ * [설계 변경사항]:
+ * - issued_quantity 제거 → COUPON_TICKET으로 관리
+ * - 쿠폰 메타데이터만 관리, 발급 관리는 COUPON_TICKET에서 처리
  */
-data class CouponEntity(
-    val id: Long?,
-    val name: String,
-    val discountType: String, // PERCENTAGE, FIXED_AMOUNT
-    val discountValue: Int,
-    val minOrderAmount: Int,
-    val maxDiscountAmount: Int,
-    val totalQuantity: Int,
-    val validFrom: LocalDateTime,
-    val validUntil: LocalDateTime,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime
-) {
-    /**
-     * Entity를 DTO(Response)로 변환
-     *
-     * @param remainingQuantity 남은 수량 (COUPON_TICKET에서 계산)
-     */
-    fun toResponse(remainingQuantity: Int): CouponResponse {
-        val now = LocalDateTime.now()
-        val isInValidPeriod = now.isAfter(validFrom) && now.isBefore(validUntil)
-        val hasRemainingQuantity = remainingQuantity > 0
-        val isIssuable = isInValidPeriod && hasRemainingQuantity
+@Entity
+@Table(name = "coupons")
+class CouponEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
 
-        return CouponResponse(
-            couponId = id!!,
-            name = name,
-            discountType = discountType,
-            discountValue = discountValue,
-            minOrderAmount = minOrderAmount,
-            maxDiscountAmount = maxDiscountAmount,
-            remainingQuantity = remainingQuantity,
-            totalQuantity = totalQuantity,
-            validFrom = validFrom,
-            validUntil = validUntil,
-            isIssuable = isIssuable
-        )
+    @Column(nullable = false)
+    val name: String,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discount_type", nullable = false)
+    val discountType: DiscountType,
+
+    @Column(name = "discount_value", nullable = false, precision = 10, scale = 2)
+    val discountValue: BigDecimal,
+
+    @Column(name = "min_order_amount", nullable = false, precision = 10, scale = 2)
+    val minOrderAmount: BigDecimal,
+
+    @Column(name = "max_discount_amount", nullable = false, precision = 10, scale = 2)
+    val maxDiscountAmount: BigDecimal,
+
+    @Column(name = "total_quantity", nullable = false)
+    val totalQuantity: Int,
+
+    @Column(name = "valid_from", nullable = false)
+    val validFrom: LocalDateTime,
+
+    @Column(name = "valid_until", nullable = false)
+    val validUntil: LocalDateTime,
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now()
+) {
+    @PreUpdate
+    fun onPreUpdate() {
+        updatedAt = LocalDateTime.now()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as CouponEntity
+
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+
+    override fun toString(): String {
+        return "CouponEntity(id=$id, name='$name', discountType=$discountType, totalQuantity=$totalQuantity)"
     }
 }
