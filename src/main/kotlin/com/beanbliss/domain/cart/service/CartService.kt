@@ -1,6 +1,6 @@
 package com.beanbliss.domain.cart.service
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.repository.CartItemRepository
 import com.beanbliss.domain.order.exception.CartEmptyException
 import com.beanbliss.domain.order.exception.ProductOptionInactiveException
@@ -18,7 +18,7 @@ import java.time.LocalDateTime
  * @property isNewItem 신규 아이템 여부 (true: 신규 추가, false: 기존 수량 증가)
  */
 data class UpsertCartItemResult(
-    val cartItem: CartItemResponse,
+    val cartItem: CartItemDetail,
     val isNewItem: Boolean
 )
 
@@ -96,7 +96,7 @@ class CartService(
             }
 
             // 신규 장바구니 아이템 생성
-            val newCartItem = CartItemResponse(
+            val newCartItem = CartItemDetail(
                 cartItemId = 0L, // 신규 저장 시 0
                 productOptionId = productOption.optionId,
                 productName = productOption.productName,
@@ -130,7 +130,7 @@ class CartService(
      * @return 장바구니 아이템 목록 (상품명, 옵션 코드, 가격 등 포함)
      * @throws CartEmptyException 장바구니가 비어 있는 경우
      */
-    fun getCartItemsWithProducts(userId: Long): List<CartItemResponse> {
+    fun getCartItemsWithProducts(userId: Long): List<CartItemDetail> {
         // 1. 장바구니 조회
         val cartItems = cartItemRepository.findByUserId(userId)
 
@@ -151,7 +151,7 @@ class CartService(
      * @param cartItems 검증할 장바구니 아이템 목록
      * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
      */
-    fun validateCartItems(cartItems: List<CartItemResponse>) {
+    fun validateCartItems(cartItems: List<CartItemDetail>) {
         cartItems.forEach { cartItem ->
             val productOption = productOptionRepository.findActiveOptionWithProduct(cartItem.productOptionId)
             if (productOption == null || !productOption.isActive) {

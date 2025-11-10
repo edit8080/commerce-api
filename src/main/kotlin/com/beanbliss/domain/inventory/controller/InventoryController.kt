@@ -6,6 +6,7 @@ import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.inventory.dto.InventoryAddStockRequest
 import com.beanbliss.domain.inventory.dto.InventoryAddStockResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
+import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.service.InventoryService
 import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
 import jakarta.validation.Valid
@@ -52,10 +53,25 @@ class InventoryController(
         @Max(value = 100, message = "페이지 크기는 100 이하여야 합니다.")
         size: Int
     ): ResponseEntity<ApiResponse<InventoryListResponse>> {
-        // Service 계층에 위임 (도메인 데이터 반환)
+        // 1. Service 계층에 위임 (도메인 데이터 반환)
         val serviceResult = inventoryService.getInventories(page, size)
 
-        // 도메인 데이터 → Response DTO 변환
+        // 2. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val inventoryResponses = serviceResult.inventories.map { inventory ->
+            InventoryResponse(
+                inventoryId = inventory.inventoryId,
+                productId = inventory.productId,
+                productName = inventory.productName,
+                productOptionId = inventory.productOptionId,
+                optionCode = inventory.optionCode,
+                optionName = inventory.optionName,
+                price = inventory.price,
+                stockQuantity = inventory.stockQuantity,
+                createdAt = inventory.createdAt
+            )
+        }
+
+        // 3. 페이징 정보 계산
         val totalPages = PageCalculator.calculateTotalPages(serviceResult.totalElements, size)
         val pageable = PageableResponse(
             pageNumber = page,
@@ -64,11 +80,11 @@ class InventoryController(
             totalPages = totalPages
         )
         val response = InventoryListResponse(
-            content = serviceResult.inventories,
+            content = inventoryResponses,
             pageable = pageable
         )
 
-        // 200 OK 응답
+        // 4. 200 OK 응답
         return ResponseEntity.ok(ApiResponse(data = response))
     }
 

@@ -9,9 +9,10 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 /**
- * [책임]: 장바구니 API 엔드포인트 제공.
+ * [책임]: 장바구니 API 엔드포인트 제공
  * - 클라이언트 요청의 유효성 검사 (@Valid)
  * - UseCase 계층에 위임
+ * - Repository JOIN DTO → Presentation DTO 변환
  * - 적절한 HTTP 상태 코드 반환 (201 Created, 200 OK)
  *
  * [주요 API]:
@@ -38,13 +39,29 @@ class CartController(
         @Valid @RequestBody request: AddToCartRequest
     ): ResponseEntity<Map<String, CartItemResponse>> {
 
-        // UseCase 계층에 위임
+        // 1. UseCase 계층에 위임
         val result = addToCartUseCase.addToCart(request)
 
-        // 응답 래핑: {"data": {...}}
-        val response = mapOf("data" to result.cartItem)
+        // 2. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val cartItemResponse = CartItemResponse(
+            cartItemId = result.cartItem.cartItemId,
+            productOptionId = result.cartItem.productOptionId,
+            productName = result.cartItem.productName,
+            optionCode = result.cartItem.optionCode,
+            origin = result.cartItem.origin,
+            grindType = result.cartItem.grindType,
+            weightGrams = result.cartItem.weightGrams,
+            price = result.cartItem.price,
+            quantity = result.cartItem.quantity,
+            totalPrice = result.cartItem.totalPrice,
+            createdAt = result.cartItem.createdAt,
+            updatedAt = result.cartItem.updatedAt
+        )
 
-        // 신규 추가 vs 수량 증가에 따라 HTTP 상태 코드 결정
+        // 3. 응답 래핑: {"data": {...}}
+        val response = mapOf("data" to cartItemResponse)
+
+        // 4. 신규 추가 vs 수량 증가에 따라 HTTP 상태 코드 결정
         return if (result.isNewItem) {
             ResponseEntity.status(HttpStatus.CREATED).body(response) // 201 Created
         } else {

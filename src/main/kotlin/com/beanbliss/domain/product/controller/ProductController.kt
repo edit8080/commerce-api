@@ -6,6 +6,7 @@ import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.product.dto.PopularProductInfo
 import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
+import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
@@ -58,7 +59,29 @@ class ProductController(
         // 2. UseCase 호출 (ProductService + InventoryService 오케스트레이션)
         val result = getProductsUseCase.getProducts(page, size)
 
-        // 3. 도메인 데이터 → DTO 변환 (Controller 책임)
+        // 3. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val productResponses = result.products.map { product ->
+            ProductResponse(
+                productId = product.productId,
+                name = product.name,
+                description = product.description,
+                brand = product.brand,
+                createdAt = product.createdAt,
+                options = product.options.map { option ->
+                    ProductOptionResponse(
+                        optionId = option.optionId,
+                        optionCode = option.optionCode,
+                        origin = option.origin,
+                        grindType = option.grindType,
+                        weightGrams = option.weightGrams,
+                        price = option.price,
+                        availableStock = option.availableStock
+                    )
+                }
+            )
+        }
+
+        // 4. 페이징 정보 계산
         val totalPages = PageCalculator.calculateTotalPages(result.totalElements, size)
         val pageable = PageableResponse(
             pageNumber = page,
@@ -67,11 +90,11 @@ class ProductController(
             totalPages = totalPages
         )
         val response = ProductListResponse(
-            content = result.products,
+            content = productResponses,
             pageable = pageable
         )
 
-        // 4. 응답 반환
+        // 5. 응답 반환
         return ApiResponse(data = response)
     }
 
@@ -86,11 +109,31 @@ class ProductController(
     fun getProductDetail(
         @PathVariable productId: Long
     ): ApiResponse<ProductResponse> {
-        // UseCase 호출 (ProductService + InventoryService 오케스트레이션)
-        val result = getProductDetailUseCase.getProductDetail(productId)
+        // 1. UseCase 호출 (ProductService + InventoryService 오케스트레이션)
+        val productWithOptions = getProductDetailUseCase.getProductDetail(productId)
 
-        // 응답 반환
-        return ApiResponse(data = result)
+        // 2. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val productResponse = ProductResponse(
+            productId = productWithOptions.productId,
+            name = productWithOptions.name,
+            description = productWithOptions.description,
+            brand = productWithOptions.brand,
+            createdAt = productWithOptions.createdAt,
+            options = productWithOptions.options.map { option ->
+                ProductOptionResponse(
+                    optionId = option.optionId,
+                    optionCode = option.optionCode,
+                    origin = option.origin,
+                    grindType = option.grindType,
+                    weightGrams = option.weightGrams,
+                    price = option.price,
+                    availableStock = option.availableStock
+                )
+            }
+        )
+
+        // 3. 응답 반환
+        return ApiResponse(data = productResponse)
     }
 
     /**

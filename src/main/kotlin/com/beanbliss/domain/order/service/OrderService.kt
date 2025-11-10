@@ -1,7 +1,7 @@
 package com.beanbliss.domain.order.service
 
 import com.beanbliss.domain.order.dto.OrderCreationData
-import com.beanbliss.domain.order.dto.ProductOrderCount
+import com.beanbliss.domain.order.repository.ProductOrderCount
 import com.beanbliss.domain.order.entity.OrderEntity
 import com.beanbliss.domain.order.entity.OrderItemEntity
 import com.beanbliss.domain.order.entity.OrderStatus

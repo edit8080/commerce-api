@@ -2,8 +2,8 @@ package com.beanbliss.domain.product.service
 
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.domain.order.exception.ProductOptionInactiveException
-import com.beanbliss.domain.product.dto.ProductBasicInfo
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductBasicInfo
+import com.beanbliss.domain.product.repository.ProductWithOptions
 import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.domain.product.repository.ProductRepository
 import org.springframework.stereotype.Service
@@ -28,7 +28,7 @@ class ProductService(
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<ProductResponse> {
+    ): List<ProductWithOptions> {
         // Repository에서 활성 옵션이 있는 상품 조회 (정렬 조건 적용)
         // availableStock은 0으로 초기화된 상태로 반환 (UseCase에서 채움)
         return productRepository.findActiveProducts(
@@ -44,7 +44,7 @@ class ProductService(
         return productRepository.countActiveProducts()
     }
 
-    fun getProductWithOptions(productId: Long): ProductResponse {
+    fun getProductWithOptions(productId: Long): ProductWithOptions {
         // 1. Repository에서 상품 상세 조회 (활성 옵션 포함, Repository에서 정렬됨)
         val product = productRepository.findByIdWithOptions(productId)
             ?: throw ResourceNotFoundException("상품 ID: $productId 의 상품을 찾을 수 없습니다.")

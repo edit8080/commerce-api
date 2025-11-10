@@ -1,8 +1,8 @@
 package com.beanbliss.domain.inventory.service
 
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.inventory.dto.InventoryResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.inventory.repository.InventoryDetail
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository
@@ -37,7 +37,7 @@ class InventoryService(
      * 재고 목록 조회 결과 (도메인 데이터)
      */
     data class InventoriesResult(
-        val inventories: List<InventoryResponse>,
+        val inventories: List<InventoryDetail>,
         val totalElements: Long
     )
 
@@ -117,7 +117,7 @@ class InventoryService(
      * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
      */
     @Transactional
-    fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<ReservationItem> {
+    fun reserveInventory(userId: Long, cartItems: List<CartItemDetail>): List<ReservationItem> {
         // 1. 중복 예약 방지
         val activeReservationCount = inventoryReservationRepository.countActiveReservations(userId)
         if (activeReservationCount > 0) {
@@ -173,7 +173,7 @@ class InventoryService(
     }
 
     @Transactional
-    fun reduceStockForOrder(cartItems: List<CartItemResponse>) {
+    fun reduceStockForOrder(cartItems: List<CartItemDetail>) {
         // 1. 장바구니 아이템의 모든 상품 옵션 ID 추출
         val productOptionIds = cartItems.map { it.productOptionId }
 

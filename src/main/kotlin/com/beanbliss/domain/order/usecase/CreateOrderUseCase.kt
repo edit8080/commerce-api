@@ -1,7 +1,7 @@
 package com.beanbliss.domain.order.usecase
 
 import com.beanbliss.domain.user.service.BalanceService
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.repository.CartItemDetail
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.coupon.dto.CouponValidationResult
 import com.beanbliss.domain.coupon.service.CouponService
@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component
  * [책임]: 주문 생성 UseCase 구현
  * - 7개 도메인 Service 조율
  * - 복잡한 비즈니스 트랜잭션 오케스트레이션 (12단계)
+ * - 도메인 데이터 반환 (Controller에서 Presentation DTO로 변환)
  *
  * [DIP 준수]:
  * - UserService, CartService, CouponService, InventoryReservationService, InventoryService, OrderService, BalanceService에만 의존
@@ -43,7 +44,7 @@ class CreateOrderUseCase(
     data class OrderCreationResult(
         val orderEntity: OrderEntity,
         val orderItemEntities: List<OrderItemEntity>,
-        val cartItems: List<CartItemResponse>,
+        val cartItems: List<CartItemDetail>,
         val couponInfo: CouponService.CouponInfo?,
         val userCouponId: Long?,
         val originalAmount: Int,
