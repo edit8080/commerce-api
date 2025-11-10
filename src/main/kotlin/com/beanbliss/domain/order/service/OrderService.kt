@@ -78,12 +78,14 @@ class OrderService(
         val orderEntity = OrderEntity(
             id = 0L, // Auto-generated
             userId = data.userId,
-            totalAmount = data.originalAmount,
-            discountAmount = data.discountAmount,
-            finalAmount = data.finalAmount,
+            userCouponId = data.userCouponId,
+            status = OrderStatus.PAYMENT_COMPLETED,
+            originalAmount = data.originalAmount.toBigDecimal(),
+            discountAmount = data.discountAmount.toBigDecimal(),
+            finalAmount = data.finalAmount.toBigDecimal(),
             shippingAddress = data.shippingAddress,
-            orderStatus = OrderStatus.PAYMENT_COMPLETED,
-            orderedAt = now,
+            trackingNumber = null,
+            createdAt = now,
             updatedAt = now
         )
 
@@ -97,8 +99,9 @@ class OrderService(
                 orderId = savedOrder.id,
                 productOptionId = cartItem.productOptionId,
                 quantity = cartItem.quantity,
-                unitPrice = cartItem.price,
-                totalPrice = cartItem.totalPrice
+                unitPrice = cartItem.price.toBigDecimal(),
+                totalPrice = cartItem.totalPrice.toBigDecimal(),
+                createdAt = now
             )
         }
 

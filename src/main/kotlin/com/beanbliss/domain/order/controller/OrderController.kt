@@ -82,8 +82,8 @@ class OrderController(
                 productName = cartItem.productName,
                 optionCode = cartItem.optionCode,
                 quantity = orderItem.quantity,
-                unitPrice = orderItem.unitPrice,
-                totalPrice = orderItem.totalPrice
+                unitPrice = orderItem.unitPrice.toInt(),
+                totalPrice = orderItem.totalPrice.toInt()
             )
         }
 
@@ -109,12 +109,12 @@ class OrderController(
         // 4. CreateOrderResponse 조립
         val response = CreateOrderResponse(
             orderId = result.orderEntity.id,
-            orderStatus = result.orderEntity.orderStatus,
+            orderStatus = result.orderEntity.status,
             orderItems = orderItemResponses,
             appliedCoupon = appliedCouponInfo,
             priceInfo = priceInfo,
             shippingAddress = result.shippingAddress,
-            orderedAt = result.orderEntity.orderedAt
+            orderedAt = result.orderEntity.createdAt
         )
 
         // data envelope 형태로 응답 반환

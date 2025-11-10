@@ -1,13 +1,10 @@
 package com.beanbliss.domain.coupon.repository
 
 import com.beanbliss.domain.coupon.entity.CouponEntity
-import com.beanbliss.domain.coupon.entity.CouponTicketEntity
 import com.beanbliss.domain.coupon.entity.CouponTicketStatus
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Query
-import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import java.math.BigDecimal
 
@@ -16,26 +13,6 @@ import java.math.BigDecimal
  * Infrastructure Layer에 속하며, JPA 기술에 종속적
  */
 interface CouponJpaRepository : JpaRepository<CouponEntity, Long>
-
-/**
- * [책임]: Spring Data JPA를 활용한 CouponTicket 조회 (remainingQuantity 계산용)
- */
-interface CouponTicketJpaRepository : JpaRepository<CouponTicketEntity, Long> {
-    /**
-     * 쿠폰 ID와 상태로 티켓 개수 조회
-     */
-    @Query("""
-        SELECT COUNT(ct)
-        FROM CouponTicketEntity ct
-        WHERE ct.couponId = :couponId
-        AND ct.status = :status
-        AND ct.userId IS NULL
-    """)
-    fun countByCouponIdAndStatus(
-        @Param("couponId") couponId: Long,
-        @Param("status") status: CouponTicketStatus
-    ): Long
-}
 
 /**
  * [책임]: CouponRepository 인터페이스 구현체

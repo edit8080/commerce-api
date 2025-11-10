@@ -53,11 +53,9 @@ class InventoryReservationService(
         // 2. 예약 상태를 CONFIRMED로 변경
         val now = LocalDateTime.now()
         reservations.forEach { reservation ->
-            val updated = reservation.copy(
-                status = InventoryReservationStatus.CONFIRMED,
-                updatedAt = now
-            )
-            inventoryReservationRepository.save(updated)
+            reservation.status = InventoryReservationStatus.CONFIRMED
+            reservation.updatedAt = now
+            inventoryReservationRepository.save(reservation)
         }
     }
 }

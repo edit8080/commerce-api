@@ -64,6 +64,21 @@ interface CouponTicketJpaRepository : JpaRepository<CouponTicketEntity, Long> {
         AND ct.userId IS NULL
     """)
     fun countAvailableTickets(@Param("couponId") couponId: Long): Long
+
+    /**
+     * 쿠폰 ID와 상태로 티켓 개수 조회
+     */
+    @Query("""
+        SELECT COUNT(ct)
+        FROM CouponTicketEntity ct
+        WHERE ct.couponId = :couponId
+        AND ct.status = :status
+        AND ct.userId IS NULL
+    """)
+    fun countByCouponIdAndStatus(
+        @Param("couponId") couponId: Long,
+        @Param("status") status: CouponTicketStatus
+    ): Long
 }
 
 /**
