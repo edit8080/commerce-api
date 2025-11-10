@@ -34,8 +34,9 @@ class CouponTicketEntity(
     @Column(name = "user_id", nullable = true)
     var userId: Long? = null,
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: String = "AVAILABLE", // AVAILABLE, ISSUED, EXPIRED
+    var status: CouponTicketStatus = CouponTicketStatus.AVAILABLE,
 
     @Column(name = "user_coupon_id", nullable = true)
     var userCouponId: Long? = null,
@@ -60,6 +61,6 @@ class CouponTicketEntity(
     }
 
     override fun toString(): String {
-        return "CouponTicketEntity(id=$id, couponId=$couponId, status='$status', userId=$userId)"
+        return "CouponTicketEntity(id=$id, couponId=$couponId, status=$status, userId=$userId)"
     }
 }

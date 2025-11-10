@@ -1,6 +1,7 @@
 package com.beanbliss.domain.coupon.repository
 
 import com.beanbliss.domain.coupon.entity.CouponTicketEntity
+import com.beanbliss.domain.coupon.entity.CouponTicketStatus
 import org.springframework.stereotype.Repository
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
@@ -35,12 +36,8 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
             tickets[ticketId] = CouponTicketEntity(
                 id = ticketId,
                 couponId = 1L,
-                status = "AVAILABLE",
-                userId = null,
-                userCouponId = null,
-                issuedAt = null,
-                createdAt = now.minusDays(1),
-                updatedAt = now.minusDays(1)
+                status = CouponTicketStatus.AVAILABLE,
+                createdAt = now.minusDays(1)
             )
         }
 
@@ -50,27 +47,23 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
             tickets[ticketId] = CouponTicketEntity(
                 id = ticketId,
                 couponId = 2L,
-                status = "AVAILABLE",
-                userId = null,
-                userCouponId = null,
-                issuedAt = null,
-                createdAt = now.minusDays(2),
-                updatedAt = now.minusDays(2)
+                status = CouponTicketStatus.AVAILABLE,
+                createdAt = now.minusDays(2)
             )
         }
 
         // 쿠폰 3번: 3개 티켓 (모두 ISSUED - 품절)
         repeat(3) { index ->
             val ticketId = idGenerator.getAndIncrement()
+            val issuedTime = now.minusHours(1)
             tickets[ticketId] = CouponTicketEntity(
                 id = ticketId,
                 couponId = 3L,
-                status = "ISSUED",
                 userId = 999L,
+                status = CouponTicketStatus.ISSUED,
                 userCouponId = 999L,
-                issuedAt = now.minusHours(1),
-                createdAt = now.minusDays(3),
-                updatedAt = now.minusHours(1)
+                issuedAt = issuedTime,
+                createdAt = now.minusDays(3)
             )
         }
     }
@@ -79,20 +72,24 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
         // FOR UPDATE SKIP LOCKED 시뮬레이션
         // AVAILABLE 상태이고 userId가 null인 티켓 중 첫 번째 반환
         return tickets.values
-            .filter { it.couponId == couponId && it.status == "AVAILABLE" && it.userId == null }
-            .minByOrNull { it.id!! } // ID 순서로 선점
+            .filter { it.couponId == couponId && it.status == CouponTicketStatus.AVAILABLE && it.userId == null }
+            .minByOrNull { it.id }
     }
 
     override fun updateTicketAsIssued(ticketId: Long, userId: Long, userCouponId: Long) {
         val ticket = tickets[ticketId]
             ?: throw IllegalArgumentException("티켓을 찾을 수 없습니다: $ticketId")
 
-        val updatedTicket = ticket.copy(
-            status = "ISSUED",
+        // 일반 class이므로 새 인스턴스 생성
+        val now = LocalDateTime.now()
+        val updatedTicket = CouponTicketEntity(
+            id = ticket.id,
+            couponId = ticket.couponId,
             userId = userId,
+            status = CouponTicketStatus.ISSUED,
             userCouponId = userCouponId,
-            issuedAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
+            issuedAt = now,
+            createdAt = ticket.createdAt
         )
 
         tickets[ticketId] = updatedTicket
@@ -100,20 +97,28 @@ class CouponTicketRepositoryImpl : CouponTicketRepository {
 
     override fun countAvailableTickets(couponId: Long): Int {
         return tickets.values.count {
-            it.couponId == couponId && it.status == "AVAILABLE" && it.userId == null
+            it.couponId == couponId && it.status == CouponTicketStatus.AVAILABLE && it.userId == null
         }
     }
 
     override fun saveAll(ticketList: List<CouponTicketEntity>): List<CouponTicketEntity> {
         val savedTickets = ticketList.map { ticket ->
-            // ID가 null이면 새로운 ID 생성
-            val savedTicket = if (ticket.id == null) {
-                ticket.copy(id = idGenerator.getAndIncrement())
+            // ID가 0이면 새로운 ID 생성
+            val savedTicket = if (ticket.id == 0L) {
+                CouponTicketEntity(
+                    id = idGenerator.getAndIncrement(),
+                    couponId = ticket.couponId,
+                    userId = ticket.userId,
+                    status = ticket.status,
+                    userCouponId = ticket.userCouponId,
+                    issuedAt = ticket.issuedAt,
+                    createdAt = ticket.createdAt
+                )
             } else {
                 ticket
             }
 
-            tickets[savedTicket.id!!] = savedTicket
+            tickets[savedTicket.id] = savedTicket
             savedTicket
         }
 

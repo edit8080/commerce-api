@@ -1,7 +1,10 @@
 package com.beanbliss.domain.coupon.repository
 
+import com.beanbliss.domain.coupon.domain.DiscountType
 import com.beanbliss.domain.coupon.entity.CouponEntity
+import com.beanbliss.domain.coupon.entity.CouponTicketStatus
 import org.springframework.stereotype.Repository
+import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
 
@@ -116,7 +119,7 @@ class CouponRepositoryImpl : CouponRepository {
      */
     private fun calculateRemainingQuantity(couponId: Long): Int {
         val couponTickets = tickets[couponId] ?: return 0
-        return couponTickets.count { it.status == "AVAILABLE" }
+        return couponTickets.count { it.status == CouponTicketStatus.AVAILABLE }
     }
 
     /**
@@ -129,64 +132,61 @@ class CouponRepositoryImpl : CouponRepository {
         val coupon1 = CouponEntity(
             id = 1L,
             name = "오픈 기념! 선착순 100명 10% 할인 쿠폰",
-            discountType = "PERCENTAGE",
-            discountValue = 10,
-            minOrderAmount = 10000,
-            maxDiscountAmount = 5000,
+            discountType = DiscountType.PERCENTAGE,
+            discountValue = BigDecimal("10"),
+            minOrderAmount = BigDecimal("10000"),
+            maxDiscountAmount = BigDecimal("5000"),
             totalQuantity = 100,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(30),
-            createdAt = now.minusDays(2),
-            updatedAt = now.minusDays(2)
+            createdAt = now.minusDays(2)
         )
         coupons[1L] = coupon1
 
         // 쿠폰 1의 티켓 (AVAILABLE: 47개, ISSUED: 53개)
         val tickets1 = mutableListOf<CouponTicket>()
-        repeat(47) { tickets1.add(CouponTicket(couponId = 1L, status = "AVAILABLE")) }
-        repeat(53) { tickets1.add(CouponTicket(couponId = 1L, status = "ISSUED")) }
+        repeat(47) { tickets1.add(CouponTicket(couponId = 1L, status = CouponTicketStatus.AVAILABLE)) }
+        repeat(53) { tickets1.add(CouponTicket(couponId = 1L, status = CouponTicketStatus.ISSUED)) }
         tickets[1L] = tickets1
 
         // 쿠폰 2: 신규 회원 쿠폰 (수량 소진)
         val coupon2 = CouponEntity(
             id = 2L,
             name = "신규 회원 5000원 할인 쿠폰",
-            discountType = "FIXED_AMOUNT",
-            discountValue = 5000,
-            minOrderAmount = 30000,
-            maxDiscountAmount = 5000,
+            discountType = DiscountType.FIXED_AMOUNT,
+            discountValue = BigDecimal("5000"),
+            minOrderAmount = BigDecimal("30000"),
+            maxDiscountAmount = BigDecimal("5000"),
             totalQuantity = 500,
             validFrom = now.minusDays(1),
             validUntil = now.plusDays(60),
-            createdAt = now.minusDays(1),
-            updatedAt = now.minusDays(1)
+            createdAt = now.minusDays(1)
         )
         coupons[2L] = coupon2
 
         // 쿠폰 2의 티켓 (모두 ISSUED)
         val tickets2 = mutableListOf<CouponTicket>()
-        repeat(500) { tickets2.add(CouponTicket(couponId = 2L, status = "ISSUED")) }
+        repeat(500) { tickets2.add(CouponTicket(couponId = 2L, status = CouponTicketStatus.ISSUED)) }
         tickets[2L] = tickets2
 
         // 쿠폰 3: 만료된 쿠폰
         val coupon3 = CouponEntity(
             id = 3L,
             name = "만료된 쿠폰",
-            discountType = "PERCENTAGE",
-            discountValue = 15,
-            minOrderAmount = 20000,
-            maxDiscountAmount = 10000,
+            discountType = DiscountType.PERCENTAGE,
+            discountValue = BigDecimal("15"),
+            minOrderAmount = BigDecimal("20000"),
+            maxDiscountAmount = BigDecimal("10000"),
             totalQuantity = 100,
             validFrom = now.minusDays(60),
             validUntil = now.minusDays(30),
-            createdAt = now.minusDays(60),
-            updatedAt = now.minusDays(60)
+            createdAt = now.minusDays(60)
         )
         coupons[3L] = coupon3
 
         // 쿠폰 3의 티켓 (모두 AVAILABLE이지만 만료됨)
         val tickets3 = mutableListOf<CouponTicket>()
-        repeat(100) { tickets3.add(CouponTicket(couponId = 3L, status = "AVAILABLE")) }
+        repeat(100) { tickets3.add(CouponTicket(couponId = 3L, status = CouponTicketStatus.AVAILABLE)) }
         tickets[3L] = tickets3
     }
 
@@ -197,6 +197,6 @@ class CouponRepositoryImpl : CouponRepository {
      */
     private data class CouponTicket(
         val couponId: Long,
-        val status: String // "AVAILABLE", "ISSUED", "USED", "EXPIRED"
+        val status: CouponTicketStatus // AVAILABLE, ISSUED, EXPIRED
     )
 }
