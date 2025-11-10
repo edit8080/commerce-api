@@ -1,12 +1,13 @@
 package com.beanbliss.domain.inventory.repository
 
+import com.beanbliss.common.util.SortUtils
 import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.entity.InventoryEntity
-import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -34,7 +35,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
 
     /**
      * 재고 목록 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
-     * N+1 문제 방지를 위한 단일 쿼리
+     * N+1 문제 방지를 위한 단일 쿼리 (DB 레벨 정렬 및 페이징)
      */
     @Query("""
         SELECT i, po, p
@@ -43,7 +44,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         INNER JOIN ProductEntity p ON po.productId = p.id
         WHERE po.isActive = true
     """)
-    fun findAllWithProductInfo(): List<Array<Any>>
+    fun findAllWithProductInfo(pageable: Pageable): Page<Array<Any>>
 
     /**
      * 특정 상품 옵션의 가용 재고 계산 (INVENTORY_RESERVATION과 LEFT JOIN)
@@ -132,11 +133,15 @@ class InventoryRepositoryImpl(
         sortBy: String,
         sortDirection: String
     ): List<InventoryDetail> {
-        // 1. 모든 재고 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
-        val results = inventoryJpaRepository.findAllWithProductInfo()
+        // 1. Create Sort object using SortUtils
+        val sort = SortUtils.createSort(sortBy, sortDirection)
 
-        // 2. InventoryDetail로 변환
-        val inventoryDetails = results.map { row ->
+        // 2. DB 레벨에서 정렬 및 페이징 적용하여 재고 조회
+        val pageRequest = PageRequest.of(page - 1, size, sort)
+        val results = inventoryJpaRepository.findAllWithProductInfo(pageRequest).content
+
+        // 3. InventoryDetail로 변환
+        return results.map { row ->
             val inventory = row[0] as InventoryEntity
             val productOption = row[1] as ProductOptionEntity
             val product = row[2] as ProductEntity
@@ -153,22 +158,6 @@ class InventoryRepositoryImpl(
                 createdAt = inventory.createdAt
             )
         }
-
-        // 3. 정렬 적용
-        val sorted = when (sortBy) {
-            "created_at" -> {
-                if (sortDirection == "DESC") {
-                    inventoryDetails.sortedByDescending { it.createdAt }
-                } else {
-                    inventoryDetails.sortedBy { it.createdAt }
-                }
-            }
-            else -> inventoryDetails
-        }
-
-        // 4. 페이징 적용 (1-based index)
-        val offset = (page - 1) * size
-        return sorted.drop(offset).take(size)
     }
 
     override fun count(): Long {

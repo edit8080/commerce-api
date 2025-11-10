@@ -1,7 +1,11 @@
 package com.beanbliss.domain.product.repository
 
+import com.beanbliss.common.util.SortUtils
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -33,6 +37,17 @@ interface ProductJpaRepository : JpaRepository<ProductEntity, Long> {
         WHERE po.isActive = true
     """)
     fun countProductsWithActiveOptions(): Long
+
+    /**
+     * 활성 옵션이 있는 상품 목록 조회 (DB 레벨 정렬 및 페이징)
+     */
+    @Query("""
+        SELECT DISTINCT p
+        FROM ProductEntity p
+        INNER JOIN ProductOptionEntity po ON po.productId = p.id
+        WHERE po.isActive = true
+    """)
+    fun findActiveProductsWithPagination(pageable: Pageable): Page<ProductEntity>
 }
 
 /**
@@ -53,23 +68,12 @@ class ProductRepositoryImpl(
         sortBy: String,
         sortDirection: String
     ): List<ProductWithOptions> {
-        // 1. 활성 옵션이 있는 상품 ID 목록 조회
-        val productIdsWithActiveOptions = productJpaRepository.findProductIdsWithActiveOptions()
+        // 1. Create Sort object using SortUtils
+        val sort = SortUtils.createSort(sortBy, sortDirection)
 
-        // 2. 해당 상품들 조회 (페이징 적용)
-        val products = if (productIdsWithActiveOptions.isEmpty()) {
-            emptyList()
-        } else {
-            productJpaRepository.findAllById(productIdsWithActiveOptions)
-                .sortedWith(compareBy { product ->
-                    when (sortBy) {
-                        "name" -> if (sortDirection == "DESC") -product.name.hashCode() else product.name.hashCode()
-                        else -> if (sortDirection == "DESC") -product.createdAt.hashCode() else product.createdAt.hashCode()
-                    }
-                })
-                .drop((page - 1) * size)
-                .take(size)
-        }
+        // 2. DB 레벨에서 정렬 및 페이징 적용하여 상품 조회
+        val pageRequest = org.springframework.data.domain.PageRequest.of(page - 1, size, sort)
+        val products = productJpaRepository.findActiveProductsWithPagination(pageRequest).content
 
         // 3. ProductWithOptions로 변환 (옵션 포함)
         return products.map { product ->
@@ -119,16 +123,16 @@ class ProductRepositoryImpl(
     }
 
     /**
-     * 상품 ID로 활성 옵션 목록 조회 (정렬 포함)
+     * 상품 ID로 활성 옵션 목록 조회 (DB 레벨 정렬)
      *
      * [설계 변경]:
      * - 재고 정보는 조회하지 않음 (availableStock = null)
      * - Service 계층에서 InventoryRepository를 사용하여 별도 조회
      * - 도메인 경계 준수: Product Repository는 Inventory에 의존하지 않음
+     * - 정렬은 DB 레벨에서 수행 (메모리 정렬 제거)
      */
     private fun getActiveOptionsForProduct(productId: Long): List<ProductOptionInfo> {
         val options = productOptionJpaRepository.findByProductIdAndIsActiveTrue(productId)
-            .sortedWith(compareBy({ it.weightGrams }, { it.grindType }))
 
         return options.map { option ->
             ProductOptionInfo(

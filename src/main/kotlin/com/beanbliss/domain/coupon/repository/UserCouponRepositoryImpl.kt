@@ -3,7 +3,9 @@ package com.beanbliss.domain.coupon.repository
 import com.beanbliss.domain.coupon.entity.CouponEntity
 import com.beanbliss.domain.coupon.entity.UserCouponEntity
 import com.beanbliss.domain.coupon.enums.UserCouponStatus
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -21,9 +23,15 @@ interface UserCouponJpaRepository : JpaRepository<UserCouponEntity, Long> {
     fun existsByUserIdAndCouponId(userId: Long, couponId: Long): Boolean
 
     /**
-     * 사용자 ID로 모든 쿠폰 조회
+     * 사용자 ID로 모든 쿠폰 조회 (DB 레벨 정렬)
      */
-    fun findByUserId(userId: Long): List<UserCouponEntity>
+    @Query("""
+        SELECT uc
+        FROM UserCouponEntity uc
+        WHERE uc.userId = :userId
+        ORDER BY uc.createdAt DESC
+    """)
+    fun findByUserId(@Param("userId") userId: Long): List<UserCouponEntity>
 
     /**
      * 사용자 ID로 쿠폰 개수 조회
@@ -31,7 +39,7 @@ interface UserCouponJpaRepository : JpaRepository<UserCouponEntity, Long> {
     fun countByUserId(userId: Long): Long
 
     /**
-     * 사용자 쿠폰 목록 조회 (Coupon 정보 포함, 페이징, 정렬)
+     * 사용자 쿠폰 목록 조회 (Coupon 정보 포함, DB 레벨 정렬 및 페이징)
      * - isAvailable 계산: (status == 'ISSUED') AND (validFrom <= now <= validUntil)
      * - 정렬: isAvailable DESC, createdAt DESC
      */
@@ -47,8 +55,9 @@ interface UserCouponJpaRepository : JpaRepository<UserCouponEntity, Long> {
     """)
     fun findByUserIdWithCoupon(
         @Param("userId") userId: Long,
-        @Param("now") now: LocalDateTime
-    ): List<Array<Any>>
+        @Param("now") now: LocalDateTime,
+        pageable: Pageable
+    ): Page<Array<Any>>
 }
 
 /**
@@ -86,7 +95,6 @@ class UserCouponRepositoryImpl(
 
     override fun findAllByUserId(userId: Long): List<UserCouponEntity> {
         return userCouponJpaRepository.findByUserId(userId)
-            .sortedByDescending { it.createdAt }
     }
 
     override fun findByUserIdWithPaging(
@@ -95,11 +103,12 @@ class UserCouponRepositoryImpl(
         size: Int,
         now: LocalDateTime
     ): List<UserCouponWithCoupon> {
-        // 1. userId로 필터링 및 Coupon과 JOIN (쿼리 레벨 정렬 적용)
-        val results = userCouponJpaRepository.findByUserIdWithCoupon(userId, now)
+        // 1. DB 레벨에서 정렬 및 페이징 적용하여 조회
+        val pageRequest = PageRequest.of(page - 1, size)
+        val results = userCouponJpaRepository.findByUserIdWithCoupon(userId, now, pageRequest).content
 
         // 2. UserCouponWithCoupon으로 변환
-        val userCouponsWithCoupon = results.map { row ->
+        return results.map { row ->
             val userCoupon = row[0] as UserCouponEntity
             val coupon = row[1] as CouponEntity
             val isAvailable = row[2] as Boolean
@@ -122,10 +131,6 @@ class UserCouponRepositoryImpl(
                 isAvailable = isAvailable
             )
         }
-
-        // 3. 페이징 적용 (1-based index)
-        val offset = (page - 1) * size
-        return userCouponsWithCoupon.drop(offset).take(size)
     }
 
     override fun countByUserId(userId: Long): Long {

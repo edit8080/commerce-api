@@ -13,9 +13,15 @@ import org.springframework.stereotype.Repository
  */
 interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> {
     /**
-     * 상품 ID와 활성 상태로 옵션 조회
+     * 상품 ID와 활성 상태로 옵션 조회 (DB 레벨 정렬)
      */
-    fun findByProductIdAndIsActiveTrue(productId: Long): List<ProductOptionEntity>
+    @Query("""
+        SELECT po
+        FROM ProductOptionEntity po
+        WHERE po.productId = :productId AND po.isActive = true
+        ORDER BY po.weightGrams ASC, po.grindType ASC
+    """)
+    fun findByProductIdAndIsActiveTrue(@Param("productId") productId: Long): List<ProductOptionEntity>
 
     /**
      * 상품 옵션 ID로 활성 상태의 옵션 조회 (PRODUCT와 INNER JOIN)

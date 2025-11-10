@@ -1,9 +1,10 @@
 package com.beanbliss.domain.coupon.repository
 
+import com.beanbliss.common.util.SortUtils
 import com.beanbliss.domain.coupon.entity.CouponEntity
-import com.beanbliss.domain.coupon.entity.CouponTicketEntity
+import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
@@ -15,11 +16,11 @@ import org.springframework.stereotype.Repository
 interface CouponJpaRepository : JpaRepository<CouponEntity, Long> {
     /**
      * 쿠폰 목록 조회 (COUPON_TICKET과 LEFT JOIN하여 remainingQuantity 계산)
-     * N+1 문제 방지를 위한 단일 쿼리
+     * N+1 문제 방지를 위한 단일 쿼리 (DB 레벨 정렬 및 페이징)
      *
      * 계산식: COUNT(COUPON_TICKET) WHERE status = 'AVAILABLE' AND user_id IS NULL
      *
-     * @return List<Array<Any>> = [[CouponEntity, remainingQuantity: Long], ...]
+     * @return Page<Array<Any>> = [[CouponEntity, remainingQuantity: Long], ...]
      */
     @Query("""
         SELECT c, COUNT(ct)
@@ -31,7 +32,7 @@ interface CouponJpaRepository : JpaRepository<CouponEntity, Long> {
                  c.maxDiscountAmount, c.totalQuantity, c.validFrom, c.validUntil,
                  c.createdAt, c.updatedAt
     """)
-    fun findAllCouponsWithRemainingQuantity(): List<Array<Any>>
+    fun findAllCouponsWithRemainingQuantity(pageable: Pageable): Page<Array<Any>>
 }
 
 /**
@@ -50,11 +51,15 @@ class CouponRepositoryImpl(
         sortBy: String,
         sortDirection: String
     ): List<CouponWithQuantity> {
-        // 1. COUPON과 COUPON_TICKET을 LEFT JOIN하여 단일 쿼리로 조회
-        val results = couponJpaRepository.findAllCouponsWithRemainingQuantity()
+        // 1. Create Sort object using SortUtils
+        val sort = SortUtils.createSort(sortBy, sortDirection)
 
-        // 2. CouponWithQuantity로 변환
-        val couponsWithQuantity = results.map { row ->
+        // 2. DB 레벨에서 정렬 및 페이징 적용하여 조회
+        val pageRequest = PageRequest.of(page - 1, size, sort)
+        val results = couponJpaRepository.findAllCouponsWithRemainingQuantity(pageRequest).content
+
+        // 3. CouponWithQuantity로 변환
+        return results.map { row ->
             val coupon = row[0] as CouponEntity
             val remainingQuantity = (row[1] as Long).toInt()
 
@@ -73,28 +78,6 @@ class CouponRepositoryImpl(
                 remainingQuantity = remainingQuantity
             )
         }
-
-        // 3. 정렬 적용
-        val sorted = when (sortBy) {
-            "name" -> {
-                if (sortDirection == "DESC") {
-                    couponsWithQuantity.sortedByDescending { it.name }
-                } else {
-                    couponsWithQuantity.sortedBy { it.name }
-                }
-            }
-            else -> {
-                if (sortDirection == "DESC") {
-                    couponsWithQuantity.sortedByDescending { it.createdAt }
-                } else {
-                    couponsWithQuantity.sortedBy { it.createdAt }
-                }
-            }
-        }
-
-        // 4. 페이징 적용 (1-based index)
-        val offset = (page - 1) * size
-        return sorted.drop(offset).take(size)
     }
 
     override fun countAllCoupons(): Long {
