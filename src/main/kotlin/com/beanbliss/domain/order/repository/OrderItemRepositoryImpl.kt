@@ -49,8 +49,8 @@ class OrderItemRepositoryImpl(
     private val orderItemJpaRepository: OrderItemJpaRepository
 ) : OrderItemRepository {
 
-    override fun saveAll(orderItemEntities: List<OrderItemEntity>): List<OrderItemEntity> {
-        return orderItemJpaRepository.saveAll(orderItemEntities).toList()
+    override fun saveAll(orderItems: List<OrderItemEntity>): List<OrderItemEntity> {
+        return orderItemJpaRepository.saveAll(orderItems).toList()
     }
 
     override fun findTopOrderedProducts(startDate: LocalDateTime, limit: Int): List<ProductOrderCount> {

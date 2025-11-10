@@ -111,7 +111,7 @@ class CouponTicketRepositoryImpl(
         return couponTicketJpaRepository.countAvailableTickets(couponId).toInt()
     }
 
-    override fun saveAll(ticketList: List<CouponTicketEntity>): List<CouponTicketEntity> {
-        return couponTicketJpaRepository.saveAll(ticketList).toList()
+    override fun saveAll(tickets: List<CouponTicketEntity>): List<CouponTicketEntity> {
+        return couponTicketJpaRepository.saveAll(tickets).toList()
     }
 }

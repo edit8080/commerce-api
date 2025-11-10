@@ -89,7 +89,7 @@ class CouponService(
 
         // 4. Entity → Service DTO 변환
         return CouponInfo(
-            id = savedEntity.id!!,
+            id = savedEntity.id,
             name = savedEntity.name,
             discountType = savedEntity.discountType.name,
             discountValue = savedEntity.discountValue.toInt(),
@@ -178,7 +178,7 @@ class CouponService(
 
         // 3. Entity → Service DTO 변환
         return CouponInfo(
-            id = coupon.id!!,
+            id = coupon.id,
             name = coupon.name,
             discountType = coupon.discountType.name,
             discountValue = coupon.discountValue.toInt(),
@@ -218,7 +218,7 @@ class CouponService(
 
         // 6. Entity → Service DTO 변환
         val couponInfo = CouponInfo(
-            id = coupon.id!!,
+            id = coupon.id,
             name = coupon.name,
             discountType = coupon.discountType.name,
             discountValue = coupon.discountValue.toInt(),

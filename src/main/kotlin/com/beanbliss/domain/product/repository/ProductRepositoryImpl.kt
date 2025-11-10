@@ -2,8 +2,6 @@ package com.beanbliss.domain.product.repository
 
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
-import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -55,25 +53,10 @@ class ProductRepositoryImpl(
         sortBy: String,
         sortDirection: String
     ): List<ProductWithOptions> {
-        // 1. 정렬 설정
-        val sort = when (sortBy) {
-            "name" -> Sort.by(
-                if (sortDirection == "DESC") Sort.Direction.DESC else Sort.Direction.ASC,
-                "name"
-            )
-            else -> Sort.by(
-                if (sortDirection == "DESC") Sort.Direction.DESC else Sort.Direction.ASC,
-                "createdAt"
-            )
-        }
-
-        // 2. 페이징 설정 (0-based index)
-        val pageRequest = PageRequest.of(page - 1, size, sort)
-
-        // 3. 활성 옵션이 있는 상품 ID 목록 조회
+        // 1. 활성 옵션이 있는 상품 ID 목록 조회
         val productIdsWithActiveOptions = productJpaRepository.findProductIdsWithActiveOptions()
 
-        // 4. 해당 상품들 조회 (페이징 적용)
+        // 2. 해당 상품들 조회 (페이징 적용)
         val products = if (productIdsWithActiveOptions.isEmpty()) {
             emptyList()
         } else {
@@ -88,7 +71,7 @@ class ProductRepositoryImpl(
                 .take(size)
         }
 
-        // 5. ProductWithOptions로 변환 (옵션 포함)
+        // 3. ProductWithOptions로 변환 (옵션 포함)
         return products.map { product ->
             val options = getActiveOptionsForProduct(product.id)
             ProductWithOptions(
