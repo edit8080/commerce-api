@@ -39,12 +39,12 @@ interface ProductJpaRepository : JpaRepository<ProductEntity, Long> {
  * [책임]: ProductRepository 인터페이스 구현체
  * - ProductJpaRepository를 활용하여 실제 DB 접근
  * - 활성 옵션이 있는 상품만 조회
+ * - 재고 정보는 조회하지 않음 (도메인 경계 준수, Service 계층에서 처리)
  */
 @Repository
 class ProductRepositoryImpl(
     private val productJpaRepository: ProductJpaRepository,
-    private val productOptionJpaRepository: ProductOptionJpaRepository,
-    private val inventoryJpaRepository: InventoryJpaRepository
+    private val productOptionJpaRepository: ProductOptionJpaRepository
 ) : ProductRepository {
 
     override fun findActiveProducts(
@@ -120,19 +120,15 @@ class ProductRepositoryImpl(
 
     /**
      * 상품 ID로 활성 옵션 목록 조회 (정렬 포함)
+     *
+     * [설계 변경]:
+     * - 재고 정보는 조회하지 않음 (availableStock = null)
+     * - Service 계층에서 InventoryRepository를 사용하여 별도 조회
+     * - 도메인 경계 준수: Product Repository는 Inventory에 의존하지 않음
      */
     private fun getActiveOptionsForProduct(productId: Long): List<ProductOptionInfo> {
         val options = productOptionJpaRepository.findByProductIdAndIsActiveTrue(productId)
             .sortedWith(compareBy({ it.weightGrams }, { it.grindType }))
-
-        // 재고 정보 조회 (Batch)
-        val optionIds = options.map { it.id }
-        val inventoryMap = if (optionIds.isNotEmpty()) {
-            inventoryJpaRepository.findByProductOptionIdIn(optionIds)
-                .associateBy({ it.productOptionId }, { it.stockQuantity })
-        } else {
-            emptyMap()
-        }
 
         return options.map { option ->
             ProductOptionInfo(
@@ -142,28 +138,8 @@ class ProductRepositoryImpl(
                 grindType = option.grindType,
                 weightGrams = option.weightGrams,
                 price = option.price.toInt(),
-                availableStock = inventoryMap[option.id] ?: 0
+                availableStock = null  // Repository 계층에서는 null 반환
             )
         }
     }
-}
-
-/**
- * [책임]: Spring Data JPA를 활용한 ProductOption 조회
- */
-interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> {
-    /**
-     * 상품 ID와 활성 상태로 옵션 조회
-     */
-    fun findByProductIdAndIsActiveTrue(productId: Long): List<ProductOptionEntity>
-}
-
-/**
- * [책임]: Spring Data JPA를 활용한 Inventory 조회 (재고 정보용)
- */
-interface InventoryJpaRepository : JpaRepository<com.beanbliss.domain.inventory.entity.InventoryEntity, Long> {
-    /**
-     * 여러 상품 옵션 ID로 재고 조회 (Batch)
-     */
-    fun findByProductOptionIdIn(productOptionIds: List<Long>): List<com.beanbliss.domain.inventory.entity.InventoryEntity>
 }

@@ -2,7 +2,7 @@ package com.beanbliss.domain.inventory.repository
 
 import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.entity.InventoryEntity
-import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
+import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
 import org.springframework.data.domain.PageRequest
@@ -44,36 +44,85 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         WHERE po.isActive = true
     """)
     fun findAllWithProductInfo(): List<Array<Any>>
+
+    /**
+     * 특정 상품 옵션의 가용 재고 계산 (INVENTORY_RESERVATION과 LEFT JOIN)
+     *
+     * 계산식: INVENTORY.stock_quantity - COALESCE(SUM(INVENTORY_RESERVATION.quantity), 0)
+     * WHERE INVENTORY_RESERVATION.status IN ('RESERVED', 'CONFIRMED')
+     *
+     * @param productOptionId 상품 옵션 ID
+     * @return Array<Any> = [stockQuantity: Int, reservedQuantity: Long]
+     */
+    @Query("""
+        SELECT i.stockQuantity, COALESCE(SUM(ir.quantity), 0)
+        FROM InventoryEntity i
+        LEFT JOIN InventoryReservationEntity ir ON ir.productOptionId = i.productOptionId
+            AND ir.status IN ('RESERVED', 'CONFIRMED')
+        WHERE i.productOptionId = :productOptionId
+        GROUP BY i.productOptionId, i.stockQuantity
+    """)
+    fun calculateAvailableStockForOption(@Param("productOptionId") productOptionId: Long): Array<Any>?
+
+    /**
+     * 여러 상품 옵션의 가용 재고를 한 번에 계산 (Batch 조회)
+     *
+     * N+1 문제 방지: INVENTORY_RESERVATION과 LEFT JOIN하여 단일 쿼리로 처리
+     *
+     * @param productOptionIds 상품 옵션 ID 리스트
+     * @return List<Array<Any>> = [[productOptionId: Long, stockQuantity: Int, reservedQuantity: Long], ...]
+     */
+    @Query("""
+        SELECT i.productOptionId, i.stockQuantity, COALESCE(SUM(ir.quantity), 0)
+        FROM InventoryEntity i
+        LEFT JOIN InventoryReservationEntity ir ON ir.productOptionId = i.productOptionId
+            AND ir.status IN ('RESERVED', 'CONFIRMED')
+        WHERE i.productOptionId IN :productOptionIds
+        GROUP BY i.productOptionId, i.stockQuantity
+    """)
+    fun calculateAvailableStockBatchForOptions(@Param("productOptionIds") productOptionIds: List<Long>): List<Array<Any>>
 }
 
 /**
  * [책임]: InventoryRepository 인터페이스 구현체
  * - InventoryJpaRepository를 활용하여 실제 DB 접근
- * - INVENTORY_RESERVATION을 고려하여 가용 재고 계산
+ * - INVENTORY_RESERVATION과 LEFT JOIN하여 가용 재고 계산 (단일 쿼리)
  */
 @Repository
 class InventoryRepositoryImpl(
-    private val inventoryJpaRepository: InventoryJpaRepository,
-    private val inventoryReservationRepository: InventoryReservationRepository
+    private val inventoryJpaRepository: InventoryJpaRepository
 ) : InventoryRepository {
 
     override fun calculateAvailableStock(productOptionId: Long): Int {
-        // 실제 재고 조회
-        val actualStock = inventoryJpaRepository.findByProductOptionId(productOptionId)?.stockQuantity ?: 0
+        // INVENTORY와 INVENTORY_RESERVATION을 LEFT JOIN하여 단일 쿼리로 조회
+        val result = inventoryJpaRepository.calculateAvailableStockForOption(productOptionId)
+            ?: return 0
 
-        // 예약된 수량 합계 조회 (RESERVED, CONFIRMED 상태)
-        val reservedQuantity = inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(
-            productOptionId,
-            InventoryReservationStatus.activeStatuses()
-        )
+        // result = [stockQuantity: Int, reservedQuantity: Long]
+        val stockQuantity = result[0] as Int
+        val reservedQuantity = (result[1] as Long).toInt()
 
         // 가용 재고 = 실제 재고 - 예약된 수량
-        return actualStock - reservedQuantity
+        return stockQuantity - reservedQuantity
     }
 
     override fun calculateAvailableStockBatch(productOptionIds: List<Long>): Map<Long, Int> {
-        return productOptionIds.associateWith { optionId ->
-            calculateAvailableStock(optionId)
+        if (productOptionIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        // INVENTORY와 INVENTORY_RESERVATION을 LEFT JOIN하여 단일 쿼리로 Batch 조회
+        val results = inventoryJpaRepository.calculateAvailableStockBatchForOptions(productOptionIds)
+
+        // Map<productOptionId, availableStock> 변환
+        return results.associate { row ->
+            // row = [productOptionId: Long, stockQuantity: Int, reservedQuantity: Long]
+            val productOptionId = row[0] as Long
+            val stockQuantity = row[1] as Int
+            val reservedQuantity = (row[2] as Long).toInt()
+            val availableStock = stockQuantity - reservedQuantity
+
+            productOptionId to availableStock
         }
     }
 

@@ -21,8 +21,13 @@ data class ProductWithOptions(
 )
 
 /**
- * [책임]: PRODUCT_OPTION + INVENTORY JOIN 결과
+ * [책임]: PRODUCT_OPTION 정보
  * ProductWithOptions의 내부 데이터 구조
+ *
+ * [설계 변경]:
+ * - availableStock은 nullable로 변경
+ * - Repository 계층에서는 재고 정보를 조회하지 않음 (도메인 경계 준수)
+ * - Service 계층에서 InventoryRepository를 사용하여 재고 정보를 별도 조회
  */
 data class ProductOptionInfo(
     val optionId: Long,
@@ -31,7 +36,7 @@ data class ProductOptionInfo(
     val grindType: String,
     val weightGrams: Int,
     val price: Int,
-    val availableStock: Int
+    val availableStock: Int? = null  // nullable로 변경 (Repository에서는 null 반환)
 )
 
 /**

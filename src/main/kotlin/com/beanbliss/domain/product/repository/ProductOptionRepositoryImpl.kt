@@ -11,52 +11,48 @@ import org.springframework.stereotype.Repository
  * [책임]: Spring Data JPA를 활용한 ProductOption 영속성 처리
  * Infrastructure Layer에 속하며, JPA 기술에 종속적
  */
-interface ProductOptionWithProductJpaRepository : JpaRepository<ProductOptionEntity, Long> {
+interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> {
     /**
-     * 상품 옵션 ID로 활성 상태의 옵션 조회 (PRODUCT와 JOIN)
+     * 상품 ID와 활성 상태로 옵션 조회
+     */
+    fun findByProductIdAndIsActiveTrue(productId: Long): List<ProductOptionEntity>
+
+    /**
+     * 상품 옵션 ID로 활성 상태의 옵션 조회 (PRODUCT와 INNER JOIN)
+     * N+1 문제 방지를 위한 단일 쿼리
      *
      * @param productOptionId 상품 옵션 ID
-     * @param isActive 활성 상태 (true)
-     * @return 활성 상태의 상품 옵션 (없으면 null)
+     * @return Array<Any> = [ProductOptionEntity, ProductEntity] (없으면 null)
      */
     @Query("""
         SELECT po, p
         FROM ProductOptionEntity po
         INNER JOIN ProductEntity p ON po.productId = p.id
-        WHERE po.id = :productOptionId AND po.isActive = :isActive
+        WHERE po.id = :productOptionId AND po.isActive = true
     """)
-    fun findByIdAndIsActiveWithProduct(
-        @Param("productOptionId") productOptionId: Long,
-        @Param("isActive") isActive: Boolean
-    ): List<Array<Any>>?
+    fun findActiveByIdWithProduct(@Param("productOptionId") productOptionId: Long): Array<Any>?
 }
 
 /**
  * [책임]: ProductOptionRepository 인터페이스 구현체
- * - ProductOptionWithProductJpaRepository를 활용하여 실제 DB 접근
- * - 활성 상태의 상품 옵션만 조회
+ * - ProductOptionJpaRepository를 활용하여 실제 DB 접근
+ * - PRODUCT와 INNER JOIN하여 단일 쿼리로 조회
  */
 @Repository
 class ProductOptionRepositoryImpl(
-    private val productOptionJpaRepository: ProductOptionJpaRepository,
-    private val productJpaRepository: org.springframework.data.jpa.repository.JpaRepository<ProductEntity, Long>
+    private val productOptionJpaRepository: ProductOptionJpaRepository
 ) : ProductOptionRepository {
 
     override fun findActiveOptionWithProduct(productOptionId: Long): ProductOptionDetail? {
-        // 1. 상품 옵션 조회 (is_active = true 조건)
-        val optionEntity = productOptionJpaRepository.findById(productOptionId).orElse(null)
+        // PRODUCT_OPTION과 PRODUCT를 INNER JOIN하여 단일 쿼리로 조회
+        val result = productOptionJpaRepository.findActiveByIdWithProduct(productOptionId)
             ?: return null
 
-        // 활성 상태가 아니면 null 반환
-        if (!optionEntity.isActive) {
-            return null
-        }
+        // result = [ProductOptionEntity, ProductEntity]
+        val optionEntity = result[0] as ProductOptionEntity
+        val productEntity = result[1] as ProductEntity
 
-        // 2. 상품 정보 조회 (JOIN)
-        val productEntity = productJpaRepository.findById(optionEntity.productId).orElse(null)
-            ?: return null
-
-        // 3. ProductOptionDetail로 변환
+        // ProductOptionDetail로 변환
         return optionEntity.toDetail(productEntity.name)
     }
 }

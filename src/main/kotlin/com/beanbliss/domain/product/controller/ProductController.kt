@@ -75,7 +75,7 @@ class ProductController(
                         grindType = option.grindType,
                         weightGrams = option.weightGrams,
                         price = option.price,
-                        availableStock = option.availableStock
+                        availableStock = option.availableStock ?: 0  // UseCase에서 채워진 값, null-safe 처리
                     )
                 }
             )
@@ -127,7 +127,7 @@ class ProductController(
                     grindType = option.grindType,
                     weightGrams = option.weightGrams,
                     price = option.price,
-                    availableStock = option.availableStock
+                    availableStock = option.availableStock ?: 0  // UseCase에서 채워진 값, null-safe 처리
                 )
             }
         )

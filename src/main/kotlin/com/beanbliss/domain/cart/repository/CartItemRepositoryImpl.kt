@@ -16,14 +16,50 @@ import org.springframework.transaction.annotation.Transactional
  */
 interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
     /**
-     * 사용자 ID로 장바구니 아이템 조회
+     * 사용자 ID로 장바구니 아이템 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+     * N+1 문제 방지를 위한 단일 쿼리
+     *
+     * @return List<Array<Any>> = [[CartItemEntity, ProductOptionEntity, ProductEntity], ...]
      */
-    fun findByUserId(userId: Long): List<CartItemEntity>
+    @Query("""
+        SELECT c, po, p
+        FROM CartItemEntity c
+        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
+        INNER JOIN ProductEntity p ON po.productId = p.id
+        WHERE c.userId = :userId
+    """)
+    fun findByUserIdWithProductInfo(@Param("userId") userId: Long): List<Array<Any>>
 
     /**
-     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회
+     * 장바구니 아이템 ID로 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+     *
+     * @return Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
      */
-    fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemEntity?
+    @Query("""
+        SELECT c, po, p
+        FROM CartItemEntity c
+        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
+        INNER JOIN ProductEntity p ON po.productId = p.id
+        WHERE c.id = :cartItemId
+    """)
+    fun findByIdWithProductInfo(@Param("cartItemId") cartItemId: Long): Array<Any>?
+
+    /**
+     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+     *
+     * @return Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
+     */
+    @Query("""
+        SELECT c, po, p
+        FROM CartItemEntity c
+        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
+        INNER JOIN ProductEntity p ON po.productId = p.id
+        WHERE c.userId = :userId AND c.productOptionId = :productOptionId
+    """)
+    fun findByUserIdAndProductOptionIdWithProductInfo(
+        @Param("userId") userId: Long,
+        @Param("productOptionId") productOptionId: Long
+    ): Array<Any>?
 
     /**
      * 사용자의 모든 장바구니 아이템 삭제
@@ -36,69 +72,29 @@ interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
 /**
  * [책임]: CartItemRepository 인터페이스 구현체
  * - CartItemJpaRepository를 활용하여 실제 DB 접근
- * - PRODUCT_OPTION, PRODUCT와 JOIN하여 상세 정보 제공
+ * - PRODUCT_OPTION, PRODUCT와 JOIN하여 상세 정보 제공 (단일 쿼리)
  */
 @Repository
 class CartItemRepositoryImpl(
-    private val cartItemJpaRepository: CartItemJpaRepository,
-    private val productOptionJpaRepository: JpaRepository<ProductOptionEntity, Long>,
-    private val productJpaRepository: JpaRepository<ProductEntity, Long>
+    private val cartItemJpaRepository: CartItemJpaRepository
 ) : CartItemRepository {
 
     override fun findByUserId(userId: Long): List<CartItemDetail> {
-        val cartItems = cartItemJpaRepository.findByUserId(userId)
+        // CART_ITEM, PRODUCT_OPTION, PRODUCT를 JOIN하여 단일 쿼리로 조회
+        val results = cartItemJpaRepository.findByUserIdWithProductInfo(userId)
 
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
-        return cartItems.mapNotNull { cartItem ->
-            val productOption = productOptionJpaRepository.findById(cartItem.productOptionId).orElse(null)
-                ?: return@mapNotNull null
-            val product = productJpaRepository.findById(productOption.productId).orElse(null)
-                ?: return@mapNotNull null
-
-            CartItemDetail(
-                cartItemId = cartItem.id,
-                productOptionId = cartItem.productOptionId,
-                productName = product.name,
-                optionCode = productOption.optionCode,
-                origin = productOption.origin,
-                grindType = productOption.grindType,
-                weightGrams = productOption.weightGrams,
-                price = productOption.price.toInt(),
-                quantity = cartItem.quantity,
-                totalPrice = productOption.price.toInt() * cartItem.quantity,
-                createdAt = cartItem.createdAt,
-                updatedAt = cartItem.updatedAt
-            )
-        }
+        return results.map { row -> mapToCartItemDetail(row) }
     }
 
     override fun findByUserIdAndProductOptionId(
         userId: Long,
         productOptionId: Long
     ): CartItemDetail? {
-        val cartItem = cartItemJpaRepository.findByUserIdAndProductOptionId(userId, productOptionId)
+        // CART_ITEM, PRODUCT_OPTION, PRODUCT를 JOIN하여 단일 쿼리로 조회
+        val result = cartItemJpaRepository.findByUserIdAndProductOptionIdWithProductInfo(userId, productOptionId)
             ?: return null
 
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
-        val productOption = productOptionJpaRepository.findById(cartItem.productOptionId).orElse(null)
-            ?: return null
-        val product = productJpaRepository.findById(productOption.productId).orElse(null)
-            ?: return null
-
-        return CartItemDetail(
-            cartItemId = cartItem.id,
-            productOptionId = cartItem.productOptionId,
-            productName = product.name,
-            optionCode = productOption.optionCode,
-            origin = productOption.origin,
-            grindType = productOption.grindType,
-            weightGrams = productOption.weightGrams,
-            price = productOption.price.toInt(),
-            quantity = cartItem.quantity,
-            totalPrice = productOption.price.toInt() * cartItem.quantity,
-            createdAt = cartItem.createdAt,
-            updatedAt = cartItem.updatedAt
-        )
+        return mapToCartItemDetail(result)
     }
 
     override fun save(cartItem: CartItemDetail, userId: Long): CartItemDetail {
@@ -122,24 +118,11 @@ class CartItemRepositoryImpl(
 
         val savedEntity = cartItemJpaRepository.save(entity)
 
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
-        val productOption = productOptionJpaRepository.findById(savedEntity.productOptionId).orElseThrow()
-        val product = productJpaRepository.findById(productOption.productId).orElseThrow()
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회 (단일 쿼리)
+        val result = cartItemJpaRepository.findByIdWithProductInfo(savedEntity.id)
+            ?: throw IllegalStateException("장바구니 아이템 저장 후 조회 실패: ${savedEntity.id}")
 
-        return CartItemDetail(
-            cartItemId = savedEntity.id,
-            productOptionId = savedEntity.productOptionId,
-            productName = product.name,
-            optionCode = productOption.optionCode,
-            origin = productOption.origin,
-            grindType = productOption.grindType,
-            weightGrams = productOption.weightGrams,
-            price = productOption.price.toInt(),
-            quantity = savedEntity.quantity,
-            totalPrice = productOption.price.toInt() * savedEntity.quantity,
-            createdAt = savedEntity.createdAt,
-            updatedAt = savedEntity.updatedAt
-        )
+        return mapToCartItemDetail(result)
     }
 
     @Transactional
@@ -160,23 +143,37 @@ class CartItemRepositoryImpl(
 
         val savedEntity = cartItemJpaRepository.save(updatedEntity)
 
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
-        val productOption = productOptionJpaRepository.findById(savedEntity.productOptionId).orElseThrow()
-        val product = productJpaRepository.findById(productOption.productId).orElseThrow()
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회 (단일 쿼리)
+        val result = cartItemJpaRepository.findByIdWithProductInfo(savedEntity.id)
+            ?: throw IllegalStateException("장바구니 아이템 업데이트 후 조회 실패: ${savedEntity.id}")
+
+        return mapToCartItemDetail(result)
+    }
+
+    /**
+     * JPA 쿼리 결과를 CartItemDetail로 변환하는 헬퍼 메서드
+     *
+     * @param row Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
+     * @return CartItemDetail
+     */
+    private fun mapToCartItemDetail(row: Array<Any>): CartItemDetail {
+        val cartItem = row[0] as CartItemEntity
+        val productOption = row[1] as ProductOptionEntity
+        val product = row[2] as ProductEntity
 
         return CartItemDetail(
-            cartItemId = savedEntity.id,
-            productOptionId = savedEntity.productOptionId,
+            cartItemId = cartItem.id,
+            productOptionId = cartItem.productOptionId,
             productName = product.name,
             optionCode = productOption.optionCode,
             origin = productOption.origin,
             grindType = productOption.grindType,
             weightGrams = productOption.weightGrams,
             price = productOption.price.toInt(),
-            quantity = savedEntity.quantity,
-            totalPrice = productOption.price.toInt() * savedEntity.quantity,
-            createdAt = savedEntity.createdAt,
-            updatedAt = savedEntity.updatedAt
+            quantity = cartItem.quantity,
+            totalPrice = productOption.price.toInt() * cartItem.quantity,
+            createdAt = cartItem.createdAt,
+            updatedAt = cartItem.updatedAt
         )
     }
 
