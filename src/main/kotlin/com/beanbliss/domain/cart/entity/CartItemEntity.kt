@@ -1,5 +1,7 @@
 package com.beanbliss.domain.cart.entity
 
+import com.beanbliss.domain.product.entity.ProductOptionEntity
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -15,12 +17,12 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - USER와 N:1 관계
- * - PRODUCT_OPTION과 N:1 관계
+ * [연관관계]:
+ * - CART_ITEM N:1 USER
+ * - CART_ITEM N:1 PRODUCT_OPTION
  */
 @Entity
-@Table(name = "cart_items")
+@Table(name = "cart_item")
 class CartItemEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,6 +43,15 @@ class CartItemEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_option_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var productOption: ProductOptionEntity? = null
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

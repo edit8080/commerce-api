@@ -1,5 +1,6 @@
 package com.beanbliss.domain.inventory.entity
 
+import com.beanbliss.domain.product.entity.ProductOptionEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -14,8 +15,8 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - PRODUCT_OPTION과 1:1 관계
+ * [연관관계]:
+ * - INVENTORY 1:1 PRODUCT_OPTION
  *
  * [동시성 제어]:
  * - PRODUCT_OPTION과 분리하여 Lock 적용 용이
@@ -39,6 +40,11 @@ class InventoryEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_option_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var productOption: ProductOptionEntity? = null
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

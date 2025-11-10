@@ -1,5 +1,7 @@
 package com.beanbliss.domain.order.entity
 
+import com.beanbliss.domain.coupon.entity.UserCouponEntity
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -21,16 +23,16 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - USER와 N:1 관계
- * - USER_COUPON과 N:1 관계 (선택적)
- * - ORDER_ITEM과 1:N 관계
+ * [연관관계]:
+ * - ORDER N:1 USER
+ * - ORDER N:1 USER_COUPON (nullable)
+ * - ORDER 1:N ORDER_ITEM
  *
  * [고려 사항]:
  * - 금액 필드들은 계산 가능하지만 성능 최적화와 이력 관리를 위해 별도 저장
  */
 @Entity
-@Table(name = "orders")
+@Table(name = "`order`")
 class OrderEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -67,6 +69,18 @@ class OrderEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_coupon_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var userCoupon: UserCouponEntity? = null
+
+    @OneToMany(mappedBy = "order", fetch = FetchType.LAZY)
+    var orderItems: List<OrderItemEntity> = listOf()
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

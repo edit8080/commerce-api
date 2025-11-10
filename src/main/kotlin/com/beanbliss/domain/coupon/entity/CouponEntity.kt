@@ -22,12 +22,15 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
+ * [연관관계]:
+ * - COUPON 1:N COUPON_TICKET
+ *
  * [설계 변경사항]:
  * - issued_quantity 제거 → COUPON_TICKET으로 관리
  * - 쿠폰 메타데이터만 관리, 발급 관리는 COUPON_TICKET에서 처리
  */
 @Entity
-@Table(name = "coupons")
+@Table(name = "coupon")
 class CouponEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,6 +67,10 @@ class CouponEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @OneToMany(mappedBy = "coupon", fetch = FetchType.LAZY)
+    var couponTickets: List<CouponTicketEntity> = listOf()
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

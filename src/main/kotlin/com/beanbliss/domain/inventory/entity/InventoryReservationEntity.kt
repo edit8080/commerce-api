@@ -1,5 +1,7 @@
 package com.beanbliss.domain.inventory.entity
 
+import com.beanbliss.domain.product.entity.ProductOptionEntity
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -17,6 +19,10 @@ import java.time.LocalDateTime
  * - expires_at: datetime (만료 시각, reserved_at + 10분)
  * - updated_at: datetime
  *
+ * [연관관계]:
+ * - INVENTORY_RESERVATION N:1 PRODUCT_OPTION
+ * - INVENTORY_RESERVATION N:1 USER
+ *
  * [설계 배경]:
  * - 하이브리드 재고 관리: 2단계 재고 차감 전략
  *   - Phase 1 (예약): 주문창 진입 시 가상 예약 (실제 재고 차감 X)
@@ -25,7 +31,7 @@ import java.time.LocalDateTime
  * - 악의적 선점 방지: 타임아웃(10분) + 1인 1회 제한
  */
 @Entity
-@Table(name = "inventory_reservations")
+@Table(name = "inventory_reservation")
 class InventoryReservationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,6 +59,15 @@ class InventoryReservationEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_option_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var productOption: ProductOptionEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

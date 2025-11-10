@@ -15,11 +15,11 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - PRODUCT_OPTION과 1:N 관계
+ * [연관관계]:
+ * - PRODUCT 1:N PRODUCT_OPTION
  */
 @Entity
-@Table(name = "products")
+@Table(name = "product")
 class ProductEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,6 +40,10 @@ class ProductEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    var productOptions: List<ProductOptionEntity> = listOf()
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

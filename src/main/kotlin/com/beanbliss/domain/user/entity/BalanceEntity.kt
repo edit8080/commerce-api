@@ -7,6 +7,16 @@ import java.time.LocalDateTime
 /**
  * [책임]: 사용자 잔액 정보를 DB에 저장하기 위한 JPA Entity
  * Infrastructure Layer에 속하며, 기술 종속적인 코드 포함
+ *
+ * [테이블 구조]:
+ * - id: bigint (PK)
+ * - user_id: bigint (FK to USER, Unique)
+ * - amount: decimal
+ * - created_at: datetime
+ * - updated_at: datetime
+ *
+ * [연관관계]:
+ * - BALANCE 1:1 USER
  */
 @Entity
 @Table(name = "balance")
@@ -27,6 +37,11 @@ class BalanceEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

@@ -1,5 +1,6 @@
 package com.beanbliss.domain.coupon.entity
 
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -16,13 +17,18 @@ import java.time.LocalDateTime
  * - issued_at: datetime (nullable)
  * - created_at: datetime
  *
+ * [연관관계]:
+ * - COUPON_TICKET N:1 COUPON
+ * - COUPON_TICKET N:1 USER (nullable)
+ * - COUPON_TICKET 1:1 USER_COUPON
+ *
  * [설계 배경]:
  * - 선착순 쿠폰 발급 시 동시성 제어
  * - total_quantity만큼 티켓을 사전 생성
  * - FOR UPDATE SKIP LOCKED로 동시 발급 처리
  */
 @Entity
-@Table(name = "coupon_tickets")
+@Table(name = "coupon_ticket")
 class CouponTicketEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,6 +53,18 @@ class CouponTicketEntity(
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var coupon: CouponEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
+    @OneToOne(mappedBy = "couponTicket", fetch = FetchType.LAZY)
+    var userCoupon: UserCouponEntity? = null
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

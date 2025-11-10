@@ -1,5 +1,9 @@
 package com.beanbliss.domain.product.entity
 
+import com.beanbliss.domain.cart.entity.CartItemEntity
+import com.beanbliss.domain.inventory.entity.InventoryEntity
+import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
+import com.beanbliss.domain.order.entity.OrderItemEntity
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -20,12 +24,15 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - PRODUCT와 N:1 관계
- * - INVENTORY와 1:1 관계
+ * [연관관계]:
+ * - PRODUCT_OPTION N:1 PRODUCT
+ * - PRODUCT_OPTION 1:1 INVENTORY
+ * - PRODUCT_OPTION 1:N CART_ITEM
+ * - PRODUCT_OPTION 1:N ORDER_ITEM
+ * - PRODUCT_OPTION 1:N INVENTORY_RESERVATION
  */
 @Entity
-@Table(name = "product_options")
+@Table(name = "product_option")
 class ProductOptionEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,6 +65,23 @@ class ProductOptionEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var product: ProductEntity? = null
+
+    @OneToOne(mappedBy = "productOption", fetch = FetchType.LAZY)
+    var inventory: InventoryEntity? = null
+
+    @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    var cartItems: List<CartItemEntity> = listOf()
+
+    @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    var orderItems: List<OrderItemEntity> = listOf()
+
+    @OneToMany(mappedBy = "productOption", fetch = FetchType.LAZY)
+    var inventoryReservations: List<InventoryReservationEntity> = listOf()
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()

@@ -1,5 +1,6 @@
 package com.beanbliss.domain.order.entity
 
+import com.beanbliss.domain.product.entity.ProductOptionEntity
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -17,15 +18,15 @@ import java.time.LocalDateTime
  * - total_price: decimal (총액, quantity * unit_price)
  * - created_at: datetime
  *
- * [관계]:
- * - ORDER와 N:1 관계
- * - PRODUCT_OPTION과 N:1 관계
+ * [연관관계]:
+ * - ORDER_ITEM N:1 ORDER
+ * - ORDER_ITEM N:1 PRODUCT_OPTION
  *
  * [고려 사항]:
  * - 주문 당시 가격을 unit_price에 저장하여 가격 변동에 대비 (snapshot)
  */
 @Entity
-@Table(name = "order_items")
+@Table(name = "order_item")
 class OrderItemEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,6 +50,15 @@ class OrderItemEntity(
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var order: OrderEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_option_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var productOption: ProductOptionEntity? = null
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

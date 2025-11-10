@@ -1,6 +1,8 @@
 package com.beanbliss.domain.coupon.entity
 
 import com.beanbliss.domain.coupon.enums.UserCouponStatus
+import com.beanbliss.domain.order.entity.OrderEntity
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -18,13 +20,14 @@ import java.time.LocalDateTime
  * - created_at: datetime
  * - updated_at: datetime
  *
- * [관계]:
- * - USER와 N:1 관계
- * - COUPON과 N:1 관계
- * - ORDER와 N:1 관계 (사용된 경우)
+ * [연관관계]:
+ * - USER_COUPON N:1 USER
+ * - USER_COUPON N:1 COUPON
+ * - USER_COUPON 1:1 COUPON_TICKET
+ * - USER_COUPON 1:1 ORDER (nullable, mappedBy)
  */
 @Entity
-@Table(name = "user_coupons")
+@Table(name = "user_coupon")
 class UserCouponEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,6 +55,22 @@ class UserCouponEntity(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
+    // 연관관계 (fetch = LAZY로 N+1 문제 방지, FK 제약조건 없음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var user: UserEntity? = null
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var coupon: CouponEntity? = null
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id", insertable = false, updatable = false, foreignKey = ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    var couponTicket: CouponTicketEntity? = null
+
+    @OneToOne(mappedBy = "userCoupon", fetch = FetchType.LAZY)
+    var order: OrderEntity? = null
+
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()
