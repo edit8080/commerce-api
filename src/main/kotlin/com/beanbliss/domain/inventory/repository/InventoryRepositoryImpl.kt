@@ -1,37 +1,65 @@
 package com.beanbliss.domain.inventory.repository
 
 import com.beanbliss.domain.inventory.domain.Inventory
-import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.entity.InventoryEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
-import com.beanbliss.domain.product.repository.ProductOptionRepository
+import com.beanbliss.domain.product.entity.ProductEntity
+import com.beanbliss.domain.product.entity.ProductOptionEntity
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
-import java.time.LocalDateTime
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * [책임]: 재고 In-memory 저장소 구현
- * - ConcurrentHashMap을 사용하여 Thread-safe 보장
- * - product_option_id를 키로 사용하여 재고 정보 관리
+ * [책임]: Spring Data JPA를 활용한 Inventory 영속성 처리
+ * Infrastructure Layer에 속하며, JPA 기술에 종속적
+ */
+interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
+    /**
+     * 상품 옵션 ID로 재고 조회
+     */
+    fun findByProductOptionId(productOptionId: Long): InventoryEntity?
+
+    /**
+     * 여러 상품 옵션 ID로 재고 일괄 조회 (Bulk 조회)
+     */
+    fun findByProductOptionIdIn(productOptionIds: List<Long>): List<InventoryEntity>
+
+    /**
+     * 전체 재고 개수 조회
+     */
+    override fun count(): Long
+
+    /**
+     * 재고 목록 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+     * N+1 문제 방지를 위한 단일 쿼리
+     */
+    @Query("""
+        SELECT i, po, p
+        FROM InventoryEntity i
+        INNER JOIN ProductOptionEntity po ON i.productOptionId = po.id
+        INNER JOIN ProductEntity p ON po.productId = p.id
+        WHERE po.isActive = true
+    """)
+    fun findAllWithProductInfo(): List<Array<Any>>
+}
+
+/**
+ * [책임]: InventoryRepository 인터페이스 구현체
+ * - InventoryJpaRepository를 활용하여 실제 DB 접근
  * - INVENTORY_RESERVATION을 고려하여 가용 재고 계산
- * - INVENTORY + PRODUCT_OPTION + PRODUCT를 JOIN하여 재고 목록 조회
- *
- * [주의사항]:
- * - 애플리케이션 재시작 시 데이터 소실 (In-memory 특성)
- * - 실제 DB 사용 시 JPA 기반 구현체로 교체 필요
  */
 @Repository
 class InventoryRepositoryImpl(
-    private val inventoryReservationRepository: InventoryReservationRepository,
-    private val productOptionRepository: ProductOptionRepository
+    private val inventoryJpaRepository: InventoryJpaRepository,
+    private val inventoryReservationRepository: InventoryReservationRepository
 ) : InventoryRepository {
-
-    // Thread-safe한 In-memory 저장소 (product_option_id -> InventoryEntity)
-    private val inventories = ConcurrentHashMap<Long, InventoryEntity>()
 
     override fun calculateAvailableStock(productOptionId: Long): Int {
         // 실제 재고 조회
-        val actualStock = inventories[productOptionId]?.stockQuantity ?: 0
+        val actualStock = inventoryJpaRepository.findByProductOptionId(productOptionId)?.stockQuantity ?: 0
 
         // 예약된 수량 합계 조회 (RESERVED, CONFIRMED 상태)
         val reservedQuantity = inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(
@@ -54,51 +82,52 @@ class InventoryRepositoryImpl(
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<InventoryResponse> {
-        // 1. 모든 재고를 조회하고, ProductOption 정보와 JOIN
-        val inventoryResponses = inventories.values.mapNotNull { inventory ->
-            // ProductOption 정보 조회 (PRODUCT와 JOIN된 정보 포함)
-            val optionDetail = productOptionRepository.findActiveOptionWithProduct(inventory.productOptionId)
-                ?: return@mapNotNull null // 활성 옵션이 아니면 제외
+    ): List<InventoryDetail> {
+        // 1. 모든 재고 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+        val results = inventoryJpaRepository.findAllWithProductInfo()
 
-            // InventoryResponse 생성
-            InventoryResponse(
+        // 2. InventoryDetail로 변환
+        val inventoryDetails = results.map { row ->
+            val inventory = row[0] as InventoryEntity
+            val productOption = row[1] as ProductOptionEntity
+            val product = row[2] as ProductEntity
+
+            InventoryDetail(
                 inventoryId = inventory.id,
-                productId = optionDetail.productId,
-                productName = optionDetail.productName,
-                productOptionId = optionDetail.optionId,
-                optionCode = optionDetail.optionCode,
-                optionName = "${optionDetail.grindType} ${optionDetail.weightGrams}g", // 옵션명 생성
-                price = optionDetail.price,
+                productId = product.id,
+                productName = product.name,
+                productOptionId = productOption.id,
+                optionCode = productOption.optionCode,
+                optionName = "${productOption.grindType} ${productOption.weightGrams}g",
+                price = productOption.price.toInt(),
                 stockQuantity = inventory.stockQuantity,
                 createdAt = inventory.createdAt
             )
         }
 
-        // 2. 정렬 (sortBy, sortDirection 적용)
+        // 3. 정렬 적용
         val sorted = when (sortBy) {
             "created_at" -> {
                 if (sortDirection == "DESC") {
-                    inventoryResponses.sortedByDescending { it.createdAt }
+                    inventoryDetails.sortedByDescending { it.createdAt }
                 } else {
-                    inventoryResponses.sortedBy { it.createdAt }
+                    inventoryDetails.sortedBy { it.createdAt }
                 }
             }
-            else -> inventoryResponses // 기본 정렬 (정렬 기준 없음)
+            else -> inventoryDetails
         }
 
-        // 3. 페이징 적용 (offset, limit)
+        // 4. 페이징 적용 (1-based index)
         val offset = (page - 1) * size
         return sorted.drop(offset).take(size)
     }
 
     override fun count(): Long {
-        return inventories.size.toLong()
+        return inventoryJpaRepository.count()
     }
 
     override fun findByProductOptionId(productOptionId: Long): Inventory? {
-        // InventoryEntity를 조회하여 Inventory 도메인 모델로 변환
-        val entity = inventories[productOptionId] ?: return null
+        val entity = inventoryJpaRepository.findByProductOptionId(productOptionId) ?: return null
         return Inventory(
             productOptionId = entity.productOptionId,
             stockQuantity = entity.stockQuantity
@@ -106,60 +135,45 @@ class InventoryRepositoryImpl(
     }
 
     override fun findAllByProductOptionIds(productOptionIds: List<Long>): List<Inventory> {
-        // Bulk 조회: WHERE product_option_id IN (...) 시뮬레이션
-        // 실제 DB에서는 단일 쿼리로 처리됨
-        return productOptionIds.mapNotNull { productOptionId ->
-            inventories[productOptionId]?.let { entity ->
-                Inventory(
-                    productOptionId = entity.productOptionId,
-                    stockQuantity = entity.stockQuantity
-                )
-            }
+        if (productOptionIds.isEmpty()) {
+            return emptyList()
+        }
+
+        return inventoryJpaRepository.findByProductOptionIdIn(productOptionIds).map { entity ->
+            Inventory(
+                productOptionId = entity.productOptionId,
+                stockQuantity = entity.stockQuantity
+            )
         }
     }
 
     override fun save(inventory: Inventory): Inventory {
         // 기존 entity가 있으면 수정, 없으면 새로 생성
-        val existingEntity = inventories[inventory.productOptionId]
+        val existingEntity = inventoryJpaRepository.findByProductOptionId(inventory.productOptionId)
 
         val entity = if (existingEntity != null) {
             // 기존 entity 업데이트
-            existingEntity.copy(
+            InventoryEntity(
+                id = existingEntity.id,
+                productOptionId = existingEntity.productOptionId,
                 stockQuantity = inventory.stockQuantity,
-                updatedAt = LocalDateTime.now()
+                createdAt = existingEntity.createdAt,
+                updatedAt = java.time.LocalDateTime.now()
             )
         } else {
             // 새로운 entity 생성
             InventoryEntity(
-                id = inventories.size.toLong() + 1, // 간단한 ID 생성
+                id = 0L,
                 productOptionId = inventory.productOptionId,
-                stockQuantity = inventory.stockQuantity,
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                stockQuantity = inventory.stockQuantity
             )
         }
 
-        // 저장
-        inventories[inventory.productOptionId] = entity
+        val savedEntity = inventoryJpaRepository.save(entity)
 
-        // 저장된 entity를 domain model로 변환하여 반환
         return Inventory(
-            productOptionId = entity.productOptionId,
-            stockQuantity = entity.stockQuantity
+            productOptionId = savedEntity.productOptionId,
+            stockQuantity = savedEntity.stockQuantity
         )
-    }
-
-    /**
-     * 테스트용 헬퍼 메서드: 재고 정보 추가
-     */
-    fun add(entity: InventoryEntity) {
-        inventories[entity.productOptionId] = entity
-    }
-
-    /**
-     * 테스트용 헬퍼 메서드: 모든 데이터 삭제
-     */
-    fun clear() {
-        inventories.clear()
     }
 }

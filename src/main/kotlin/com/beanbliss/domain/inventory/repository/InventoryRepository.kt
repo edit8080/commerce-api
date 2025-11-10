@@ -1,7 +1,6 @@
 package com.beanbliss.domain.inventory.repository
 
 import com.beanbliss.domain.inventory.domain.Inventory
-import com.beanbliss.domain.inventory.dto.InventoryResponse
 
 /**
  * [책임]: 재고 영속성 계층의 계약 정의
@@ -74,7 +73,7 @@ interface InventoryRepository {
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<InventoryResponse>
+    ): List<InventoryDetail>
 
     /**
      * 전체 재고 개수 조회

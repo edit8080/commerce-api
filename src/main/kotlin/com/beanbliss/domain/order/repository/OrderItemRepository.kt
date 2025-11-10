@@ -1,6 +1,5 @@
 package com.beanbliss.domain.order.repository
 
-import com.beanbliss.domain.order.dto.ProductOrderCount
 import com.beanbliss.domain.order.entity.OrderItemEntity
 import java.time.LocalDateTime
 

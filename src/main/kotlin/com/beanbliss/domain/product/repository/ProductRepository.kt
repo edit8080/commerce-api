@@ -1,8 +1,5 @@
 package com.beanbliss.domain.product.repository
 
-import com.beanbliss.domain.product.dto.ProductBasicInfo
-import com.beanbliss.domain.product.dto.ProductResponse
-
 /**
  * [책임]: 상품 영속성 계층의 계약 정의
  * Service는 이 인터페이스에만 의존합니다 (DIP 준수)
@@ -29,7 +26,7 @@ interface ProductRepository {
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<ProductResponse>
+    ): List<ProductWithOptions>
 
     /**
      * 활성 상품 총 개수 조회
@@ -44,12 +41,12 @@ interface ProductRepository {
      * - PRODUCT_OPTION.is_active = true인 옵션만 포함
      * - 옵션은 용량(weightGrams) 오름차순 → 분쇄 타입(grindType) 오름차순으로 정렬
      * - 상품이 존재하지 않으면 null 반환
-     * - 상품이 존재하지만 활성 옵션이 없으면 빈 options 리스트를 가진 ProductResponse 반환
+     * - 상품이 존재하지만 활성 옵션이 없으면 빈 options 리스트를 가진 ProductWithOptions 반환
      *
      * @param productId 상품 ID
      * @return 상품 정보 (옵션 포함) 또는 null (상품이 존재하지 않는 경우)
      */
-    fun findByIdWithOptions(productId: Long): ProductResponse?
+    fun findByIdWithOptions(productId: Long): ProductWithOptions?
 
     /**
      * 여러 상품의 기본 정보 조회

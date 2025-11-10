@@ -1,94 +1,187 @@
 package com.beanbliss.domain.cart.repository
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
 import com.beanbliss.domain.cart.entity.CartItemEntity
+import com.beanbliss.domain.product.entity.ProductEntity
+import com.beanbliss.domain.product.entity.ProductOptionEntity
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
-import java.time.LocalDateTime
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import org.springframework.transaction.annotation.Transactional
 
 /**
- * [책임]: 장바구니 아이템 In-memory 저장소 구현
- * - ConcurrentHashMap을 사용하여 Thread-safe 보장
- * - AtomicLong을 사용하여 ID 자동 생성
- *
- * [주의사항]:
- * - 애플리케이션 재시작 시 데이터 소실 (In-memory 특성)
- * - 실제 DB 사용 시 JPA 기반 구현체로 교체 필요
+ * [책임]: Spring Data JPA를 활용한 CartItem 영속성 처리
+ * Infrastructure Layer에 속하며, JPA 기술에 종속적
+ */
+interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
+    /**
+     * 사용자 ID로 장바구니 아이템 조회
+     */
+    fun findByUserId(userId: Long): List<CartItemEntity>
+
+    /**
+     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회
+     */
+    fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemEntity?
+
+    /**
+     * 사용자의 모든 장바구니 아이템 삭제
+     */
+    @Modifying
+    @Query("DELETE FROM CartItemEntity c WHERE c.userId = :userId")
+    fun deleteByUserId(@Param("userId") userId: Long)
+}
+
+/**
+ * [책임]: CartItemRepository 인터페이스 구현체
+ * - CartItemJpaRepository를 활용하여 실제 DB 접근
+ * - PRODUCT_OPTION, PRODUCT와 JOIN하여 상세 정보 제공
  */
 @Repository
-class CartItemRepositoryImpl : CartItemRepository {
+class CartItemRepositoryImpl(
+    private val cartItemJpaRepository: CartItemJpaRepository,
+    private val productOptionJpaRepository: JpaRepository<ProductOptionEntity, Long>,
+    private val productJpaRepository: JpaRepository<ProductEntity, Long>
+) : CartItemRepository {
 
-    // Thread-safe한 In-memory 저장소
-    private val cartItems = ConcurrentHashMap<Long, CartItemEntity>()
+    override fun findByUserId(userId: Long): List<CartItemDetail> {
+        val cartItems = cartItemJpaRepository.findByUserId(userId)
 
-    // 자동 증가 ID 생성기
-    private val idGenerator = AtomicLong(1L)
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
+        return cartItems.mapNotNull { cartItem ->
+            val productOption = productOptionJpaRepository.findById(cartItem.productOptionId).orElse(null)
+                ?: return@mapNotNull null
+            val product = productJpaRepository.findById(productOption.productId).orElse(null)
+                ?: return@mapNotNull null
 
-    override fun findByUserId(userId: Long): List<CartItemResponse> {
-        return cartItems.values
-            .filter { it.userId == userId }
-            .map { it.toResponse() }
+            CartItemDetail(
+                cartItemId = cartItem.id,
+                productOptionId = cartItem.productOptionId,
+                productName = product.name,
+                optionCode = productOption.optionCode,
+                origin = productOption.origin,
+                grindType = productOption.grindType,
+                weightGrams = productOption.weightGrams,
+                price = productOption.price.toInt(),
+                quantity = cartItem.quantity,
+                totalPrice = productOption.price.toInt() * cartItem.quantity,
+                createdAt = cartItem.createdAt,
+                updatedAt = cartItem.updatedAt
+            )
+        }
     }
 
     override fun findByUserIdAndProductOptionId(
         userId: Long,
         productOptionId: Long
-    ): CartItemResponse? {
-        return cartItems.values
-            .firstOrNull { it.userId == userId && it.productOptionId == productOptionId }
-            ?.toResponse()
+    ): CartItemDetail? {
+        val cartItem = cartItemJpaRepository.findByUserIdAndProductOptionId(userId, productOptionId)
+            ?: return null
+
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
+        val productOption = productOptionJpaRepository.findById(cartItem.productOptionId).orElse(null)
+            ?: return null
+        val product = productJpaRepository.findById(productOption.productId).orElse(null)
+            ?: return null
+
+        return CartItemDetail(
+            cartItemId = cartItem.id,
+            productOptionId = cartItem.productOptionId,
+            productName = product.name,
+            optionCode = productOption.optionCode,
+            origin = productOption.origin,
+            grindType = productOption.grindType,
+            weightGrams = productOption.weightGrams,
+            price = productOption.price.toInt(),
+            quantity = cartItem.quantity,
+            totalPrice = productOption.price.toInt() * cartItem.quantity,
+            createdAt = cartItem.createdAt,
+            updatedAt = cartItem.updatedAt
+        )
     }
 
-    override fun save(cartItem: CartItemResponse, userId: Long): CartItemResponse {
-        val now = LocalDateTime.now()
+    override fun save(cartItem: CartItemDetail, userId: Long): CartItemDetail {
+        val now = java.time.LocalDateTime.now()
 
-        // 신규 저장: ID가 0이면 새 ID 생성
-        val id = if (cartItem.cartItemId == 0L) {
-            idGenerator.getAndIncrement()
+        // 기존 아이템이 있는지 확인
+        val existingEntity = if (cartItem.cartItemId != 0L) {
+            cartItemJpaRepository.findById(cartItem.cartItemId).orElse(null)
         } else {
-            cartItem.cartItemId
+            null
         }
 
         val entity = CartItemEntity(
-            id = id,
+            id = cartItem.cartItemId,
             userId = userId,
             productOptionId = cartItem.productOptionId,
-            productName = cartItem.productName,
-            optionCode = cartItem.optionCode,
-            origin = cartItem.origin,
-            grindType = cartItem.grindType,
-            weightGrams = cartItem.weightGrams,
-            price = cartItem.price,
             quantity = cartItem.quantity,
-            createdAt = if (cartItem.cartItemId == 0L) now else cartItem.createdAt,
+            createdAt = existingEntity?.createdAt ?: now,
             updatedAt = now
         )
 
-        cartItems[id] = entity
-        return entity.toResponse()
+        val savedEntity = cartItemJpaRepository.save(entity)
+
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
+        val productOption = productOptionJpaRepository.findById(savedEntity.productOptionId).orElseThrow()
+        val product = productJpaRepository.findById(productOption.productId).orElseThrow()
+
+        return CartItemDetail(
+            cartItemId = savedEntity.id,
+            productOptionId = savedEntity.productOptionId,
+            productName = product.name,
+            optionCode = productOption.optionCode,
+            origin = productOption.origin,
+            grindType = productOption.grindType,
+            weightGrams = productOption.weightGrams,
+            price = productOption.price.toInt(),
+            quantity = savedEntity.quantity,
+            totalPrice = productOption.price.toInt() * savedEntity.quantity,
+            createdAt = savedEntity.createdAt,
+            updatedAt = savedEntity.updatedAt
+        )
     }
 
-    override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItemResponse {
-        val entity = cartItems[cartItemId]
-            ?: throw IllegalArgumentException("장바구니 아이템을 찾을 수 없습니다. ID: $cartItemId")
+    @Transactional
+    override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItemDetail {
+        val entity = cartItemJpaRepository.findById(cartItemId).orElseThrow {
+            IllegalArgumentException("장바구니 아이템을 찾을 수 없습니다. ID: $cartItemId")
+        }
 
         // 수량 업데이트
-        entity.quantity = newQuantity
-        entity.updatedAt = LocalDateTime.now()
+        val updatedEntity = CartItemEntity(
+            id = entity.id,
+            userId = entity.userId,
+            productOptionId = entity.productOptionId,
+            quantity = newQuantity,
+            createdAt = entity.createdAt,
+            updatedAt = java.time.LocalDateTime.now()
+        )
 
-        return entity.toResponse()
+        val savedEntity = cartItemJpaRepository.save(updatedEntity)
+
+        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회
+        val productOption = productOptionJpaRepository.findById(savedEntity.productOptionId).orElseThrow()
+        val product = productJpaRepository.findById(productOption.productId).orElseThrow()
+
+        return CartItemDetail(
+            cartItemId = savedEntity.id,
+            productOptionId = savedEntity.productOptionId,
+            productName = product.name,
+            optionCode = productOption.optionCode,
+            origin = productOption.origin,
+            grindType = productOption.grindType,
+            weightGrams = productOption.weightGrams,
+            price = productOption.price.toInt(),
+            quantity = savedEntity.quantity,
+            totalPrice = productOption.price.toInt() * savedEntity.quantity,
+            createdAt = savedEntity.createdAt,
+            updatedAt = savedEntity.updatedAt
+        )
     }
 
+    @Transactional
     override fun deleteByUserId(userId: Long) {
-        cartItems.values.removeIf { it.userId == userId }
-    }
-
-    /**
-     * 테스트용 헬퍼 메서드: 모든 데이터 삭제
-     */
-    fun clear() {
-        cartItems.clear()
-        idGenerator.set(1L)
+        cartItemJpaRepository.deleteByUserId(userId)
     }
 }
