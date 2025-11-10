@@ -40,28 +40,73 @@
 - **Language**: Java 17+ / Kotlin
 - **Framework**: Spring Boot 3.x
 
-## 시작하기
-
-### 사전 요구사항
-- JDK 17 이상
-- Kotlin 1.9 이상
-
 ## 프로젝트 구조
+
+이 프로젝트는 **4계층 아키텍처**를 기반으로 구성되어 있으며, 각 계층의 책임을 명확히 분리합니다.
+
+### 아키텍처 계층 구조
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Presentation Layer                                       │
+│ HTTP 요청/응답, 유효성 검사, DTO 변환                        │
+│ → controller/, dto/                                      │
+└──────────────────────────────────────────────────────────┘
+                         ↓
+┌──────────────────────────────────────────────────────────┐
+│ Application Layer                                        │
+│ 여러 Service 조합, 복합 트랜잭션 처리                         │
+│ → usecase/                                               │
+└──────────────────────────────────────────────────────────┘
+                         ↓
+┌──────────────────────────────────────────────────────────┐
+│ Domain Layer                                             │
+│ 비즈니스 로직, 도메인 규칙, 영속성 계약 정의 (DIP)              │
+│ → service/, domain/, repository/ (interface), exception/ │
+└──────────────────────────────────────────────────────────┘
+                         ↓
+┌──────────────────────────────────────────────────────────┐
+│ Infrastructure Layer                                     │
+│ DB 접근, 외부 시스템 연동, 기술 종속적 구현                    │
+│ → repository/ (impl), entity/                            │
+└──────────────────────────────────────────────────────────┘
+
+의존성: Presentation → Application → Domain ← Infrastructure
+```
+
+### 디렉토리 구조
 
 ```
 src/
-├── main/
-│   ├── kotlin/com/beanbliss/
-│   │   ├── domain/
-│   │   │   ├── product/
-│   │   │   ├── coupon/
-│   │   │   ├── order/
-│   │   │   ├── inventory/
-│   │   │   └── user/
-│   │   └── common/
-│   └── resources/
-│       ├── application.properties
-│  
-└── test/
-    └── kotlin/com/beanbliss/
+├── main/kotlin/com/beanbliss/
+│   ├── domain/                           # 도메인별 패키지
+│   │   ├── product/                      # 상품 도메인
+│   │   │   ├── controller/               # [Presentation] REST API 엔드포인트
+│   │   │   ├── dto/                      # [Presentation] Request/Response DTO
+│   │   │   ├── usecase/                  # [Application] 유스케이스 조율
+│   │   │   ├── service/                  # [Domain] 비즈니스 로직
+│   │   │   ├── domain/                   # [Domain] 도메인 모델
+│   │   │   ├── exception/                # [Domain] 도메인별 예외
+│   │   │   ├── repository/               # [Domain] Repository 인터페이스
+│   │   │   │                             # [Infrastructure] Repository 구현체
+│   │   │   └── entity/                   # [Infrastructure] JPA Entity
+│   │   │
+│   │   ├── coupon/                       # 쿠폰 도메인
+│   │   ├── order/                        # 주문 도메인
+│   │   ├── inventory/                    # 재고 도메인
+│   │   ├── cart/                         # 장바구니 도메인
+│   │   └── user/                         # 사용자 도메인
+│   │
+│   └── common/                           # 공통 모듈
+│       ├── dto/                          # 공통 DTO
+│       ├── pagination/                   # 페이지네이션 유틸
+│       └── exception/                    # 공통 예외 처리
+│
+└── test/kotlin/com/beanbliss/            # 테스트 코드
+    └── domain/
+        └── product/
+            ├── controller/               # Presentation Layer 테스트
+            ├── usecase/                  # Application Layer 테스트
+            └── service/                  # Domain Layer 테스트
 ```
+
