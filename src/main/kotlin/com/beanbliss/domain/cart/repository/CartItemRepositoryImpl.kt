@@ -1,8 +1,7 @@
 package com.beanbliss.domain.cart.repository
 
+import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.entity.CartItemEntity
-import com.beanbliss.domain.product.entity.ProductEntity
-import com.beanbliss.domain.product.entity.ProductOptionEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -13,53 +12,28 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * [책임]: Spring Data JPA를 활용한 CartItem 영속성 처리
  * Infrastructure Layer에 속하며, JPA 기술에 종속적
+ *
+ * [설계 변경]:
+ * - 도메인 간 JOIN 제거: CART_ITEM 테이블만 조회
+ * - PRODUCT_OPTION, PRODUCT와의 JOIN 제거
  */
 interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
     /**
-     * 사용자 ID로 장바구니 아이템 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
-     * N+1 문제 방지를 위한 단일 쿼리
+     * 사용자 ID로 장바구니 아이템 조회 (CART_ITEM만)
      *
-     * @return List<Array<Any>> = [[CartItemEntity, ProductOptionEntity, ProductEntity], ...]
+     * @param userId 사용자 ID
+     * @return CartItemEntity 리스트
      */
-    @Query("""
-        SELECT c, po, p
-        FROM CartItemEntity c
-        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
-        INNER JOIN ProductEntity p ON po.productId = p.id
-        WHERE c.userId = :userId
-    """)
-    fun findByUserIdWithProductInfo(@Param("userId") userId: Long): List<Array<Any>>
+    fun findByUserId(userId: Long): List<CartItemEntity>
 
     /**
-     * 장바구니 아이템 ID로 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
+     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회 (CART_ITEM만)
      *
-     * @return Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
+     * @param userId 사용자 ID
+     * @param productOptionId 상품 옵션 ID
+     * @return CartItemEntity (없으면 null)
      */
-    @Query("""
-        SELECT c, po, p
-        FROM CartItemEntity c
-        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
-        INNER JOIN ProductEntity p ON po.productId = p.id
-        WHERE c.id = :cartItemId
-    """)
-    fun findByIdWithProductInfo(@Param("cartItemId") cartItemId: Long): Array<Any>?
-
-    /**
-     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회 (PRODUCT_OPTION, PRODUCT와 JOIN)
-     *
-     * @return Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
-     */
-    @Query("""
-        SELECT c, po, p
-        FROM CartItemEntity c
-        INNER JOIN ProductOptionEntity po ON c.productOptionId = po.id
-        INNER JOIN ProductEntity p ON po.productId = p.id
-        WHERE c.userId = :userId AND c.productOptionId = :productOptionId
-    """)
-    fun findByUserIdAndProductOptionIdWithProductInfo(
-        @Param("userId") userId: Long,
-        @Param("productOptionId") productOptionId: Long
-    ): Array<Any>?
+    fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemEntity?
 
     /**
      * 사용자의 모든 장바구니 아이템 삭제
@@ -72,113 +46,66 @@ interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
 /**
  * [책임]: CartItemRepository 인터페이스 구현체
  * - CartItemJpaRepository를 활용하여 실제 DB 접근
- * - PRODUCT_OPTION, PRODUCT와 JOIN하여 상세 정보 제공 (단일 쿼리)
+ * - CART_ITEM 테이블만 조회 (도메인 간 JOIN 제거)
+ * - Entity ↔ Domain Model 변환 담당
  */
 @Repository
 class CartItemRepositoryImpl(
     private val cartItemJpaRepository: CartItemJpaRepository
 ) : CartItemRepository {
 
-    override fun findByUserId(userId: Long): List<CartItemDetail> {
-        // CART_ITEM, PRODUCT_OPTION, PRODUCT를 JOIN하여 단일 쿼리로 조회
-        val results = cartItemJpaRepository.findByUserIdWithProductInfo(userId)
-
-        return results.map { row -> mapToCartItemDetail(row) }
+    override fun findByUserId(userId: Long): List<CartItem> {
+        // CART_ITEM만 조회 (JOIN 제거)
+        val entities = cartItemJpaRepository.findByUserId(userId)
+        return entities.map { it.toDomain() }
     }
 
-    override fun findByUserIdAndProductOptionId(
-        userId: Long,
-        productOptionId: Long
-    ): CartItemDetail? {
-        // CART_ITEM, PRODUCT_OPTION, PRODUCT를 JOIN하여 단일 쿼리로 조회
-        val result = cartItemJpaRepository.findByUserIdAndProductOptionIdWithProductInfo(userId, productOptionId)
+    override fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItem? {
+        // CART_ITEM만 조회 (JOIN 제거)
+        val entity = cartItemJpaRepository.findByUserIdAndProductOptionId(userId, productOptionId)
             ?: return null
-
-        return mapToCartItemDetail(result)
+        return entity.toDomain()
     }
 
-    override fun save(cartItem: CartItemDetail, userId: Long): CartItemDetail {
-        val now = java.time.LocalDateTime.now()
+    override fun findById(cartItemId: Long): CartItem? {
+        val entity = cartItemJpaRepository.findById(cartItemId).orElse(null)
+            ?: return null
+        return entity.toDomain()
+    }
 
-        // 기존 아이템이 있는지 확인
-        val existingEntity = if (cartItem.cartItemId != 0L) {
-            cartItemJpaRepository.findById(cartItem.cartItemId).orElse(null)
-        } else {
-            null
-        }
-
-        val entity = CartItemEntity(
-            id = cartItem.cartItemId,
-            userId = userId,
-            productOptionId = cartItem.productOptionId,
-            quantity = cartItem.quantity,
-            createdAt = existingEntity?.createdAt ?: now,
-            updatedAt = now
-        )
-
+    override fun save(cartItem: CartItem): CartItem {
+        val entity = cartItem.toEntity()
         val savedEntity = cartItemJpaRepository.save(entity)
-
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회 (단일 쿼리)
-        val result = cartItemJpaRepository.findByIdWithProductInfo(savedEntity.id)
-            ?: throw IllegalStateException("장바구니 아이템 저장 후 조회 실패: ${savedEntity.id}")
-
-        return mapToCartItemDetail(result)
-    }
-
-    @Transactional
-    override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItemDetail {
-        val entity = cartItemJpaRepository.findById(cartItemId).orElseThrow {
-            IllegalArgumentException("장바구니 아이템을 찾을 수 없습니다. ID: $cartItemId")
-        }
-
-        // 수량 업데이트
-        val updatedEntity = CartItemEntity(
-            id = entity.id,
-            userId = entity.userId,
-            productOptionId = entity.productOptionId,
-            quantity = newQuantity,
-            createdAt = entity.createdAt,
-            updatedAt = java.time.LocalDateTime.now()
-        )
-
-        val savedEntity = cartItemJpaRepository.save(updatedEntity)
-
-        // PRODUCT_OPTION, PRODUCT와 JOIN하여 정보 조회 (단일 쿼리)
-        val result = cartItemJpaRepository.findByIdWithProductInfo(savedEntity.id)
-            ?: throw IllegalStateException("장바구니 아이템 업데이트 후 조회 실패: ${savedEntity.id}")
-
-        return mapToCartItemDetail(result)
-    }
-
-    /**
-     * JPA 쿼리 결과를 CartItemDetail로 변환하는 헬퍼 메서드
-     *
-     * @param row Array<Any> = [CartItemEntity, ProductOptionEntity, ProductEntity]
-     * @return CartItemDetail
-     */
-    private fun mapToCartItemDetail(row: Array<Any>): CartItemDetail {
-        val cartItem = row[0] as CartItemEntity
-        val productOption = row[1] as ProductOptionEntity
-        val product = row[2] as ProductEntity
-
-        return CartItemDetail(
-            cartItemId = cartItem.id,
-            productOptionId = cartItem.productOptionId,
-            productName = product.name,
-            optionCode = productOption.optionCode,
-            origin = productOption.origin,
-            grindType = productOption.grindType,
-            weightGrams = productOption.weightGrams,
-            price = productOption.price.toInt(),
-            quantity = cartItem.quantity,
-            totalPrice = productOption.price.toInt() * cartItem.quantity,
-            createdAt = cartItem.createdAt,
-            updatedAt = cartItem.updatedAt
-        )
+        return savedEntity.toDomain()
     }
 
     @Transactional
     override fun deleteByUserId(userId: Long) {
         cartItemJpaRepository.deleteByUserId(userId)
     }
+}
+
+/**
+ * CartItemEntity ↔ CartItem 변환 확장 함수
+ */
+private fun CartItemEntity.toDomain(): CartItem {
+    return CartItem(
+        id = this.id,
+        userId = this.userId,
+        productOptionId = this.productOptionId,
+        quantity = this.quantity,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt
+    )
+}
+
+private fun CartItem.toEntity(): CartItemEntity {
+    return CartItemEntity(
+        id = this.id,
+        userId = this.userId,
+        productOptionId = this.productOptionId,
+        quantity = this.quantity,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt
+    )
 }

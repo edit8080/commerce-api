@@ -10,39 +10,38 @@ import java.time.LocalDateTime
 /**
  * [책임]: Spring Data JPA를 활용한 OrderItem 영속성 처리
  * Infrastructure Layer에 속하며, JPA 기술에 종속적
+ *
+ * [설계 변경]:
+ * - PRODUCT_OPTION과의 JOIN 제거
+ * - ORDER_ITEM 테이블만 조회
  */
 interface OrderItemJpaRepository : JpaRepository<OrderItemEntity, Long> {
     /**
-     * 지정된 기간 동안 가장 많이 주문된 상품 조회
+     * 지정된 기간 동안 상품 옵션별 주문 수량 집계 (ORDER_ITEM만)
      *
-     * [쿼리 로직]:
-     * 1. ORDER_ITEM.created_at >= startDate 필터링
-     * 2. PRODUCT_OPTION과 JOIN (product_option_id)
-     * 3. PRODUCT_OPTION.is_active = true 필터링 (활성 상품만)
-     * 4. product_id별로 quantity 합계 집계
-     * 5. SUM(quantity) DESC 정렬
-     * 6. limit 개수만큼 반환
+     * [설계 변경]:
+     * - PRODUCT_OPTION과의 JOIN 제거
+     * - product_option_id별로 집계
+     * - UseCase에서 PRODUCT 정보와 조합
+     *
+     * @return List<Array<Any>> = [[productOptionId: Long, totalCount: Long], ...]
      */
     @Query("""
-        SELECT po.productId as productId, SUM(oi.quantity) as totalOrderCount
+        SELECT oi.productOptionId, SUM(oi.quantity)
         FROM OrderItemEntity oi
-        INNER JOIN ProductOptionEntity po ON oi.productOptionId = po.id
         WHERE oi.createdAt >= :startDate
-        AND po.isActive = true
-        GROUP BY po.productId
+        GROUP BY oi.productOptionId
         ORDER BY SUM(oi.quantity) DESC
-        LIMIT :limit
     """)
-    fun findTopOrderedProducts(
-        @Param("startDate") startDate: LocalDateTime,
-        @Param("limit") limit: Int
+    fun findTopOrderedProductOptions(
+        @Param("startDate") startDate: LocalDateTime
     ): List<Array<Any>>
 }
 
 /**
  * [책임]: OrderItemRepository 인터페이스 구현체
  * - OrderItemJpaRepository를 활용하여 실제 DB 접근
- * - PRODUCT_OPTION, PRODUCT와 JOIN하여 인기 상품 조회
+ * - ORDER_ITEM 테이블만 조회 (도메인 간 JOIN 제거)
  */
 @Repository
 class OrderItemRepositoryImpl(
@@ -53,12 +52,13 @@ class OrderItemRepositoryImpl(
         return orderItemJpaRepository.saveAll(orderItems).toList()
     }
 
-    override fun findTopOrderedProducts(startDate: LocalDateTime, limit: Int): List<ProductOrderCount> {
-        val results = orderItemJpaRepository.findTopOrderedProducts(startDate, limit)
+    override fun findTopOrderedProductOptions(startDate: LocalDateTime, limit: Int): List<ProductOptionOrderCount> {
+        val results = orderItemJpaRepository.findTopOrderedProductOptions(startDate)
 
-        return results.map { row ->
-            ProductOrderCount(
-                productId = row[0] as Long,
+        // limit 적용하여 상위 N개만 반환
+        return results.take(limit).map { row ->
+            ProductOptionOrderCount(
+                productOptionId = row[0] as Long,
                 totalOrderCount = (row[1] as Number).toInt()
             )
         }

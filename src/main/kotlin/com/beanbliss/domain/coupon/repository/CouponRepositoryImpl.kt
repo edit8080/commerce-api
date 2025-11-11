@@ -91,4 +91,11 @@ class CouponRepositoryImpl(
     override fun save(coupon: CouponEntity): CouponEntity {
         return couponJpaRepository.save(coupon)
     }
+
+    override fun findByIdsBatch(couponIds: List<Long>): List<CouponEntity> {
+        if (couponIds.isEmpty()) {
+            return emptyList()
+        }
+        return couponJpaRepository.findAllById(couponIds)
+    }
 }

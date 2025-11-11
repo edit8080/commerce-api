@@ -37,6 +37,21 @@ interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> 
         WHERE po.id = :productOptionId AND po.isActive = true
     """)
     fun findActiveByIdWithProduct(@Param("productOptionId") productOptionId: Long): Array<Any>?
+
+    /**
+     * 여러 상품 옵션 ID로 활성 상태의 옵션 일괄 조회 (PRODUCT와 INNER JOIN)
+     * N+1 문제 방지를 위한 Batch 쿼리
+     *
+     * @param optionIds 상품 옵션 ID 리스트
+     * @return List<Array<Any>> = [[ProductOptionEntity, ProductEntity], ...]
+     */
+    @Query("""
+        SELECT po, p
+        FROM ProductOptionEntity po
+        INNER JOIN ProductEntity p ON po.productId = p.id
+        WHERE po.id IN :optionIds AND po.isActive = true
+    """)
+    fun findActiveByIdsWithProduct(@Param("optionIds") optionIds: List<Long>): List<Array<Any>>
 }
 
 /**
@@ -60,6 +75,23 @@ class ProductOptionRepositoryImpl(
 
         // ProductOptionDetail로 변환
         return optionEntity.toDetail(productEntity.name)
+    }
+
+    override fun findByIdsBatch(optionIds: List<Long>): List<ProductOptionDetail> {
+        if (optionIds.isEmpty()) {
+            return emptyList()
+        }
+
+        // PRODUCT_OPTION과 PRODUCT를 INNER JOIN하여 Batch 조회
+        val results = productOptionJpaRepository.findActiveByIdsWithProduct(optionIds)
+
+        // ProductOptionDetail 리스트로 변환
+        return results.map { row ->
+            // row = [ProductOptionEntity, ProductEntity]
+            val optionEntity = row[0] as ProductOptionEntity
+            val productEntity = row[1] as ProductEntity
+            optionEntity.toDetail(productEntity.name)
+        }
     }
 }
 

@@ -17,19 +17,31 @@ interface OrderItemRepository {
     fun saveAll(orderItems: List<OrderItemEntity>): List<OrderItemEntity>
 
     /**
-     * 지정된 기간 동안 가장 많이 주문된 상품 조회
+     * 지정된 기간 동안 가장 많이 주문된 상품 옵션 조회 (ORDER 도메인만)
+     *
+     * [설계 변경]:
+     * - PRODUCT_OPTION과의 JOIN 제거
+     * - ORDER_ITEM 테이블만 조회
+     * - 상품 옵션별 주문 수량 반환
+     * - UseCase에서 PRODUCT 정보와 조합
      *
      * [쿼리 로직]:
-     * 1. ORDER_ITEM.created_at >= startDate 필터링 (성능 최적화: JOIN 전 필터링)
-     * 2. PRODUCT_OPTION과 JOIN (product_option_id)
-     * 3. PRODUCT_OPTION.is_active = true 필터링 (활성 상품만)
-     * 4. product_id별로 quantity 합계 집계
-     * 5. SUM(quantity) DESC, product_id ASC 정렬
-     * 6. limit 개수만큼 반환
+     * 1. ORDER_ITEM.created_at >= startDate 필터링
+     * 2. product_option_id별로 quantity 합계 집계
+     * 3. SUM(quantity) DESC 정렬
+     * 4. limit 개수만큼 반환
      *
      * @param startDate 조회 시작 날짜
-     * @param limit 조회할 상품 개수
-     * @return 상품별 주문 수량 목록 (활성 상품만, 정렬됨)
+     * @param limit 조회할 상품 옵션 개수
+     * @return 상품 옵션별 주문 수량 목록 (ORDER 도메인만, 정렬됨)
      */
-    fun findTopOrderedProducts(startDate: LocalDateTime, limit: Int): List<ProductOrderCount>
+    fun findTopOrderedProductOptions(startDate: LocalDateTime, limit: Int): List<ProductOptionOrderCount>
 }
+
+/**
+ * 상품 옵션별 주문 수량 (ORDER 도메인만)
+ */
+data class ProductOptionOrderCount(
+    val productOptionId: Long,
+    val totalOrderCount: Int
+)

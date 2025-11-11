@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.dto
 
-import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.cart.domain.CartItemDetail
 
 /**
  * 주문 생성 데이터

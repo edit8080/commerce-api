@@ -1,48 +1,33 @@
 package com.beanbliss.domain.cart.service
 
-import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.repository.CartItemRepository
-import com.beanbliss.domain.order.exception.CartEmptyException
-import com.beanbliss.domain.order.exception.ProductOptionInactiveException
-import com.beanbliss.domain.product.repository.ProductOptionDetail
-import com.beanbliss.domain.product.repository.ProductOptionRepository
 import com.beanbliss.common.exception.InvalidParameterException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
 
 /**
- * 장바구니 Upsert 결과
+ * [책임]: 장바구니 비즈니스 로직 구현 (CART 도메인만)
  *
- * @property cartItem 추가/수정된 장바구니 아이템 정보
- * @property isNewItem 신규 아이템 여부 (true: 신규 추가, false: 기존 수량 증가)
- */
-data class UpsertCartItemResult(
-    val cartItem: CartItemDetail,
-    val isNewItem: Boolean
-)
-
-/**
- * [책임]: 장바구니 비즈니스 로직 구현
+ * [설계 변경]:
+ * - CART 도메인만 처리
+ * - ProductOptionRepository 의존성 제거
+ * - PRODUCT 정보는 UseCase에서 조합
+ *
+ * [비즈니스 규칙]:
  * - 중복 아이템 처리 (수량 증가)
- * - 최대 수량 제한 검증
+ * - 최대 수량 제한 검증 (999개)
  * - Cart 도메인 내 데이터 관리
- * - 장바구니 아이템 검증 (상품 옵션 활성화 여부)
- * - 장바구니 비우기
  *
  * [트랜잭션]: @Transactional을 통해 원자성 보장
- * - 단일 트랜잭션 내에서 조회 → 저장/수정 수행
- * - 예외 발생 시 자동 롤백
  *
  * [DIP 준수]:
  * - CartItemRepository Interface에만 의존
- * - ProductOptionRepository Interface에만 의존
  */
 @Service
 @Transactional
 class CartService(
-    private val cartItemRepository: CartItemRepository,
-    private val productOptionRepository: ProductOptionRepository
+    private val cartItemRepository: CartItemRepository
 ) {
 
     companion object {
@@ -50,28 +35,41 @@ class CartService(
     }
 
     /**
-     * 장바구니 아이템 추가 또는 수정 (Upsert)
+     * 장바구니 아이템 조회 (CART 도메인만)
+     *
+     * [변경사항]:
+     * - PRODUCT 정보 제거
+     * - CartItem 도메인 모델 반환
+     *
+     * @param userId 사용자 ID
+     * @return 장바구니 아이템 목록 (CART 도메인만, 비어있을 수 있음)
+     */
+    @Transactional(readOnly = true)
+    fun getCartItems(userId: Long): List<CartItem> {
+        return cartItemRepository.findByUserId(userId)
+    }
+
+    /**
+     * 장바구니 아이템 추가 (신규 또는 수량 증가)
      *
      * [비즈니스 규칙]:
      * - 같은 사용자가 같은 상품 옵션을 추가하면 기존 수량 증가
      * - 최대 수량: 999개
+     * - PRODUCT 정보는 UseCase에서 검증
      *
      * @param userId 사용자 ID
-     * @param productOption 상품 옵션 정보
+     * @param productOptionId 상품 옵션 ID
      * @param quantity 추가할 수량
-     * @return 추가/수정된 장바구니 아이템 정보 및 신규 여부
+     * @return 추가/수정된 장바구니 아이템 (isNewItem: 신규 여부)
      * @throws InvalidParameterException 최대 수량 초과 시
      */
-    fun upsertCartItem(
+    fun addCartItem(
         userId: Long,
-        productOption: ProductOptionDetail,
+        productOptionId: Long,
         quantity: Int
-    ): UpsertCartItemResult {
+    ): CartItemUpsertResult {
         // 1. 기존 장바구니 아이템 조회
-        val existingCartItem = cartItemRepository.findByUserIdAndProductOptionId(
-            userId = userId,
-            productOptionId = productOption.optionId
-        )
+        val existingCartItem = cartItemRepository.findByUserIdAndProductOptionId(userId, productOptionId)
 
         return if (existingCartItem != null) {
             // 2-1. 기존 아이템 존재: 수량 증가
@@ -82,10 +80,12 @@ class CartService(
                 throw InvalidParameterException("장바구니 내 동일 옵션의 최대 수량은 ${MAX_QUANTITY}개입니다.")
             }
 
-            // 수량 업데이트 후 UpsertCartItemResult로 래핑 (기존 아이템 수정)
-            val updatedCartItem = cartItemRepository.updateQuantity(existingCartItem.cartItemId, newQuantity)
-            UpsertCartItemResult(
-                cartItem = updatedCartItem,
+            // 수량 업데이트
+            val updatedCartItem = existingCartItem.updateQuantity(newQuantity)
+            val saved = cartItemRepository.save(updatedCartItem)
+
+            CartItemUpsertResult(
+                cartItem = saved,
                 isNewItem = false
             )
         } else {
@@ -96,68 +96,48 @@ class CartService(
             }
 
             // 신규 장바구니 아이템 생성
-            val newCartItem = CartItemDetail(
-                cartItemId = 0L, // 신규 저장 시 0
-                productOptionId = productOption.optionId,
-                productName = productOption.productName,
-                optionCode = productOption.optionCode,
-                origin = productOption.origin,
-                grindType = productOption.grindType,
-                weightGrams = productOption.weightGrams,
-                price = productOption.price,
-                quantity = quantity,
-                totalPrice = productOption.price * quantity,
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+            val newCartItem = CartItem(
+                id = 0L,
+                userId = userId,
+                productOptionId = productOptionId,
+                quantity = quantity
             )
 
-            // 저장 후 UpsertCartItemResult로 래핑 (신규 아이템 생성)
-            val savedCartItem = cartItemRepository.save(newCartItem, userId)
-            UpsertCartItemResult(
-                cartItem = savedCartItem,
+            val saved = cartItemRepository.save(newCartItem)
+
+            CartItemUpsertResult(
+                cartItem = saved,
                 isNewItem = true
             )
         }
     }
 
     /**
-     * 사용자의 장바구니 아이템 목록 조회 (상품 정보 포함)
+     * 장바구니 아이템 수량 업데이트
      *
      * [비즈니스 규칙]:
-     * - 장바구니가 비어 있으면 예외 발생
+     * - 최대 수량: 999개
+     * - 수량은 1개 이상
      *
-     * @param userId 사용자 ID
-     * @return 장바구니 아이템 목록 (상품명, 옵션 코드, 가격 등 포함)
-     * @throws CartEmptyException 장바구니가 비어 있는 경우
+     * @param cartItemId 장바구니 아이템 ID
+     * @param newQuantity 새로운 수량
+     * @return 업데이트된 장바구니 아이템
+     * @throws IllegalArgumentException 장바구니 아이템을 찾을 수 없는 경우
+     * @throws InvalidParameterException 최대 수량 초과 시
      */
-    fun getCartItemsWithProducts(userId: Long): List<CartItemDetail> {
-        // 1. 장바구니 조회
-        val cartItems = cartItemRepository.findByUserId(userId)
-
-        // 2. 빈 장바구니 검증
-        if (cartItems.isEmpty()) {
-            throw CartEmptyException("장바구니가 비어 있습니다.")
+    fun updateCartItemQuantity(cartItemId: Long, newQuantity: Int): CartItem {
+        // 최대 수량 검증
+        if (newQuantity > MAX_QUANTITY) {
+            throw InvalidParameterException("장바구니 내 동일 옵션의 최대 수량은 ${MAX_QUANTITY}개입니다.")
         }
 
-        return cartItems
-    }
+        // 장바구니 아이템 조회
+        val cartItem = cartItemRepository.findById(cartItemId)
+            ?: throw IllegalArgumentException("장바구니 아이템을 찾을 수 없습니다. ID: $cartItemId")
 
-    /**
-     * 장바구니 아이템 검증
-     *
-     * [비즈니스 규칙]:
-     * - 모든 상품 옵션이 활성화되어 있는지 확인
-     *
-     * @param cartItems 검증할 장바구니 아이템 목록
-     * @throws ProductOptionInactiveException 비활성화된 상품 옵션이 포함된 경우
-     */
-    fun validateCartItems(cartItems: List<CartItemDetail>) {
-        cartItems.forEach { cartItem ->
-            val productOption = productOptionRepository.findActiveOptionWithProduct(cartItem.productOptionId)
-            if (productOption == null || !productOption.isActive) {
-                throw ProductOptionInactiveException("비활성화된 상품 옵션이 포함되어 있습니다. 상품 옵션 ID: ${cartItem.productOptionId}")
-            }
-        }
+        // 수량 업데이트
+        val updatedCartItem = cartItem.updateQuantity(newQuantity)
+        return cartItemRepository.save(updatedCartItem)
     }
 
     /**
@@ -172,3 +152,14 @@ class CartService(
         cartItemRepository.deleteByUserId(userId)
     }
 }
+
+/**
+ * 장바구니 Upsert 결과
+ *
+ * @property cartItem 추가/수정된 장바구니 아이템 (CART 도메인만)
+ * @property isNewItem 신규 아이템 여부 (true: 신규 추가, false: 기존 수량 증가)
+ */
+data class CartItemUpsertResult(
+    val cartItem: CartItem,
+    val isNewItem: Boolean
+)

@@ -57,23 +57,25 @@ interface InventoryRepository {
     fun calculateAvailableStockBatch(productOptionIds: List<Long>): Map<Long, Int>
 
     /**
-     * 재고 목록 조회 (상품 정보 포함)
+     * 재고 목록 조회 (INVENTORY 도메인만)
      *
-     * INVENTORY + PRODUCT_OPTION + PRODUCT를 JOIN하여 조회합니다.
-     * N+1 문제를 방지하기 위해 단일 쿼리로 처리합니다.
+     * [설계 변경]:
+     * - PRODUCT_OPTION, PRODUCT와의 JOIN 제거
+     * - INVENTORY 테이블만 조회
+     * - UseCase에서 PRODUCT 정보와 조합
      *
      * @param page 페이지 번호 (1부터 시작)
      * @param size 페이지 크기
-     * @param sortBy 정렬 기준 (예: "created_at")
+     * @param sortBy 정렬 기준 (예: "product_option_id")
      * @param sortDirection 정렬 방향 ("ASC" 또는 "DESC")
-     * @return 재고 목록
+     * @return 재고 목록 (INVENTORY 도메인만)
      */
-    fun findAllWithProductInfo(
+    fun findAll(
         page: Int,
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<InventoryDetail>
+    ): List<Inventory>
 
     /**
      * 전체 재고 개수 조회

@@ -7,7 +7,7 @@ import com.beanbliss.domain.inventory.dto.InventoryAddStockRequest
 import com.beanbliss.domain.inventory.dto.InventoryAddStockResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.dto.InventoryResponse
-import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.inventory.usecase.GetInventoriesUseCase
 import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -21,15 +21,15 @@ import org.springframework.web.bind.annotation.*
  * [책임]:
  * - HTTP 요청 수신 및 응답 처리
  * - 요청 파라미터 바인딩
- * - Service 계층 호출 및 결과 반환
+ * - UseCase 계층 호출 및 결과 반환
  *
  * [DIP 준수]:
- * - InventoryService Interface에만 의존
+ * - UseCase에만 의존
  */
 @RestController
 @RequestMapping("/api/inventories")
 class InventoryController(
-    private val inventoryService: InventoryService,
+    private val getInventoriesUseCase: GetInventoriesUseCase,
     private val inventoryAddStockUseCase: InventoryAddStockUseCase
 ) {
 
@@ -53,11 +53,11 @@ class InventoryController(
         @Max(value = 100, message = "페이지 크기는 100 이하여야 합니다.")
         size: Int
     ): ResponseEntity<ApiResponse<InventoryListResponse>> {
-        // 1. Service 계층에 위임 (도메인 데이터 반환)
-        val serviceResult = inventoryService.getInventories(page, size)
+        // 1. UseCase 계층에 위임 (INVENTORY + PRODUCT 조합 데이터 반환)
+        val useCaseResult = getInventoriesUseCase.getInventories(page, size)
 
-        // 2. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
-        val inventoryResponses = serviceResult.inventories.map { inventory ->
+        // 2. UseCase DTO → Presentation DTO 변환 (Controller 책임)
+        val inventoryResponses = useCaseResult.inventories.map { inventory ->
             InventoryResponse(
                 inventoryId = inventory.inventoryId,
                 productId = inventory.productId,
@@ -72,11 +72,11 @@ class InventoryController(
         }
 
         // 3. 페이징 정보 계산
-        val totalPages = PageCalculator.calculateTotalPages(serviceResult.totalElements, size)
+        val totalPages = PageCalculator.calculateTotalPages(useCaseResult.totalElements, size)
         val pageable = PageableResponse(
             pageNumber = page,
             pageSize = size,
-            totalElements = serviceResult.totalElements,
+            totalElements = useCaseResult.totalElements,
             totalPages = totalPages
         )
         val response = InventoryListResponse(

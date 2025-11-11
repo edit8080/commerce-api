@@ -38,4 +38,16 @@ interface CouponRepository {
      * @return 저장된 쿠폰 Entity (ID 포함)
      */
     fun save(coupon: CouponEntity): CouponEntity
+
+    /**
+     * 여러 쿠폰 ID로 일괄 조회
+     *
+     * [성능 최적화]:
+     * - N+1 문제 방지: WHERE coupon.id IN (...) 사용
+     * - 단일 쿼리로 모든 쿠폰 조회
+     *
+     * @param couponIds 쿠폰 ID 리스트
+     * @return 쿠폰 Entity 리스트 (존재하는 것만 반환)
+     */
+    fun findByIdsBatch(couponIds: List<Long>): List<CouponEntity>
 }
