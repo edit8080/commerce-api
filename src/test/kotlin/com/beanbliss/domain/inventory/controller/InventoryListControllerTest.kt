@@ -3,7 +3,8 @@ package com.beanbliss.domain.inventory.controller
 import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.dto.InventoryResponse
-import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.inventory.usecase.GetInventoriesUseCase
+import com.beanbliss.domain.inventory.usecase.InventoryDetail
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -22,7 +23,7 @@ import java.time.LocalDateTime
  * [검증 목표]:
  * 1. API 엔드포인트가 올바른 경로와 메서드로 매핑되는가?
  * 2. 요청 파라미터가 올바르게 바인딩되는가?
- * 3. Service 결과가 올바른 JSON 형식으로 반환되는가?
+ * 3. UseCase 결과가 올바른 JSON 형식으로 반환되는가?
  * 4. 적절한 HTTP 상태 코드가 반환되는가?
  *
  * [참고]:
@@ -40,7 +41,7 @@ class InventoryListControllerTest {
     private lateinit var mockMvc: MockMvc
 
     @MockkBean
-    private lateinit var inventoryService: InventoryService
+    private lateinit var getInventoriesUseCase: GetInventoriesUseCase
 
     @MockkBean
     private lateinit var inventoryAddStockUseCase: com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
@@ -51,35 +52,36 @@ class InventoryListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockServiceResult = InventoryService.InventoriesResult(
+        val now = LocalDateTime.now()
+        val mockUseCaseResult = GetInventoriesUseCase.InventoriesUseCaseResult(
             inventories = listOf(
-                com.beanbliss.domain.inventory.repository.InventoryDetail(
+                InventoryDetail(
                     inventoryId = 1L,
-                    productId = 1L,
+                    productId = 100L,
                     productName = "에티오피아 예가체프 G1",
                     productOptionId = 1L,
                     optionCode = "ETH-HD-200",
-                    optionName = "핸드드립용 200g",
-                    price = 15000,
+                    optionName = "핸드드립 200g",
+                    price = 21000,
                     stockQuantity = 50,
-                    createdAt = LocalDateTime.of(2025, 11, 4, 10, 30, 0)
+                    createdAt = now
                 ),
-                com.beanbliss.domain.inventory.repository.InventoryDetail(
+                InventoryDetail(
                     inventoryId = 2L,
-                    productId = 1L,
-                    productName = "에티오피아 예가체프 G1",
+                    productId = 101L,
+                    productName = "콜롬비아 수프리모",
                     productOptionId = 2L,
-                    optionCode = "ETH-WB-500",
-                    optionName = "원두 500g",
-                    price = 28000,
+                    optionCode = "COL-ESP-500",
+                    optionName = "에스프레소 500g",
+                    price = 35000,
                     stockQuantity = 30,
-                    createdAt = LocalDateTime.of(2025, 11, 4, 9, 15, 0)
+                    createdAt = now
                 )
             ),
             totalElements = 45L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockServiceResult
+        every { getInventoriesUseCase.getInventories(page, size) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -92,14 +94,14 @@ class InventoryListControllerTest {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.data.content").isArray)
             .andExpect(jsonPath("$.data.content[0].inventoryId").value(1))
-            .andExpect(jsonPath("$.data.content[0].productId").value(1))
+            .andExpect(jsonPath("$.data.content[0].productId").value(100))
             .andExpect(jsonPath("$.data.content[0].productName").value("에티오피아 예가체프 G1"))
             .andExpect(jsonPath("$.data.content[0].productOptionId").value(1))
             .andExpect(jsonPath("$.data.content[0].optionCode").value("ETH-HD-200"))
-            .andExpect(jsonPath("$.data.content[0].optionName").value("핸드드립용 200g"))
-            .andExpect(jsonPath("$.data.content[0].price").value(15000))
+            .andExpect(jsonPath("$.data.content[0].optionName").value("핸드드립 200g"))
+            .andExpect(jsonPath("$.data.content[0].price").value(21000))
             .andExpect(jsonPath("$.data.content[0].stockQuantity").value(50))
-            .andExpect(jsonPath("$.data.content[1].inventoryId").value(2))
+            .andExpect(jsonPath("$.data.content[1].productOptionId").value(2))
             .andExpect(jsonPath("$.data.content[1].stockQuantity").value(30))
             .andExpect(jsonPath("$.data.pageable.pageNumber").value(page))
             .andExpect(jsonPath("$.data.pageable.pageSize").value(size))
@@ -113,12 +115,12 @@ class InventoryListControllerTest {
         // Given
         val defaultPage = 1
         val defaultSize = 10
-        val mockServiceResult = InventoryService.InventoriesResult(
+        val mockUseCaseResult = GetInventoriesUseCase.InventoriesUseCaseResult(
             inventories = emptyList(),
             totalElements = 0L
         )
 
-        every { inventoryService.getInventories(defaultPage, defaultSize) } returns mockServiceResult
+        every { getInventoriesUseCase.getInventories(defaultPage, defaultSize) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -136,12 +138,12 @@ class InventoryListControllerTest {
         // Given
         val page = 1
         val size = 10
-        val mockServiceResult = InventoryService.InventoriesResult(
+        val mockUseCaseResult = GetInventoriesUseCase.InventoriesUseCaseResult(
             inventories = emptyList(),
             totalElements = 0L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockServiceResult
+        every { getInventoriesUseCase.getInventories(page, size) } returns mockUseCaseResult
 
         // When & Then
         mockMvc.perform(
@@ -157,17 +159,17 @@ class InventoryListControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/inventories - Service를 정확한 파라미터로 호출해야 한다")
-    fun `Service를 정확한 파라미터로 호출해야 한다`() {
+    @DisplayName("GET /api/inventories - UseCase를 정확한 파라미터로 호출해야 한다")
+    fun `UseCase를 정확한 파라미터로 호출해야 한다`() {
         // Given
         val page = 2
         val size = 15
-        val mockServiceResult = InventoryService.InventoriesResult(
+        val mockUseCaseResult = GetInventoriesUseCase.InventoriesUseCaseResult(
             inventories = emptyList(),
             totalElements = 0L
         )
 
-        every { inventoryService.getInventories(page, size) } returns mockServiceResult
+        every { getInventoriesUseCase.getInventories(page, size) } returns mockUseCaseResult
 
         // When
         mockMvc.perform(

@@ -1,6 +1,6 @@
 package com.beanbliss.domain.inventory.service
 
-import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository

@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.controller
 
-import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.domain.coupon.service.CouponService
 import com.beanbliss.domain.order.entity.OrderEntity
 import com.beanbliss.domain.order.entity.OrderItemEntity

@@ -4,7 +4,7 @@ import com.beanbliss.common.exception.CommonExceptionHandler
 import com.beanbliss.domain.cart.usecase.AddToCartUseCase
 import com.beanbliss.domain.cart.usecase.AddToCartUseCaseResult
 import com.beanbliss.domain.cart.dto.AddToCartRequest
-import com.beanbliss.domain.cart.repository.CartItemDetail
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.exception.InvalidParameterException
 import com.fasterxml.jackson.databind.ObjectMapper
