@@ -80,7 +80,7 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
         // Then: CART 도메인 정보만 반환 (PRODUCT 정보 없음)
         assertEquals(1, results.size)
         val result = results[0]
-        assertEquals(cartItem.id!!, result.id) // Fixed: Added !!
+        assertEquals(cartItem.id, result.id) // Fixed: Added !!
         assertEquals(testProductOption.id, result.productOptionId)
         assertEquals(testUser.id, result.userId)
         assertEquals(2, result.quantity)
@@ -173,7 +173,7 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
         // When: 수량 업데이트 (save 메서드 사용)
         val now = java.time.LocalDateTime.now()
         val updatedCartItem = com.beanbliss.domain.cart.domain.CartItem(
-            id = cartItem.id!!, // Fixed: Added !!
+            id = cartItem.id,
             userId = testUser.id,
             productOptionId = testProductOption.id,
             quantity = 10,

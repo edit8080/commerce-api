@@ -63,21 +63,6 @@ class ReserveOrderUseCaseTest {
             isActive = true
         )
 
-        val cartItemDetail = CartItemDetail(
-            cartItemId = 1L,
-            productOptionId = 10L,
-            productName = "에티오피아 예가체프 G1",
-            optionCode = "ETH-HD-200",
-            origin = "에티오피아",
-            grindType = "홀빈",
-            weightGrams = 200,
-            price = 15000,
-            quantity = 2,
-            totalPrice = 30000,
-            createdAt = now,
-            updatedAt = now
-        )
-
         val reservationEntity = InventoryReservationEntity(
             id = 1001L,
             productOptionId = 10L,
