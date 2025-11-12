@@ -32,7 +32,6 @@ dependencies {
 
 	// Database
 	runtimeOnly("com.mysql:mysql-connector-j")
-	implementation("com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0")
 
 	// Test
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
