@@ -87,7 +87,7 @@ class CartAddControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isCreated) // 201 Created
+            .andExpect(status().isOk) // 200 OK (ApiResponse로 통일)
             .andExpect(jsonPath("$.data.cartItemId").value(100))
             .andExpect(jsonPath("$.data.productOptionId").value(1))
             .andExpect(jsonPath("$.data.productName").value("에티오피아 예가체프 G1"))
