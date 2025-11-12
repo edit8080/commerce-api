@@ -24,6 +24,24 @@ interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> 
     fun findByProductIdAndIsActiveTrue(@Param("productId") productId: Long): List<ProductOptionEntity>
 
     /**
+     * 여러 상품 ID로 활성 옵션 일괄 조회 (Batch 조회로 N+1 문제 해결)
+     *
+     * [성능 최적화]:
+     * - IN 절을 사용하여 단일 쿼리로 모든 옵션 조회
+     * - N+1 문제 해결: N번의 쿼리 → 1번의 쿼리
+     *
+     * @param productIds 상품 ID 목록
+     * @return 활성 상태의 옵션 목록 (정렬됨)
+     */
+    @Query("""
+        SELECT po
+        FROM ProductOptionEntity po
+        WHERE po.productId IN :productIds AND po.isActive = true
+        ORDER BY po.productId ASC, po.weightGrams ASC, po.grindType ASC
+    """)
+    fun findByProductIdInAndIsActiveTrue(@Param("productIds") productIds: List<Long>): List<ProductOptionEntity>
+
+    /**
      * 상품 옵션 ID로 활성 상태의 옵션 조회 (PRODUCT와 INNER JOIN)
      * N+1 문제 방지를 위한 단일 쿼리
      *
