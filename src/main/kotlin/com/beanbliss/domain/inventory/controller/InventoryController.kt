@@ -9,6 +9,9 @@ import com.beanbliss.domain.inventory.dto.InventoryListResponse
 import com.beanbliss.domain.inventory.dto.InventoryResponse
 import com.beanbliss.domain.inventory.usecase.GetInventoriesUseCase
 import com.beanbliss.domain.inventory.usecase.InventoryAddStockUseCase
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.*
  */
 @RestController
 @RequestMapping("/api/inventories")
+@Tag(name = "재고 관리", description = "재고 조회 및 추가 API")
 class InventoryController(
     private val getInventoriesUseCase: GetInventoriesUseCase,
     private val inventoryAddStockUseCase: InventoryAddStockUseCase
@@ -43,11 +47,14 @@ class InventoryController(
      * @return 재고 목록 + 페이징 정보
      */
     @GetMapping
+    @Operation(summary = "재고 목록 조회", description = "상품별 재고 목록 조회 (페이지네이션)")
     fun getInventories(
+        @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
         @RequestParam(defaultValue = "1")
         @Min(value = 1, message = "페이지 번호는 1 이상이어야 합니다.")
         page: Int,
 
+        @Parameter(description = "페이지 크기 (1-100)", example = "10")
         @RequestParam(defaultValue = "10")
         @Min(value = 1, message = "페이지 크기는 1 이상이어야 합니다.")
         @Max(value = 100, message = "페이지 크기는 100 이하여야 합니다.")
@@ -98,7 +105,9 @@ class InventoryController(
      * @return 재고 추가 결과 (상품 옵션 ID, 현재 재고 수량)
      */
     @PostMapping("/{productOptionId}/add")
+    @Operation(summary = "재고 추가", description = "상품 옵션의 재고를 추가")
     fun addStock(
+        @Parameter(description = "상품 옵션 ID", example = "1")
         @PathVariable productOptionId: Long,
         @Valid @RequestBody request: InventoryAddStockRequest
     ): ResponseEntity<ApiResponse<InventoryAddStockResponse>> {
