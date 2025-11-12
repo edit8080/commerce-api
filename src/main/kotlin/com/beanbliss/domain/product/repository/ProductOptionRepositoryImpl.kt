@@ -28,7 +28,7 @@ interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> 
      * N+1 문제 방지를 위한 단일 쿼리
      *
      * @param productOptionId 상품 옵션 ID
-     * @return Array<Any> = [ProductOptionEntity, ProductEntity] (없으면 null)
+     * @return List<Array<Any>> = [[ProductOptionEntity, ProductEntity]] (빈 리스트면 없음)
      */
     @Query("""
         SELECT po, p
@@ -36,7 +36,7 @@ interface ProductOptionJpaRepository : JpaRepository<ProductOptionEntity, Long> 
         INNER JOIN ProductEntity p ON po.productId = p.id
         WHERE po.id = :productOptionId AND po.isActive = true
     """)
-    fun findActiveByIdWithProduct(@Param("productOptionId") productOptionId: Long): Array<Any>?
+    fun findActiveByIdWithProduct(@Param("productOptionId") productOptionId: Long): List<Array<Any>>
 
     /**
      * 여러 상품 옵션 ID로 활성 상태의 옵션 일괄 조회 (PRODUCT와 INNER JOIN)
@@ -66,10 +66,15 @@ class ProductOptionRepositoryImpl(
 
     override fun findActiveOptionWithProduct(productOptionId: Long): ProductOptionDetail? {
         // PRODUCT_OPTION과 PRODUCT를 INNER JOIN하여 단일 쿼리로 조회
-        val result = productOptionJpaRepository.findActiveByIdWithProduct(productOptionId)
-            ?: return null
+        val results = productOptionJpaRepository.findActiveByIdWithProduct(productOptionId)
+
+        // 결과가 없으면 null 반환
+        if (results.isEmpty()) {
+            return null
+        }
 
         // result = [ProductOptionEntity, ProductEntity]
+        val result = results[0]
         val optionEntity = result[0] as ProductOptionEntity
         val productEntity = result[1] as ProductEntity
 

@@ -163,6 +163,60 @@ class GetPopularProductsUseCaseTest {
     }
 
     @Test
+    @DisplayName("비활성 옵션은 ProductOptionService에서 필터링되어 최종 결과에서 제외되어야 한다 (도메인 분리)")
+    fun `비활성 옵션은 ProductOptionService에서 필터링되어 최종 결과에서 제외되어야 한다`() {
+        // Given
+        val period = 7
+        val limit = 10
+
+        // ORDER 도메인: 비활성 옵션(2L)을 포함한 주문 수량 데이터 반환
+        // (OrderItemRepository는 도메인 분리 원칙에 따라 모든 옵션 반환)
+        val optionOrderCounts = listOf(
+            ProductOptionOrderCount(productOptionId = 1L, totalOrderCount = 100), // 활성
+            ProductOptionOrderCount(productOptionId = 2L, totalOrderCount = 80),  // 비활성 (필터링 대상)
+            ProductOptionOrderCount(productOptionId = 3L, totalOrderCount = 120)  // 활성
+        )
+
+        // PRODUCT 도메인: ProductOptionRepository.findByIdsBatch()가
+        // isActive=true인 옵션만 반환 (도메인 책임에 따라 비활성 필터링)
+        val productOptions = mapOf(
+            1L to ProductOptionDetail(1L, 1L, "상품1", "OPT-1", "origin1", "원두", 200, 10000, true),
+            // 2L은 비활성이므로 ProductOptionService에서 제외됨
+            3L to ProductOptionDetail(3L, 2L, "상품2", "OPT-3", "origin2", "원두", 200, 10000, true)
+        )
+
+        val productInfos = listOf(
+            ProductBasicInfo(1L, "상품1", "브랜드1", "설명1"),
+            ProductBasicInfo(2L, "상품2", "브랜드2", "설명2")
+        )
+
+        every { orderService.getTopOrderedProductOptions(period, limit * 10) } returns optionOrderCounts
+        every { productOptionService.getOptionsBatch(listOf(1L, 2L, 3L)) } returns productOptions
+        // 주문 수량 정렬 후: 상품2(120) > 상품1(100) 순서
+        every { productService.getProductsByIds(listOf(2L, 1L)) } returns productInfos
+
+        // When
+        val result = useCase.getPopularProducts(period, limit)
+
+        // Then
+        // [TDD 검증 목표 9]: 비활성 옵션(2L)이 최종 결과에서 제외되었는가?
+        assertEquals(2, result.size)
+
+        // 상품2: 옵션3(120) = 120 (주문 수 많은 순)
+        assertEquals(2L, result[0].productId)
+        assertEquals(120, result[0].totalOrderCount)
+
+        // 상품1: 옵션1(100) = 100
+        assertEquals(1L, result[1].productId)
+        assertEquals(100, result[1].totalOrderCount)
+
+        // [TDD 검증 목표 10]: 모든 Service가 올바르게 호출되었는가?
+        verify(exactly = 1) { orderService.getTopOrderedProductOptions(period, limit * 10) }
+        verify(exactly = 1) { productOptionService.getOptionsBatch(listOf(1L, 2L, 3L)) }
+        verify(exactly = 1) { productService.getProductsByIds(listOf(2L, 1L)) }
+    }
+
+    @Test
     @DisplayName("ProductService에서 일부 상품 정보가 누락되면 데이터 정합성 오류로 예외가 발생해야 한다")
     fun `ProductService에서 일부 상품 정보가 누락되면 데이터 정합성 오류로 예외가 발생해야 한다`() {
         // Given

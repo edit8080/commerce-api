@@ -19,10 +19,10 @@ interface OrderItemJpaRepository : JpaRepository<OrderItemEntity, Long> {
     /**
      * 지정된 기간 동안 상품 옵션별 주문 수량 집계 (ORDER_ITEM만)
      *
-     * [설계 변경]:
+     * [도메인 분리 원칙]:
      * - PRODUCT_OPTION과의 JOIN 제거
-     * - product_option_id별로 집계
-     * - UseCase에서 PRODUCT 정보와 조합
+     * - ORDER 도메인만 조회
+     * - 활성/비활성 필터링은 UseCase에서 처리
      *
      * @return List<Array<Any>> = [[productOptionId: Long, totalCount: Long], ...]
      */

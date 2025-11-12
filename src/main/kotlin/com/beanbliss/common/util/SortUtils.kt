@@ -12,6 +12,14 @@ import org.springframework.data.domain.Sort
  */
 object SortUtils {
 
+    private fun snakeCaseToCamelCase(snakeCaseString: String): String {
+        return snakeCaseString.split('_')
+            .mapIndexed { index, s ->
+                if (index == 0) s else s.replaceFirstChar { it.uppercase() }
+            }
+            .joinToString("")
+    }
+
     /**
      * Sort 객체 생성
      *
@@ -29,6 +37,7 @@ object SortUtils {
         } else {
             Sort.Direction.ASC
         }
-        return Sort.by(direction, sortBy)
+        val camelCaseSortBy = snakeCaseToCamelCase(sortBy) // Convert to camelCase
+        return Sort.by(direction, camelCaseSortBy)
     }
 }

@@ -31,15 +31,6 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
      */
     override fun count(): Long
 
-    /**
-     * 재고 목록 조회 (INVENTORY만, PRODUCT JOIN 제거)
-     *
-     * [설계 변경]:
-     * - PRODUCT_OPTION, PRODUCT와의 JOIN 제거
-     * - INVENTORY 테이블만 조회
-     * - DB 레벨 정렬 및 페이징
-     */
-    fun findAllByOrderBy(pageable: Pageable): Page<InventoryEntity>
 
     /**
      * 특정 상품 옵션의 가용 재고 계산 (INVENTORY_RESERVATION과 LEFT JOIN)
@@ -48,7 +39,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
      * WHERE INVENTORY_RESERVATION.status IN ('RESERVED', 'CONFIRMED')
      *
      * @param productOptionId 상품 옵션 ID
-     * @return Array<Any> = [stockQuantity: Int, reservedQuantity: Long]
+     * @return List<Array<Any>> = [[stockQuantity: Int, reservedQuantity: Long]]
      */
     @Query("""
         SELECT i.stockQuantity, COALESCE(SUM(ir.quantity), 0)
@@ -58,7 +49,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         WHERE i.productOptionId = :productOptionId
         GROUP BY i.productOptionId, i.stockQuantity
     """)
-    fun calculateAvailableStockForOption(@Param("productOptionId") productOptionId: Long): Array<Any>?
+    fun calculateAvailableStockForOption(@Param("productOptionId") productOptionId: Long): List<Array<Any>>
 
     /**
      * 여러 상품 옵션의 가용 재고를 한 번에 계산 (Batch 조회)
@@ -91,12 +82,17 @@ class InventoryRepositoryImpl(
 
     override fun calculateAvailableStock(productOptionId: Long): Int {
         // INVENTORY와 INVENTORY_RESERVATION을 LEFT JOIN하여 단일 쿼리로 조회
-        val result = inventoryJpaRepository.calculateAvailableStockForOption(productOptionId)
-            ?: return 0
+        val results = inventoryJpaRepository.calculateAvailableStockForOption(productOptionId)
 
-        // result = [stockQuantity: Int, reservedQuantity: Long]
+        // 빈 결과 체크
+        if (results.isEmpty()) {
+            return 0
+        }
+
+        // result = [stockQuantity: Int, reservedQuantity: Number]
+        val result = results[0]
         val stockQuantity = result[0] as Int
-        val reservedQuantity = (result[1] as Long).toInt()
+        val reservedQuantity = (result[1] as Number).toInt()
 
         // 가용 재고 = 실제 재고 - 예약된 수량
         return stockQuantity - reservedQuantity
@@ -112,10 +108,10 @@ class InventoryRepositoryImpl(
 
         // Map<productOptionId, availableStock> 변환
         return results.associate { row ->
-            // row = [productOptionId: Long, stockQuantity: Int, reservedQuantity: Long]
+            // row = [productOptionId: Long, stockQuantity: Int, reservedQuantity: Number]
             val productOptionId = row[0] as Long
             val stockQuantity = row[1] as Int
-            val reservedQuantity = (row[2] as Long).toInt()
+            val reservedQuantity = (row[2] as Number).toInt()
             val availableStock = stockQuantity - reservedQuantity
 
             productOptionId to availableStock
@@ -133,7 +129,7 @@ class InventoryRepositoryImpl(
 
         // 2. DB 레벨에서 정렬 및 페이징 적용하여 재고 조회 (INVENTORY만)
         val pageRequest = PageRequest.of(page - 1, size, sort)
-        val results = inventoryJpaRepository.findAllByOrderBy(pageRequest).content
+        val results = inventoryJpaRepository.findAll(pageRequest).content
 
         // 3. Inventory 도메인 모델로 변환
         return results.map { entity ->

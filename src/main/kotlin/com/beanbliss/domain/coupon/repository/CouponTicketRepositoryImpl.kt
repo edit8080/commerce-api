@@ -37,20 +37,21 @@ interface CouponTicketJpaRepository : JpaRepository<CouponTicketEntity, Long> {
     /**
      * 티켓 상태 업데이트
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE CouponTicketEntity ct
         SET ct.status = :status,
             ct.userId = :userId,
             ct.userCouponId = :userCouponId,
-            ct.issuedAt = CURRENT_TIMESTAMP
+            ct.issuedAt = :issuedAt
         WHERE ct.id = :ticketId
     """)
     fun updateTicketAsIssued(
         @Param("ticketId") ticketId: Long,
         @Param("userId") userId: Long,
         @Param("userCouponId") userCouponId: Long,
-        @Param("status") status: CouponTicketStatus
+        @Param("status") status: CouponTicketStatus,
+        @Param("issuedAt") issuedAt: java.time.LocalDateTime
     )
 
     /**
@@ -97,14 +98,18 @@ class CouponTicketRepositoryImpl(
     }
 
     @Transactional
-    @Modifying
     override fun updateTicketAsIssued(ticketId: Long, userId: Long, userCouponId: Long) {
-        couponTicketJpaRepository.updateTicketAsIssued(
-            ticketId,
-            userId,
-            userCouponId,
-            CouponTicketStatus.ISSUED
-        )
+        // getReferenceById를 사용하여 프록시 대신 실제 엔티티 가져오기
+        val ticket = couponTicketJpaRepository.getReferenceById(ticketId)
+
+        // 엔티티 필드 직접 수정 (JPA dirty checking)
+        ticket.userId = userId
+        ticket.userCouponId = userCouponId
+        ticket.status = CouponTicketStatus.ISSUED
+        ticket.issuedAt = java.time.LocalDateTime.now()
+
+        // save() 호출 불필요 - JPA가 자동으로 UPDATE 수행
+        couponTicketJpaRepository.flush()  // 명시적 flush로 즉시 DB 반영
     }
 
     override fun countAvailableTickets(couponId: Long): Int {
