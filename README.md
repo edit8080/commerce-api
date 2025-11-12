@@ -110,3 +110,73 @@ src/
             └── service/                  # Domain Layer 테스트
 ```
 
+## 시작하기
+
+### 개발 환경 설정
+
+#### 1. 사전 요구사항
+- Java 17 이상
+- MySQL 8.0 이상
+- Gradle 8.x
+
+#### 2. 데이터베이스 설정
+
+```bash
+# MySQL에서 commerce 데이터베이스 생성
+mysql -u root -p -e "CREATE DATABASE commerce CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+#### 3. 애플리케이션 실행
+
+##### 프로덕션 환경 (기본)
+```bash
+./gradlew bootRun
+```
+
+##### 개발 환경 (dev 프로파일 - 더미 데이터 자동 생성)
+```bash
+./gradlew bootRun --args="--spring.profiles.active=dev"
+```
+
+---
+
+## 더미 데이터 초기화
+
+### 개요
+
+dev 프로파일로 애플리케이션을 실행하면 **자동으로 더미 데이터가 생성**됩니다.
+
+이는 `ApplicationReadyEvent`를 기반으로 한 `DataInitializer` 클래스에 기반합니다.
+
+### 생성되는 데이터
+
+각 엔티티별로 **100건씩** 생성됩니다:
+
+| 엔티티 | 수량 | 설명 |
+|--------|------|------|
+| **User** | 100명 | `user1@beanbliss.com` ~ `user100@beanbliss.com` |
+| **Balance** | 100개 | 각 사용자마다 초기 잔액 100,000원 |
+| **Product** | 100개 | 다양한 커피 브랜드 상품 |
+| **ProductOption** | 300개 | 상품당 3개 옵션 (250g, 500g, 1kg) |
+| **Inventory** | 300개 | 옵션당 1,000개 초기 재고 |
+| **Coupon** | 100개 | 정률/정액 할인 쿠폰 (혼합) |
+| **CouponTicket** | 10,000개 | 쿠폰당 100개 선착순 티켓 |
+| **CartItem** | 100개 | 사용자별 장바구니 상품 |
+| **Order** | 100개 | 다양한 주문 상태 (결제완료, 배송준비, 배송중, 완료) |
+| **OrderItem** | 100~300개 | 주문당 1~3개 상품 |
+| **InventoryReservation** | 50개 | 주문에 대한 재고 예약 |
+
+### 실행 방법
+
+#### dev 프로파일로 애플리케이션 시작
+
+```bash
+./gradlew bootRun --args="--spring.profiles.active=dev"
+```
+
+#### 더미 데이터 리셋 (초기화)
+
+```bash
+# MySQL에서 데이터베이스 삭제 및 재생성
+mysql -u root -p -e "DROP DATABASE commerce; CREATE DATABASE commerce CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
