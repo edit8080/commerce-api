@@ -27,7 +27,15 @@ import java.time.LocalDateTime
  * - USER_COUPON 1:1 ORDER (nullable, mappedBy)
  */
 @Entity
-@Table(name = "user_coupon")
+@Table(
+    name = "user_coupon",
+    indexes = [
+        Index(name = "idx_user_id", columnList = "user_id"),
+        Index(name = "idx_user_status", columnList = "user_id, status"),
+        Index(name = "idx_user_coupon_id", columnList = "user_id, coupon_id"),
+        Index(name = "idx_created_at", columnList = "created_at")
+    ]
+)
 class UserCouponEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -22,7 +22,13 @@ import java.time.LocalDateTime
  * - CART_ITEM N:1 PRODUCT_OPTION
  */
 @Entity
-@Table(name = "cart_item")
+@Table(
+    name = "cart_item",
+    indexes = [
+        Index(name = "idx_user_id", columnList = "user_id"),
+        Index(name = "idx_user_product", columnList = "user_id, product_option_id")
+    ]
+)
 class CartItemEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

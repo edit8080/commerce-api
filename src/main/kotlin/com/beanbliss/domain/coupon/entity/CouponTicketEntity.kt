@@ -28,7 +28,14 @@ import java.time.LocalDateTime
  * - FOR UPDATE SKIP LOCKED로 동시 발급 처리
  */
 @Entity
-@Table(name = "coupon_ticket")
+@Table(
+    name = "coupon_ticket",
+    indexes = [
+        Index(name = "idx_coupon_status_user", columnList = "coupon_id, status, user_id"),
+        Index(name = "idx_coupon_available", columnList = "coupon_id, status"),
+        Index(name = "idx_status_user", columnList = "status, user_id")
+    ]
+)
 class CouponTicketEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

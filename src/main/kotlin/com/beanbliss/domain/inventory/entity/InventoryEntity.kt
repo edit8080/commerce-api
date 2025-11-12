@@ -22,7 +22,12 @@ import java.time.LocalDateTime
  * - PRODUCT_OPTION과 분리하여 Lock 적용 용이
  */
 @Entity
-@Table(name = "inventory")
+@Table(
+    name = "inventory",
+    indexes = [
+        Index(name = "idx_product_option_id", columnList = "product_option_id")
+    ]
+)
 class InventoryEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

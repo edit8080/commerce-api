@@ -26,7 +26,13 @@ import java.time.LocalDateTime
  * - 주문 당시 가격을 unit_price에 저장하여 가격 변동에 대비 (snapshot)
  */
 @Entity
-@Table(name = "order_item")
+@Table(
+    name = "order_item",
+    indexes = [
+        Index(name = "idx_order_id", columnList = "order_id"),
+        Index(name = "idx_product_option_id", columnList = "product_option_id")
+    ]
+)
 class OrderItemEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -32,7 +32,14 @@ import java.time.LocalDateTime
  * - 금액 필드들은 계산 가능하지만 성능 최적화와 이력 관리를 위해 별도 저장
  */
 @Entity
-@Table(name = "`order`")
+@Table(
+    name = "`order`",
+    indexes = [
+        Index(name = "idx_user_id", columnList = "user_id"),
+        Index(name = "idx_user_status", columnList = "user_id, status"),
+        Index(name = "idx_created_at", columnList = "created_at")
+    ]
+)
 class OrderEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

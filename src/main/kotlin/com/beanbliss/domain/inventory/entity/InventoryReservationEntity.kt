@@ -29,9 +29,17 @@ import java.time.LocalDateTime
  *   - Phase 2 (차감): 결제 시 비관적 락으로 실제 재고 차감
  * - 사용자 경험 향상: 주문창 진입 시 "내 재고"를 10분간 보장
  * - 악의적 선점 방지: 타임아웃(10분) + 1인 1회 제한
+ *
  */
 @Entity
-@Table(name = "inventory_reservation")
+@Table(
+    name = "inventory_reservation",
+    indexes = [
+        Index(name = "idx_user_status_expires", columnList = "user_id, status, expires_at"),
+        Index(name = "idx_product_status", columnList = "product_option_id, status"),
+        Index(name = "idx_user_status_expires_qty", columnList = "user_id, status, expires_at, quantity")
+    ]
+)
 class InventoryReservationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
