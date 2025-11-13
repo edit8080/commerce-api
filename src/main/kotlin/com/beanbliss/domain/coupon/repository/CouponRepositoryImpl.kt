@@ -28,9 +28,7 @@ interface CouponJpaRepository : JpaRepository<CouponEntity, Long> {
         LEFT JOIN CouponTicketEntity ct ON ct.couponId = c.id
             AND ct.status = 'AVAILABLE'
             AND ct.userId IS NULL
-        GROUP BY c.id, c.name, c.discountType, c.discountValue, c.minOrderAmount,
-                 c.maxDiscountAmount, c.totalQuantity, c.validFrom, c.validUntil,
-                 c.createdAt, c.updatedAt
+        GROUP BY c.id
     """)
     fun findAllCouponsWithRemainingQuantity(pageable: Pageable): Page<Array<Any>>
 }

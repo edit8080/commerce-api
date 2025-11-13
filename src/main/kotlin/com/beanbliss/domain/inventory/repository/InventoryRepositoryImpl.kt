@@ -47,7 +47,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         LEFT JOIN InventoryReservationEntity ir ON ir.productOptionId = i.productOptionId
             AND ir.status IN ('RESERVED', 'CONFIRMED')
         WHERE i.productOptionId = :productOptionId
-        GROUP BY i.productOptionId, i.stockQuantity
+        GROUP BY i.productOptionId
     """)
     fun calculateAvailableStockForOption(@Param("productOptionId") productOptionId: Long): List<Array<Any>>
 
@@ -65,7 +65,7 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         LEFT JOIN InventoryReservationEntity ir ON ir.productOptionId = i.productOptionId
             AND ir.status IN ('RESERVED', 'CONFIRMED')
         WHERE i.productOptionId IN :productOptionIds
-        GROUP BY i.productOptionId, i.stockQuantity
+        GROUP BY i.productOptionId
     """)
     fun calculateAvailableStockBatchForOptions(@Param("productOptionIds") productOptionIds: List<Long>): List<Array<Any>>
 }
