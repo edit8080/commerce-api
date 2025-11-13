@@ -1,11 +1,11 @@
 package com.beanbliss.domain.coupon.service
 
 import com.beanbliss.domain.coupon.entity.CouponTicketEntity
+import com.beanbliss.domain.coupon.entity.CouponTicketStatus
 import com.beanbliss.domain.coupon.exception.CouponOutOfStockException
 import com.beanbliss.domain.coupon.repository.CouponTicketRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
 
 /**
  * [책임]: 쿠폰 티켓 비즈니스 로직 처리
@@ -24,14 +24,8 @@ class CouponTicketService(
         // 1. totalQuantity만큼 CouponTicketEntity 생성
         val tickets = (1..totalQuantity).map {
             CouponTicketEntity(
-                id = null, // Auto-generated
                 couponId = couponId,
-                status = "AVAILABLE",
-                userId = null, // 발급 전이므로 null
-                userCouponId = null, // 발급 전이므로 null
-                issuedAt = null,
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+                status = CouponTicketStatus.AVAILABLE
             )
         }
 

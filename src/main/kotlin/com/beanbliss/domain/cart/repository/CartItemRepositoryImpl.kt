@@ -1,94 +1,111 @@
 package com.beanbliss.domain.cart.repository
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.entity.CartItemEntity
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
-import java.time.LocalDateTime
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import org.springframework.transaction.annotation.Transactional
 
 /**
- * [책임]: 장바구니 아이템 In-memory 저장소 구현
- * - ConcurrentHashMap을 사용하여 Thread-safe 보장
- * - AtomicLong을 사용하여 ID 자동 생성
+ * [책임]: Spring Data JPA를 활용한 CartItem 영속성 처리
+ * Infrastructure Layer에 속하며, JPA 기술에 종속적
  *
- * [주의사항]:
- * - 애플리케이션 재시작 시 데이터 소실 (In-memory 특성)
- * - 실제 DB 사용 시 JPA 기반 구현체로 교체 필요
+ * [설계 변경]:
+ * - 도메인 간 JOIN 제거: CART_ITEM 테이블만 조회
+ * - PRODUCT_OPTION, PRODUCT와의 JOIN 제거
  */
-@Repository
-class CartItemRepositoryImpl : CartItemRepository {
-
-    // Thread-safe한 In-memory 저장소
-    private val cartItems = ConcurrentHashMap<Long, CartItemEntity>()
-
-    // 자동 증가 ID 생성기
-    private val idGenerator = AtomicLong(1L)
-
-    override fun findByUserId(userId: Long): List<CartItemResponse> {
-        return cartItems.values
-            .filter { it.userId == userId }
-            .map { it.toResponse() }
-    }
-
-    override fun findByUserIdAndProductOptionId(
-        userId: Long,
-        productOptionId: Long
-    ): CartItemResponse? {
-        return cartItems.values
-            .firstOrNull { it.userId == userId && it.productOptionId == productOptionId }
-            ?.toResponse()
-    }
-
-    override fun save(cartItem: CartItemResponse, userId: Long): CartItemResponse {
-        val now = LocalDateTime.now()
-
-        // 신규 저장: ID가 0이면 새 ID 생성
-        val id = if (cartItem.cartItemId == 0L) {
-            idGenerator.getAndIncrement()
-        } else {
-            cartItem.cartItemId
-        }
-
-        val entity = CartItemEntity(
-            id = id,
-            userId = userId,
-            productOptionId = cartItem.productOptionId,
-            productName = cartItem.productName,
-            optionCode = cartItem.optionCode,
-            origin = cartItem.origin,
-            grindType = cartItem.grindType,
-            weightGrams = cartItem.weightGrams,
-            price = cartItem.price,
-            quantity = cartItem.quantity,
-            createdAt = if (cartItem.cartItemId == 0L) now else cartItem.createdAt,
-            updatedAt = now
-        )
-
-        cartItems[id] = entity
-        return entity.toResponse()
-    }
-
-    override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItemResponse {
-        val entity = cartItems[cartItemId]
-            ?: throw IllegalArgumentException("장바구니 아이템을 찾을 수 없습니다. ID: $cartItemId")
-
-        // 수량 업데이트
-        entity.quantity = newQuantity
-        entity.updatedAt = LocalDateTime.now()
-
-        return entity.toResponse()
-    }
-
-    override fun deleteByUserId(userId: Long) {
-        cartItems.values.removeIf { it.userId == userId }
-    }
+interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
+    /**
+     * 사용자 ID로 장바구니 아이템 조회 (CART_ITEM만)
+     *
+     * @param userId 사용자 ID
+     * @return CartItemEntity 리스트
+     */
+    fun findByUserId(userId: Long): List<CartItemEntity>
 
     /**
-     * 테스트용 헬퍼 메서드: 모든 데이터 삭제
+     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회 (CART_ITEM만)
+     *
+     * @param userId 사용자 ID
+     * @param productOptionId 상품 옵션 ID
+     * @return CartItemEntity (없으면 null)
      */
-    fun clear() {
-        cartItems.clear()
-        idGenerator.set(1L)
+    fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemEntity?
+
+    /**
+     * 사용자의 모든 장바구니 아이템 삭제
+     */
+    @Modifying
+    @Query("DELETE FROM CartItemEntity c WHERE c.userId = :userId")
+    fun deleteByUserId(@Param("userId") userId: Long)
+}
+
+/**
+ * [책임]: CartItemRepository 인터페이스 구현체
+ * - CartItemJpaRepository를 활용하여 실제 DB 접근
+ * - CART_ITEM 테이블만 조회 (도메인 간 JOIN 제거)
+ * - Entity ↔ Domain Model 변환 담당
+ */
+@Repository
+class CartItemRepositoryImpl(
+    private val cartItemJpaRepository: CartItemJpaRepository
+) : CartItemRepository {
+
+    override fun findByUserId(userId: Long): List<CartItem> {
+        // CART_ITEM만 조회 (JOIN 제거)
+        val entities = cartItemJpaRepository.findByUserId(userId)
+        return entities.map { it.toDomain() }
     }
+
+    override fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItem? {
+        // CART_ITEM만 조회 (JOIN 제거)
+        val entity = cartItemJpaRepository.findByUserIdAndProductOptionId(userId, productOptionId)
+            ?: return null
+        return entity.toDomain()
+    }
+
+    override fun findById(cartItemId: Long): CartItem? {
+        val entity = cartItemJpaRepository.findById(cartItemId).orElse(null)
+            ?: return null
+        return entity.toDomain()
+    }
+
+    override fun save(cartItem: CartItem): CartItem {
+        val entity = cartItem.toEntity()
+        val savedEntity = cartItemJpaRepository.save(entity)
+        return savedEntity.toDomain()
+    }
+
+    @Transactional
+    override fun deleteByUserId(userId: Long) {
+        cartItemJpaRepository.deleteByUserId(userId)
+    }
+}
+
+/**
+ * CartItemEntity ↔ CartItem 변환 확장 함수
+ */
+private fun CartItemEntity.toDomain(): CartItem {
+    return CartItem(
+        id = this.id,
+        userId = this.userId,
+        productOptionId = this.productOptionId,
+        quantity = this.quantity,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt
+    )
+}
+
+private fun CartItem.toEntity(): CartItemEntity {
+    return CartItemEntity(
+        id = this.id,
+        userId = this.userId,
+        productOptionId = this.productOptionId,
+        quantity = this.quantity,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt
+    )
 }

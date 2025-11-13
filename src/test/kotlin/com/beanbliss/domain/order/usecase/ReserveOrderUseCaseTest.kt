@@ -1,10 +1,13 @@
 package com.beanbliss.domain.order.usecase
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItem
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.service.InventoryService
+import com.beanbliss.domain.product.repository.ProductOptionDetail
+import com.beanbliss.domain.product.service.ProductOptionService
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.user.service.UserService
 import io.mockk.*
@@ -24,35 +27,40 @@ class ReserveOrderUseCaseTest {
 
     private val userService: UserService = mockk()
     private val cartService: CartService = mockk()
+    private val productOptionService: ProductOptionService = mockk()
     private val productService: ProductService = mockk()
     private val inventoryService: InventoryService = mockk()
     private val reserveOrderUseCase = ReserveOrderUseCase(
-        userService, cartService, productService, inventoryService
+        userService, cartService, productOptionService, productService, inventoryService
     )
 
     private val now = LocalDateTime.now()
 
     @Test
-    @DisplayName("주문 예약 시 UserService, CartService, ProductService, InventoryService를 올바른 순서로 호출하고 응답을 반환해야 한다")
+    @DisplayName("주문 예약 시 UserService, CartService, ProductOptionService, ProductService, InventoryService를 올바른 순서로 호출하고 응답을 반환해야 한다")
     fun `주문 예약 시_모든 Service를 올바른 순서로 호출하고_응답을 반환해야 한다`() {
         // Given
         val userId = 123L
 
-        val cartItems = listOf(
-            CartItemResponse(
-                cartItemId = 1L,
-                productOptionId = 10L,
-                productName = "에티오피아 예가체프 G1",
-                optionCode = "ETH-HD-200",
-                origin = "에티오피아",
-                grindType = "홀빈",
-                weightGrams = 200,
-                price = 15000,
-                quantity = 2,
-                totalPrice = 30000,
-                createdAt = now,
-                updatedAt = now
-            )
+        val cartItem = CartItem(
+            id = 1L,
+            userId = userId,
+            productOptionId = 10L,
+            quantity = 2,
+            createdAt = now,
+            updatedAt = now
+        )
+
+        val productOption = ProductOptionDetail(
+            optionId = 10L,
+            productId = 100L,
+            productName = "에티오피아 예가체프 G1",
+            optionCode = "ETH-HD-200",
+            origin = "에티오피아",
+            grindType = "홀빈",
+            weightGrams = 200,
+            price = 15000,
+            isActive = true
         )
 
         val reservationEntity = InventoryReservationEntity(
@@ -77,31 +85,35 @@ class ReserveOrderUseCaseTest {
 
         // Mocking
         every { userService.validateUserExists(userId) } just Runs
-        every { cartService.getCartItemsWithProducts(userId) } returns cartItems
+        every { cartService.getCartItems(userId) } returns listOf(cartItem)
+        every { productOptionService.getOptionsBatch(listOf(10L)) } returns mapOf(10L to productOption)
         every { productService.validateProductOptionsActive(listOf(10L)) } just Runs
-        every { inventoryService.reserveInventory(userId, cartItems) } returns reservations
+        every { inventoryService.reserveInventory(userId, any()) } returns reservations
 
         // When
         val result = reserveOrderUseCase.reserveOrder(userId)
 
         // Then
         // [검증 1]: Service 호출 순서 - UserService.validateUserExists() 먼저 호출
-        // [검증 2]: Service 호출 순서 - CartService.getCartItemsWithProducts() 다음 호출
-        // [검증 3]: Service 호출 순서 - ProductService.validateProductOptionsActive() 다음 호출
-        // [검증 4]: Service 호출 순서 - InventoryService.reserveInventory() 마지막 호출
+        // [검증 2]: Service 호출 순서 - CartService.getCartItems() 다음 호출
+        // [검증 3]: Service 호출 순서 - ProductOptionService.getOptionsBatch() 다음 호출
+        // [검증 4]: Service 호출 순서 - ProductService.validateProductOptionsActive() 다음 호출
+        // [검증 5]: Service 호출 순서 - InventoryService.reserveInventory() 마지막 호출
         verifyOrder {
             userService.validateUserExists(userId)
-            cartService.getCartItemsWithProducts(userId)
+            cartService.getCartItems(userId)
+            productOptionService.getOptionsBatch(listOf(10L))
             productService.validateProductOptionsActive(listOf(10L))
-            inventoryService.reserveInventory(userId, cartItems)
+            inventoryService.reserveInventory(userId, any())
         }
 
         verify(exactly = 1) { userService.validateUserExists(userId) }
-        verify(exactly = 1) { cartService.getCartItemsWithProducts(userId) }
+        verify(exactly = 1) { cartService.getCartItems(userId) }
+        verify(exactly = 1) { productOptionService.getOptionsBatch(listOf(10L)) }
         verify(exactly = 1) { productService.validateProductOptionsActive(listOf(10L)) }
-        verify(exactly = 1) { inventoryService.reserveInventory(userId, cartItems) }
+        verify(exactly = 1) { inventoryService.reserveInventory(userId, any()) }
 
-        // [검증 5]: 응답 DTO 반환 검증
+        // [검증 6]: 응답 DTO 반환 검증
         assertEquals(1, result.size)
         assertEquals(1001L, result[0].reservationEntity.id)
         assertEquals(10L, result[0].reservationEntity.productOptionId)

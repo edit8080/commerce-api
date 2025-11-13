@@ -52,12 +52,12 @@ class CouponIssueUseCase(
         val userCoupon = userCouponService.createUserCoupon(userId, couponId)
 
         // 6. 티켓 상태 업데이트 (CouponTicket 도메인)
-        couponTicketService.markTicketAsIssued(ticket.id!!, userId, userCoupon.id)
+        couponTicketService.markTicketAsIssued(ticket.id, userId, userCoupon.id)
 
         // 7. DTO 변환 및 반환
         return IssueCouponResponse(
             userCouponId = userCoupon.id,
-            couponId = coupon.id!!,
+            couponId = coupon.id,
             userId = userId,
             couponName = coupon.name,
             discountType = coupon.discountType,

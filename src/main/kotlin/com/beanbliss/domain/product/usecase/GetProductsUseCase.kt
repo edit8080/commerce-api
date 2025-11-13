@@ -1,7 +1,8 @@
 package com.beanbliss.domain.product.usecase
 
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.domain.product.service.ProductService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -12,9 +13,10 @@ import org.springframework.transaction.annotation.Transactional
  * [책임]:
  * - ProductService와 InventoryService를 오케스트레이션
  * - 상품 데이터와 재고 데이터 병합
+ * - Repository JOIN DTO 반환 (Controller에서 Presentation DTO로 변환)
  *
  * [DIP 준수]:
- * - ProductService, InventoryService 인터페이스에만 의존
+ * - ProductService, InventoryService에만 의존
  *
  * [SRP 준수]:
  * - UseCase는 오케스트레이션만 담당 (비즈니스 로직 없음)
@@ -28,10 +30,10 @@ class GetProductsUseCase(
 ) {
 
     /**
-     * 상품 목록 조회 결과 (도메인 데이터)
+     * 상품 목록 조회 결과 (Repository JOIN DTO)
      */
     data class ProductsResult(
-        val products: List<ProductResponse>,
+        val products: List<ProductWithOptions>,
         val totalElements: Long
     )
 
@@ -74,12 +76,27 @@ class GetProductsUseCase(
         // 6. 상품 데이터 + 재고 데이터 결합
         val productsWithStock = products.map { product ->
             val optionsWithStock = product.options.map { option ->
-                option.copy(availableStock = stockMap[option.optionId] ?: 0)
+                ProductOptionInfo(
+                    optionId = option.optionId,
+                    optionCode = option.optionCode,
+                    origin = option.origin,
+                    grindType = option.grindType,
+                    weightGrams = option.weightGrams,
+                    price = option.price,
+                    availableStock = stockMap[option.optionId] ?: 0
+                )
             }
-            product.copy(options = optionsWithStock)
+            ProductWithOptions(
+                productId = product.productId,
+                name = product.name,
+                description = product.description,
+                brand = product.brand,
+                createdAt = product.createdAt,
+                options = optionsWithStock
+            )
         }
 
-        // 7. 도메인 데이터 반환
+        // 7. Repository JOIN DTO 반환
         return ProductsResult(
             products = productsWithStock,
             totalElements = totalElements

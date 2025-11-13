@@ -49,10 +49,10 @@ class CreateCouponServiceTest {
         val savedCoupon = CouponEntity(
             id = 1L,
             name = request.name,
-            discountType = "PERCENTAGE",
-            discountValue = request.discountValue,
-            minOrderAmount = request.minOrderAmount,
-            maxDiscountAmount = request.maxDiscountAmount ?: 0,
+            discountType = DiscountType.PERCENTAGE,
+            discountValue = request.discountValue.toBigDecimal(),
+            minOrderAmount = request.minOrderAmount.toBigDecimal(),
+            maxDiscountAmount = (request.maxDiscountAmount ?: 0).toBigDecimal(),
             totalQuantity = request.totalQuantity,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
@@ -73,9 +73,9 @@ class CreateCouponServiceTest {
 
         // [검증 2]: 저장된 쿠폰 Entity 정보가 올바른가?
         assertEquals(request.name, couponSlot.captured.name)
-        assertEquals("PERCENTAGE", couponSlot.captured.discountType)
-        assertEquals(request.discountValue, couponSlot.captured.discountValue)
-        assertEquals(5000, couponSlot.captured.maxDiscountAmount)
+        assertEquals(DiscountType.PERCENTAGE, couponSlot.captured.discountType)
+        assertEquals(request.discountValue.toBigDecimal(), couponSlot.captured.discountValue)
+        assertEquals(5000.toBigDecimal(), couponSlot.captured.maxDiscountAmount)
 
         // [검증 3]: 반환된 Service DTO가 올바른가?
         assertEquals(1L, couponInfo.id)
@@ -102,10 +102,10 @@ class CreateCouponServiceTest {
         val savedCoupon = CouponEntity(
             id = 2L,
             name = request.name,
-            discountType = "FIXED_AMOUNT",
-            discountValue = request.discountValue,
-            minOrderAmount = request.minOrderAmount,
-            maxDiscountAmount = 0,
+            discountType = DiscountType.FIXED_AMOUNT,
+            discountValue = request.discountValue.toBigDecimal(),
+            minOrderAmount = request.minOrderAmount.toBigDecimal(),
+            maxDiscountAmount = 0.toBigDecimal(),
             totalQuantity = request.totalQuantity,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
@@ -169,10 +169,10 @@ class CreateCouponServiceTest {
         val savedCoupon = CouponEntity(
             id = 3L,
             name = request.name,
-            discountType = "PERCENTAGE",
-            discountValue = request.discountValue,
-            minOrderAmount = request.minOrderAmount,
-            maxDiscountAmount = 0,
+            discountType = DiscountType.PERCENTAGE,
+            discountValue = request.discountValue.toBigDecimal(),
+            minOrderAmount = request.minOrderAmount.toBigDecimal(),
+            maxDiscountAmount = 0.toBigDecimal(),
             totalQuantity = request.totalQuantity,
             validFrom = request.validFrom,
             validUntil = request.validUntil,

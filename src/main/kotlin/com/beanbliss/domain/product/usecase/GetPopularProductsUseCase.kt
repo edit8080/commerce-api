@@ -2,6 +2,7 @@ package com.beanbliss.domain.product.usecase
 
 import com.beanbliss.domain.order.service.OrderService
 import com.beanbliss.domain.product.service.ProductService
+import com.beanbliss.domain.product.service.ProductOptionService
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -9,16 +10,23 @@ import org.springframework.transaction.annotation.Transactional
  * 인기 상품 조회 UseCase
  *
  * [책임]:
- * - OrderService와 ProductService를 오케스트레이션
+ * - OrderService, ProductOptionService, ProductService를 오케스트레이션
  * - 주문 수량 데이터와 상품 정보 병합
+ * - 상품 옵션별 주문 수량을 상품별로 집계
  * - 데이터 정합성 검증
  *
+ * [설계 변경]:
+ * - Repository 간 JOIN 제거
+ * - UseCase 계층에서 여러 도메인 Service 조율
+ * - 상품 옵션별 주문 수를 상품별로 집계
+ *
  * [DIP 준수]:
- * - OrderService, ProductService 인터페이스에만 의존
+ * - OrderService, ProductOptionService, ProductService에만 의존
  */
 @Component
 class GetPopularProductsUseCase(
     private val orderService: OrderService,
+    private val productOptionService: ProductOptionService,
     private val productService: ProductService
 ) {
 
@@ -36,6 +44,13 @@ class GetPopularProductsUseCase(
     /**
      * 지정된 기간 동안 가장 많이 주문된 상품 조회
      *
+     * [오케스트레이션 흐름]:
+     * 1. ORDER 도메인: 상품 옵션별 주문 수량 조회
+     * 2. PRODUCT 도메인: 상품 옵션 정보 Batch 조회 (product_id 포함)
+     * 3. 집계: 상품 옵션별 수량을 상품별로 집계
+     * 4. PRODUCT 도메인: 상품 기본 정보 조회
+     * 5. 데이터 조합
+     *
      * @param period 조회 기간 (일 단위, 1~90일)
      * @param limit 조회할 상품 개수 (1~50개)
      * @return 인기 상품 목록 (주문 수 포함)
@@ -43,30 +58,53 @@ class GetPopularProductsUseCase(
      */
     @Transactional(readOnly = true)
     fun getPopularProducts(period: Int, limit: Int): List<PopularProduct> {
-        // 1. OrderService를 통해 활성 상품 주문 수량 조회
-        val orderCounts = orderService.getTopOrderedProducts(period, limit)
+        // 1. ORDER 도메인: 상품 옵션별 주문 수량 조회
+        // limit을 크게 조회 (옵션별이므로 상품별로 집계 시 개수가 줄어듦)
+        val optionOrderCounts = orderService.getTopOrderedProductOptions(period, limit * 10)
 
         // 2. 빈 목록인 경우 조기 반환
-        if (orderCounts.isEmpty()) {
+        if (optionOrderCounts.isEmpty()) {
             return emptyList()
         }
 
-        // 3. ProductService를 통해 상품 기본 정보 조회
-        val productIds = orderCounts.map { it.productId }
+        // 3. PRODUCT 도메인: 상품 옵션 정보 Batch 조회 (product_id 포함)
+        val optionIds = optionOrderCounts.map { it.productOptionId }
+        val productOptions = productOptionService.getOptionsBatch(optionIds)
+
+        // 4. 상품별로 주문 수량 집계
+        val productOrderCounts = optionOrderCounts
+            .mapNotNull { orderCount ->
+                productOptions[orderCount.productOptionId]?.let { option ->
+                    option.productId to orderCount.totalOrderCount
+                }
+            }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, counts) -> counts.sum() }
+            .entries
+            .sortedByDescending { it.value }
+            .take(limit)
+
+        // 5. 빈 목록인 경우 조기 반환
+        if (productOrderCounts.isEmpty()) {
+            return emptyList()
+        }
+
+        // 6. PRODUCT 도메인: 상품 기본 정보 조회
+        val productIds = productOrderCounts.map { it.key }
         val productInfos = productService.getProductsByIds(productIds)
 
-        // 4. 데이터 정합성 검증
+        // 7. 데이터 정합성 검증
         validateDataConsistency(productIds, productInfos.map { it.productId })
 
-        // 5. 결과 병합 및 정렬 순서 유지
+        // 8. 결과 병합 및 정렬 순서 유지
         val productInfoMap = productInfos.associateBy { it.productId }
-        return orderCounts.mapNotNull { orderCount ->
-            productInfoMap[orderCount.productId]?.let { productInfo ->
+        return productOrderCounts.mapNotNull { (productId, totalCount) ->
+            productInfoMap[productId]?.let { productInfo ->
                 PopularProduct(
                     productId = productInfo.productId,
                     productName = productInfo.productName,
                     brand = productInfo.brand,
-                    totalOrderCount = orderCount.totalOrderCount,
+                    totalOrderCount = totalCount,
                     description = productInfo.description
                 )
             }

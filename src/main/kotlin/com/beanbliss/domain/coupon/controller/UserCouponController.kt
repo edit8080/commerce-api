@@ -6,6 +6,9 @@ import com.beanbliss.domain.coupon.dto.UserCouponListData
 import com.beanbliss.domain.coupon.dto.UserCouponListResponse
 import com.beanbliss.domain.coupon.dto.UserCouponResponse
 import com.beanbliss.domain.coupon.service.UserCouponService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.*
  */
 @RestController
 @RequestMapping("/api/users")
+@Tag(name = "사용자 쿠폰 관리", description = "사용자 보유 쿠폰 조회 API")
 class UserCouponController(
     private val userCouponService: UserCouponService
 ) {
@@ -35,9 +39,13 @@ class UserCouponController(
      * @throws InvalidParameterException 페이징 파라미터가 유효하지 않을 경우
      */
     @GetMapping("/{userId}/coupons")
+    @Operation(summary = "사용자 쿠폰 목록 조회", description = "사용자가 보유한 쿠폰 목록 조회 (페이지네이션)")
     fun getUserCoupons(
+        @Parameter(description = "사용자 ID", example = "1")
         @PathVariable userId: Long,
+        @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
         @RequestParam(defaultValue = "1") page: Int,
+        @Parameter(description = "페이지 크기 (1-100)", example = "10")
         @RequestParam(defaultValue = "10") size: Int
     ): UserCouponListResponse {
         // 1. 파라미터 검증 (PageCalculator에 위임)

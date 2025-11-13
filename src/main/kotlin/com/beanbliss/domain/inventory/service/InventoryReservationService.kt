@@ -1,6 +1,6 @@
 package com.beanbliss.domain.inventory.service
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
 import com.beanbliss.domain.order.exception.InventoryReservationExpiredException
@@ -25,7 +25,7 @@ class InventoryReservationService(
     private val inventoryReservationRepository: InventoryReservationRepository
 ) {
 
-    fun validateReservations(userId: Long, cartItems: List<CartItemResponse>) {
+    fun validateReservations(userId: Long, cartItems: List<CartItemDetail>) {
         // 1. 사용자의 활성 재고 예약 조회
         val reservations = inventoryReservationRepository.findActiveReservationsByUserId(userId)
 
@@ -46,18 +46,16 @@ class InventoryReservationService(
         // TODO: 필요시 추가 검증 로직 구현
     }
 
-    fun confirmReservations(userId: Long, cartItems: List<CartItemResponse>) {
+    fun confirmReservations(userId: Long, cartItems: List<CartItemDetail>) {
         // 1. 사용자의 활성 재고 예약 조회
         val reservations = inventoryReservationRepository.findActiveReservationsByUserId(userId)
 
         // 2. 예약 상태를 CONFIRMED로 변경
         val now = LocalDateTime.now()
         reservations.forEach { reservation ->
-            val updated = reservation.copy(
-                status = InventoryReservationStatus.CONFIRMED,
-                updatedAt = now
-            )
-            inventoryReservationRepository.save(updated)
+            reservation.status = InventoryReservationStatus.CONFIRMED
+            reservation.updatedAt = now
+            inventoryReservationRepository.save(reservation)
         }
     }
 }

@@ -1,152 +1,198 @@
 package com.beanbliss.domain.product.repository
 
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.common.util.SortUtils
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * [책임]: 상품 In-memory 저장소 구현
- * - ConcurrentHashMap을 사용하여 Thread-safe 보장
- * - PRODUCT와 PRODUCT_OPTION을 함께 관리
- * - 활성 옵션(is_active=true)이 있는 상품만 조회
- *
- * [주의사항]:
- * - 애플리케이션 재시작 시 데이터 소실 (In-memory 특성)
- * - 실제 DB 사용 시 JPA 기반 구현체로 교체 필요
+ * [책임]: Spring Data JPA를 활용한 Product 영속성 처리
+ * Infrastructure Layer에 속하며, JPA 기술에 종속적
+ */
+interface ProductJpaRepository : JpaRepository<ProductEntity, Long> {
+    /**
+     * 활성 옵션이 있는 상품 ID 목록 조회
+     */
+    @Query("""
+        SELECT DISTINCT p.id
+        FROM ProductEntity p
+        INNER JOIN ProductOptionEntity po ON po.productId = p.id
+        WHERE po.isActive = true
+    """)
+    fun findProductIdsWithActiveOptions(): List<Long>
+
+    /**
+     * 활성 옵션이 있는 상품 수 조회
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT p.id)
+        FROM ProductEntity p
+        INNER JOIN ProductOptionEntity po ON po.productId = p.id
+        WHERE po.isActive = true
+    """)
+    fun countProductsWithActiveOptions(): Long
+
+    /**
+     * 활성 옵션이 있는 상품 목록 조회 (Fetch Join + 페이징)
+     *
+     * [성능 최적화]:
+     * - LEFT JOIN FETCH로 Product와 ProductOption을 한 번의 쿼리로 조회
+     * - Pagination과 Fetch Join을 함께 사용
+     * - Hibernate가 메모리에서 페이징 수행 (경고 발생 가능하지만 N+1보다 효율적)
+     */
+    @Query("""
+        SELECT p
+        FROM ProductEntity p
+        LEFT JOIN FETCH p.productOptions po
+        WHERE po.isActive = true
+    """)
+    fun findActiveProductsWithPagination(pageable: Pageable): Page<ProductEntity>
+
+    /**
+     * 특정 상품 ID들의 상품과 활성 옵션을 Fetch Join으로 조회
+     *
+     * [성능 최적화]:
+     * - LEFT JOIN FETCH를 사용하여 한 번의 쿼리로 Product와 ProductOption 조회
+     * - N+1 문제 완전 해결
+     *
+     * @param productIds 상품 ID 목록
+     * @return 상품과 옵션이 포함된 엔티티 목록
+     */
+    @Query("""
+        SELECT DISTINCT p
+        FROM ProductEntity p
+        LEFT JOIN FETCH p.productOptions po
+        WHERE p.id IN :productIds AND (po.isActive = true OR po.isActive IS NULL)
+        ORDER BY p.id ASC
+    """)
+    fun findByIdsWithActiveOptions(@Param("productIds") productIds: List<Long>): List<ProductEntity>
+
+    @Query("""
+        SELECT p
+        FROM ProductEntity p
+        WHERE p.id IN :productIds
+    """)
+    fun findProductsByIds(@Param("productIds") productIds: List<Long>): List<ProductEntity>
+}
+
+/**
+ * [책임]: ProductRepository 인터페이스 구현체
+ * - ProductJpaRepository를 활용하여 실제 DB 접근
+ * - Fetch Join으로 N+1 문제 해결
+ * - 활성 옵션이 있는 상품만 조회
+ * - 재고 정보는 조회하지 않음 (도메인 경계 준수, Service 계층에서 처리)
  */
 @Repository
-class ProductRepositoryImpl : ProductRepository {
-
-    // Thread-safe한 In-memory 저장소
-    private val products = ConcurrentHashMap<Long, ProductEntity>()
-    private val productOptions = ConcurrentHashMap<Long, ProductOptionEntity>()
-
-    // Inventory 정보 (product_option_id -> stock_quantity)
-    // 실제로는 InventoryRepository에서 관리하지만, ProductOptionResponse에 availableStock이 필요하므로 임시 저장
-    private val inventoryStock = ConcurrentHashMap<Long, Int>()
+class ProductRepositoryImpl(
+    private val productJpaRepository: ProductJpaRepository
+) : ProductRepository {
 
     override fun findActiveProducts(
         page: Int,
         size: Int,
         sortBy: String,
         sortDirection: String
-    ): List<ProductResponse> {
-        // 1. 활성 옵션이 있는 상품 ID 목록 추출
-        val productIdsWithActiveOptions = productOptions.values
-            .filter { it.isActive }
-            .map { it.productId }
-            .toSet()
+    ): List<ProductWithOptions> {
+        // 1. Create Sort object using SortUtils
+        val sort = SortUtils.createSort(sortBy, sortDirection)
 
-        // 2. 해당 상품들 조회
-        val activeProducts = products.values
-            .filter { productIdsWithActiveOptions.contains(it.id) }
+        // 2. Fetch Join + Pagination을 한 번에 수행
+        val pageRequest = PageRequest.of(page - 1, size, sort)
+        val products = productJpaRepository.findActiveProductsWithPagination(pageRequest).content
 
-        // 3. 정렬 적용
-        val sorted = when (sortBy) {
-            "created_at" -> if (sortDirection == "DESC") {
-                activeProducts.sortedByDescending { it.createdAt }
-            } else {
-                activeProducts.sortedBy { it.createdAt }
-            }
-            "name" -> if (sortDirection == "DESC") {
-                activeProducts.sortedByDescending { it.name }
-            } else {
-                activeProducts.sortedBy { it.name }
-            }
-            else -> activeProducts.sortedBy { it.createdAt }
+        // 3. 빈 목록인 경우 조기 반환
+        if (products.isEmpty()) {
+            return emptyList()
         }
 
-        // 4. 페이징 적용
-        val offset = (page - 1) * size
-        val paged = sorted.drop(offset).take(size)
+        // 4. ProductWithOptions로 변환
+        return products.map { product ->
+            // Entity의 연관관계를 통해 이미 로드된 옵션들 사용 (Fetch Join으로 로드됨)
+            val options = product.productOptions
+                .filter { it.isActive }
+                .sortedWith(compareBy({ it.weightGrams }, { it.grindType }))
+                .map { option ->
+                    ProductOptionInfo(
+                        optionId = option.id,
+                        optionCode = option.optionCode,
+                        origin = option.origin,
+                        grindType = option.grindType,
+                        weightGrams = option.weightGrams,
+                        price = option.price.toInt(),
+                        availableStock = null  // Repository 계층에서는 null 반환
+                    )
+                }
 
-        // 5. ProductResponse로 변환 (옵션 포함)
-        return paged.map { product ->
-            val options = getActiveOptionsForProduct(product.id)
-            product.toResponse(options)
+            ProductWithOptions(
+                productId = product.id,
+                name = product.name,
+                description = product.description,
+                brand = product.brand,
+                createdAt = product.createdAt,
+                options = options
+            )
         }
     }
 
     override fun countActiveProducts(): Long {
-        // 활성 옵션이 있는 상품 ID 목록 추출
-        val productIdsWithActiveOptions = productOptions.values
-            .filter { it.isActive }
-            .map { it.productId }
-            .toSet()
-
-        return productIdsWithActiveOptions.size.toLong()
+        return productJpaRepository.countProductsWithActiveOptions()
     }
 
-    override fun findByIdWithOptions(productId: Long): ProductResponse? {
-        val product = products[productId] ?: return null
+    override fun findByIdWithOptions(productId: Long): ProductWithOptions? {
+        // Fetch Join으로 Product와 ProductOption을 한 번에 조회
+        val productsWithOptions = productJpaRepository.findByIdsWithActiveOptions(listOf(productId))
 
-        val options = getActiveOptionsForProduct(productId)
-        return product.toResponse(options)
-    }
-
-    override fun findBasicInfoByIds(productIds: List<Long>): List<com.beanbliss.domain.product.dto.ProductBasicInfo> {
-        return productIds.mapNotNull { productId ->
-            products[productId]?.let { product ->
-                com.beanbliss.domain.product.dto.ProductBasicInfo(
-                    productId = product.id,
-                    productName = product.name,
-                    brand = product.brand,
-                    description = product.description
-                )
-            }
+        if (productsWithOptions.isEmpty()) {
+            return null
         }
-    }
 
-    /**
-     * 상품 ID로 활성 옵션 목록 조회 (정렬 포함)
-     */
-    private fun getActiveOptionsForProduct(productId: Long): List<ProductOptionResponse> {
-        return productOptions.values
-            .filter { it.productId == productId && it.isActive }
-            .sortedWith(compareBy({ it.weightGrams }, { it.grindType })) // 용량 → 분쇄 타입 순 정렬
+        val product = productsWithOptions[0]
+
+        // 활성 옵션만 필터링하고 정렬
+        val options = product.productOptions
+            .filter { it.isActive }
+            .sortedWith(compareBy({ it.weightGrams }, { it.grindType }))
             .map { option ->
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = option.id,
                     optionCode = option.optionCode,
                     origin = option.origin,
                     grindType = option.grindType,
                     weightGrams = option.weightGrams,
-                    price = option.price,
-                    availableStock = inventoryStock[option.id] ?: 0 // Inventory 조회
+                    price = option.price.toInt(),
+                    availableStock = null  // Repository 계층에서는 null 반환
                 )
             }
+
+        return ProductWithOptions(
+            productId = product.id,
+            name = product.name,
+            description = product.description,
+            brand = product.brand,
+            createdAt = product.createdAt,
+            options = options
+        )
     }
 
-    /**
-     * 테스트용 헬퍼 메서드: 상품 추가
-     */
-    fun addProduct(entity: ProductEntity) {
-        products[entity.id] = entity
-    }
+    override fun findBasicInfoByIds(productIds: List<Long>): List<ProductBasicInfo> {
+        if (productIds.isEmpty()) {
+            return emptyList()
+        }
 
-    /**
-     * 테스트용 헬퍼 메서드: 상품 옵션 추가
-     */
-    fun addProductOption(entity: ProductOptionEntity) {
-        productOptions[entity.id] = entity
-    }
-
-    /**
-     * 테스트용 헬퍼 메서드: 재고 정보 추가
-     */
-    fun addInventory(productOptionId: Long, stock: Int) {
-        inventoryStock[productOptionId] = stock
-    }
-
-    /**
-     * 테스트용 헬퍼 메서드: 모든 데이터 삭제
-     */
-    fun clear() {
-        products.clear()
-        productOptions.clear()
-        inventoryStock.clear()
+        return productJpaRepository.findProductsByIds(productIds).map { product ->
+            ProductBasicInfo(
+                productId = product.id,
+                productName = product.name,
+                brand = product.brand,
+                description = product.description
+            )
+        }
     }
 }

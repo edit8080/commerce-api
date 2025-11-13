@@ -1,14 +1,12 @@
 package com.beanbliss.domain.cart.service
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.repository.CartItemRepository
-import com.beanbliss.domain.order.exception.CartEmptyException
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.time.LocalDateTime
 
 /**
@@ -16,25 +14,28 @@ import java.time.LocalDateTime
  *
  * [검증 목표]:
  * 1. 장바구니 조회 시 Repository가 올바르게 호출되는가?
- * 2. 장바구니가 비어 있을 경우 CartEmptyException이 발생하는가? (핵심 비즈니스 규칙)
- * 3. 정상 조회 시 장바구니 아이템 목록이 반환되는가?
+ * 2. 정상 조회 시 장바구니 아이템 목록(CartItem)이 반환되는가?
+ *
+ * [변경사항]:
+ * - CartService는 이제 순수하게 CART 도메인 데이터만 반환
+ * - Product 정보 조합은 UseCase에서 처리
+ * - 빈 장바구니 검증도 UseCase에서 처리
  *
  * [관련 UseCase]:
- * - ReserveOrderUseCase
+ * - GetCartItemsUseCase, ReserveOrderUseCase, CreateOrderUseCase
  */
 @DisplayName("장바구니 조회 Service 테스트")
 class CartGetServiceTest {
 
     // Mock 객체 (Repository Interface에 의존)
     private val cartItemRepository: CartItemRepository = mockk()
-    private val productOptionRepository = mockk<com.beanbliss.domain.product.repository.ProductOptionRepository>()
 
-    // 테스트 대상 (Service 인터페이스로 선언)
+    // 테스트 대상
     private lateinit var cartService: CartService
 
     @BeforeEach
     fun setUp() {
-        cartService = CartService(cartItemRepository, productOptionRepository)
+        cartService = CartService(cartItemRepository)
     }
 
     @Test
@@ -45,31 +46,19 @@ class CartGetServiceTest {
         val now = LocalDateTime.now()
 
         val cartItems = listOf(
-            CartItemResponse(
-                cartItemId = 1L,
+            CartItem(
+                id = 1L,
+                userId = userId,
                 productOptionId = 10L,
-                productName = "에티오피아 예가체프 G1",
-                optionCode = "ETH-HD-200",
-                origin = "에티오피아",
-                grindType = "홀빈",
-                weightGrams = 200,
-                price = 15000,
                 quantity = 2,
-                totalPrice = 30000,
                 createdAt = now,
                 updatedAt = now
             ),
-            CartItemResponse(
-                cartItemId = 2L,
+            CartItem(
+                id = 2L,
+                userId = userId,
                 productOptionId = 20L,
-                productName = "콜롬비아 수프리모",
-                optionCode = "COL-WB-500",
-                origin = "콜롬비아",
-                grindType = "원두",
-                weightGrams = 500,
-                price = 25000,
                 quantity = 1,
-                totalPrice = 25000,
                 createdAt = now,
                 updatedAt = now
             )
@@ -78,7 +67,7 @@ class CartGetServiceTest {
         every { cartItemRepository.findByUserId(userId) } returns cartItems
 
         // When
-        val result = cartService.getCartItemsWithProducts(userId)
+        val result = cartService.getCartItems(userId)
 
         // Then
         // [Repository 호출 검증]: findByUserId가 정확히 한 번 호출되어야 함
@@ -86,29 +75,27 @@ class CartGetServiceTest {
 
         // [비즈니스 로직 검증]: 조회된 아이템 목록이 올바르게 반환되는가?
         assertEquals(2, result.size)
-        assertEquals(1L, result[0].cartItemId)
+        assertEquals(1L, result[0].id)
         assertEquals(10L, result[0].productOptionId)
-        assertEquals("에티오피아 예가체프 G1", result[0].productName)
         assertEquals(2, result[0].quantity)
-        assertEquals(2L, result[1].cartItemId)
+        assertEquals(2L, result[1].id)
         assertEquals(20L, result[1].productOptionId)
     }
 
     @Test
-    @DisplayName("장바구니가 비어 있을 경우 CartEmptyException이 발생해야 한다")
-    fun `장바구니가 비어 있을 경우_CartEmptyException이 발생해야 한다`() {
+    @DisplayName("장바구니가 비어 있을 경우 빈 리스트를 반환해야 한다")
+    fun `장바구니가 비어 있을 경우_빈 리스트를 반환해야 한다`() {
         // Given
         val userId = 123L
 
         every { cartItemRepository.findByUserId(userId) } returns emptyList()
 
-        // When & Then
-        // [핵심 비즈니스 규칙 검증]: 빈 장바구니 시 적절한 예외가 발생하는가?
-        val exception = assertThrows<CartEmptyException> {
-            cartService.getCartItemsWithProducts(userId)
-        }
+        // When
+        val result = cartService.getCartItems(userId)
 
-        assertEquals("장바구니가 비어 있습니다.", exception.message)
+        // Then
+        // [비즈니스 로직 검증]: 빈 장바구니는 빈 리스트 반환 (예외 발생하지 않음)
+        assertEquals(0, result.size)
 
         // [Repository 호출 검증]: findByUserId는 호출되었어야 함
         verify(exactly = 1) { cartItemRepository.findByUserId(userId) }
@@ -122,17 +109,11 @@ class CartGetServiceTest {
         val now = LocalDateTime.now()
 
         val singleCartItem = listOf(
-            CartItemResponse(
-                cartItemId = 1L,
+            CartItem(
+                id = 1L,
+                userId = userId,
                 productOptionId = 10L,
-                productName = "에티오피아 예가체프 G1",
-                optionCode = "ETH-HD-200",
-                origin = "에티오피아",
-                grindType = "홀빈",
-                weightGrams = 200,
-                price = 15000,
                 quantity = 5,
-                totalPrice = 75000,
                 createdAt = now,
                 updatedAt = now
             )
@@ -141,14 +122,13 @@ class CartGetServiceTest {
         every { cartItemRepository.findByUserId(userId) } returns singleCartItem
 
         // When
-        val result = cartService.getCartItemsWithProducts(userId)
+        val result = cartService.getCartItems(userId)
 
         // Then
         // [경계값 검증]: 단일 아이템도 정상적으로 처리되어야 함
         assertEquals(1, result.size)
-        assertEquals(1L, result[0].cartItemId)
+        assertEquals(1L, result[0].id)
         assertEquals(5, result[0].quantity)
-        assertEquals(75000, result[0].totalPrice)
 
         verify(exactly = 1) { cartItemRepository.findByUserId(userId) }
     }

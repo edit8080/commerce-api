@@ -71,12 +71,11 @@ class CouponIssueUseCaseTest {
         val availableTicket = CouponTicketEntity(
             id = 1L,
             couponId = couponId,
-            status = "AVAILABLE",
+            status = com.beanbliss.domain.coupon.entity.CouponTicketStatus.AVAILABLE,
             userId = null,
             userCouponId = null,
             issuedAt = null,
-            createdAt = now,
-            updatedAt = now
+            createdAt = now
         )
 
         val savedUserCoupon = UserCouponEntity(
@@ -291,12 +290,11 @@ class CouponIssueUseCaseTest {
         val availableTicket = CouponTicketEntity(
             id = 1L,
             couponId = couponId,
-            status = "AVAILABLE",
+            status = com.beanbliss.domain.coupon.entity.CouponTicketStatus.AVAILABLE,
             userId = null,
             userCouponId = null,
             issuedAt = null,
-            createdAt = now,
-            updatedAt = now
+            createdAt = now
         )
 
         val savedUserCoupon = UserCouponEntity(

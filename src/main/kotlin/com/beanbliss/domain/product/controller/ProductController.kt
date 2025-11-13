@@ -6,11 +6,15 @@ import com.beanbliss.common.pagination.PageCalculator
 import com.beanbliss.domain.product.dto.PopularProductInfo
 import com.beanbliss.domain.product.dto.PopularProductsResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
+import com.beanbliss.domain.product.dto.ProductOptionResponse
 import com.beanbliss.domain.product.dto.ProductResponse
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
 import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
 import com.beanbliss.domain.product.usecase.GetProductsUseCase
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import org.springframework.validation.annotation.Validated
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.*
 @Validated
 @RestController
 @RequestMapping("/api/products")
+@Tag(name = "상품 관리", description = "상품 조회 관련 API")
 class ProductController(
     private val productService: ProductService,
     private val getProductsUseCase: GetProductsUseCase,
@@ -48,8 +53,14 @@ class ProductController(
      * @return 상품 목록과 페이징 정보
      */
     @GetMapping
+    @Operation(
+        summary = "상품 목록 조회",
+        description = "페이지네이션을 적용한 상품 목록 조회"
+    )
     fun getProducts(
+        @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
         @RequestParam(defaultValue = "1") page: Int,
+        @Parameter(description = "페이지 크기 (1-100)", example = "10")
         @RequestParam(defaultValue = "10") size: Int
     ): ApiResponse<ProductListResponse> {
         // 1. 파라미터 검증 (PageCalculator에 위임)
@@ -58,7 +69,29 @@ class ProductController(
         // 2. UseCase 호출 (ProductService + InventoryService 오케스트레이션)
         val result = getProductsUseCase.getProducts(page, size)
 
-        // 3. 도메인 데이터 → DTO 변환 (Controller 책임)
+        // 3. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val productResponses = result.products.map { product ->
+            ProductResponse(
+                productId = product.productId,
+                name = product.name,
+                description = product.description,
+                brand = product.brand,
+                createdAt = product.createdAt,
+                options = product.options.map { option ->
+                    ProductOptionResponse(
+                        optionId = option.optionId,
+                        optionCode = option.optionCode,
+                        origin = option.origin,
+                        grindType = option.grindType,
+                        weightGrams = option.weightGrams,
+                        price = option.price,
+                        availableStock = option.availableStock ?: 0  // UseCase에서 채워진 값, null-safe 처리
+                    )
+                }
+            )
+        }
+
+        // 4. 페이징 정보 계산
         val totalPages = PageCalculator.calculateTotalPages(result.totalElements, size)
         val pageable = PageableResponse(
             pageNumber = page,
@@ -67,11 +100,11 @@ class ProductController(
             totalPages = totalPages
         )
         val response = ProductListResponse(
-            content = result.products,
+            content = productResponses,
             pageable = pageable
         )
 
-        // 4. 응답 반환
+        // 5. 응답 반환
         return ApiResponse(data = response)
     }
 
@@ -83,14 +116,39 @@ class ProductController(
      * @throws ResourceNotFoundException 상품이 존재하지 않거나 활성 옵션이 없는 경우
      */
     @GetMapping("/{productId}")
+    @Operation(
+        summary = "상품 상세 조회",
+        description = "상품 ID로 상세 정보와 옵션 조회"
+    )
     fun getProductDetail(
+        @Parameter(description = "상품 ID", example = "1")
         @PathVariable productId: Long
     ): ApiResponse<ProductResponse> {
-        // UseCase 호출 (ProductService + InventoryService 오케스트레이션)
-        val result = getProductDetailUseCase.getProductDetail(productId)
+        // 1. UseCase 호출 (ProductService + InventoryService 오케스트레이션)
+        val productWithOptions = getProductDetailUseCase.getProductDetail(productId)
 
-        // 응답 반환
-        return ApiResponse(data = result)
+        // 2. Repository JOIN DTO → Presentation DTO 변환 (Controller 책임)
+        val productResponse = ProductResponse(
+            productId = productWithOptions.productId,
+            name = productWithOptions.name,
+            description = productWithOptions.description,
+            brand = productWithOptions.brand,
+            createdAt = productWithOptions.createdAt,
+            options = productWithOptions.options.map { option ->
+                ProductOptionResponse(
+                    optionId = option.optionId,
+                    optionCode = option.optionCode,
+                    origin = option.origin,
+                    grindType = option.grindType,
+                    weightGrams = option.weightGrams,
+                    price = option.price,
+                    availableStock = option.availableStock ?: 0  // UseCase에서 채워진 값, null-safe 처리
+                )
+            }
+        )
+
+        // 3. 응답 반환
+        return ApiResponse(data = productResponse)
     }
 
     /**
@@ -101,12 +159,18 @@ class ProductController(
      * @return 인기 상품 목록 (주문 수 기준 내림차순)
      */
     @GetMapping("/popular")
+    @Operation(
+        summary = "인기 상품 목록 조회",
+        description = "지정된 기간 내 주문이 많은 상품 조회"
+    )
     fun getPopularProducts(
+        @Parameter(description = "조회 기간 (일 단위, 1~90)", example = "7")
         @RequestParam(defaultValue = "7")
         @Min(value = 1, message = "period는 1 이상 90 이하여야 합니다.")
         @Max(value = 90, message = "period는 1 이상 90 이하여야 합니다.")
         period: Int,
 
+        @Parameter(description = "조회할 상품 개수 (1~50)", example = "10")
         @RequestParam(defaultValue = "10")
         @Min(value = 1, message = "limit는 1 이상 50 이하여야 합니다.")
         @Max(value = 50, message = "limit는 1 이상 50 이하여야 합니다.")
