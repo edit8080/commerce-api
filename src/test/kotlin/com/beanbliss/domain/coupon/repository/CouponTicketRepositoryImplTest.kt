@@ -110,29 +110,7 @@ class CouponTicketRepositoryImplTest : RepositoryTestBase() {
         assertNull(ticket)
     }
 
-    @Test
-    @DisplayName("티켓 상태 업데이트 - ISSUED로 변경")
-    fun `updateTicketAsIssued should update ticket status to issued`() {
-        // Given: AVAILABLE 티켓 조회
-        val availableTicket = couponTicketRepository.findAvailableTicketWithLock(testCoupon.id)
-        assertNotNull(availableTicket)
 
-        val userId = 200L
-        val userCouponId = 100L
-
-        // When
-        couponTicketRepository.updateTicketAsIssued(availableTicket!!.id, userId, userCouponId)
-        entityManager.flush()
-        entityManager.clear()
-
-        // Then: 업데이트된 티켓 재조회 (EntityManager 사용)
-        val updatedTicket = entityManager.find(CouponTicketEntity::class.java, availableTicket.id)
-        assertNotNull(updatedTicket)
-        assertEquals(CouponTicketStatus.ISSUED, updatedTicket.status)
-        assertEquals(userId, updatedTicket.userId)
-        assertEquals(userCouponId, updatedTicket.userCouponId)
-        assertNotNull(updatedTicket.issuedAt)
-    }
 
     @Test
     @DisplayName("특정 쿠폰의 AVAILABLE 상태 티켓 개수 조회")

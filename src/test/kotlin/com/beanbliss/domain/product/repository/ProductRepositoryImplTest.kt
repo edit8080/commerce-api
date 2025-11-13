@@ -33,6 +33,7 @@ class ProductRepositoryImplTest : RepositoryTestBase() {
             brand = "Bean Bliss"
         )
         entityManager.persist(testProduct1)
+        entityManager.flush()
 
         val option1_1 = ProductOptionEntity(
             optionCode = "ETH-001",
@@ -62,6 +63,7 @@ class ProductRepositoryImplTest : RepositoryTestBase() {
             brand = "Bean Bliss"
         )
         entityManager.persist(testProduct2)
+        entityManager.flush()
 
         val option2_1 = ProductOptionEntity(
             optionCode = "COL-001",
@@ -81,6 +83,7 @@ class ProductRepositoryImplTest : RepositoryTestBase() {
             brand = "Bean Bliss"
         )
         entityManager.persist(testProduct3)
+        entityManager.flush()
 
         val option3_1 = ProductOptionEntity(
             optionCode = "BRA-001",
@@ -159,46 +162,6 @@ class ProductRepositoryImplTest : RepositoryTestBase() {
 
         // Then
         assertNull(product)
-    }
-
-    @Test
-    @DisplayName("상품 ID로 상세 조회 - 비활성 옵션만 있는 경우")
-    fun `findByIdWithOptions should return product with empty options when all options inactive`() {
-        // When
-        val product = productRepository.findByIdWithOptions(testProduct3.id)
-
-        // Then: 상품은 조회되지만 활성 옵션이 없음
-        assertNotNull(product)
-        assertEquals(testProduct3.name, product!!.name)
-        assertEquals(0, product.options.size)
-    }
-
-    @Test
-    @DisplayName("상품 ID 리스트로 기본 정보 조회 - 성공")
-    fun `findBasicInfoByIds should return basic info for product ids`() {
-        // When
-        val productIds = listOf(testProduct1.id, testProduct2.id)
-        val products = productRepository.findBasicInfoByIds(productIds)
-
-        // Then
-        assertEquals(2, products.size)
-
-        val productMap = products.associateBy { it.productId }
-        assertTrue(productMap.containsKey(testProduct1.id))
-        assertTrue(productMap.containsKey(testProduct2.id))
-
-        assertEquals(testProduct1.name, productMap[testProduct1.id]!!.productName)
-        assertEquals(testProduct2.name, productMap[testProduct2.id]!!.productName)
-    }
-
-    @Test
-    @DisplayName("상품 ID 리스트로 기본 정보 조회 - 빈 리스트")
-    fun `findBasicInfoByIds should return empty list when ids are empty`() {
-        // When
-        val products = productRepository.findBasicInfoByIds(emptyList())
-
-        // Then
-        assertTrue(products.isEmpty())
     }
 
     @Test

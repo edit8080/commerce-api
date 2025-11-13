@@ -73,6 +73,13 @@ interface ProductJpaRepository : JpaRepository<ProductEntity, Long> {
         ORDER BY p.id ASC
     """)
     fun findByIdsWithActiveOptions(@Param("productIds") productIds: List<Long>): List<ProductEntity>
+
+    @Query("""
+        SELECT p
+        FROM ProductEntity p
+        WHERE p.id IN :productIds
+    """)
+    fun findProductsByIds(@Param("productIds") productIds: List<Long>): List<ProductEntity>
 }
 
 /**
@@ -179,7 +186,7 @@ class ProductRepositoryImpl(
             return emptyList()
         }
 
-        return productJpaRepository.findAllById(productIds).map { product ->
+        return productJpaRepository.findProductsByIds(productIds).map { product ->
             ProductBasicInfo(
                 productId = product.id,
                 productName = product.name,
