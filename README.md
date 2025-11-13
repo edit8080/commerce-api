@@ -138,6 +138,14 @@ mysql -u root -p -e "CREATE DATABASE commerce CHARACTER SET utf8mb4 COLLATE utf8
 ./gradlew bootRun --args="--spring.profiles.active=dev"
 ```
 
+#### 4. API 문서 (Swagger)
+
+애플리케이션 실행 후 다음 URL로 Swagger UI에 접근할 수 있습니다:
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
 ---
 
 ## 더미 데이터 초기화
