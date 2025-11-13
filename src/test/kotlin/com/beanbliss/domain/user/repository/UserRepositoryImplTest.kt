@@ -8,8 +8,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.transaction.annotation.Transactional
 
 @DisplayName("User Repository 통합 테스트")
+@Transactional
 class UserRepositoryImplTest : RepositoryTestBase() {
 
     @Autowired

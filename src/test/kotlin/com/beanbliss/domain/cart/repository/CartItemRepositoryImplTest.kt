@@ -11,10 +11,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
 @DisplayName("CartItem Repository 통합 테스트")
+@Transactional
 class CartItemRepositoryImplTest : RepositoryTestBase() {
 
     @Autowired

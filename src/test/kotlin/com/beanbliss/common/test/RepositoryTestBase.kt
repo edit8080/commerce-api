@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.MySQLContainer
+import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 
@@ -60,7 +61,6 @@ import org.testcontainers.junit.jupiter.Testcontainers
         BalanceRepositoryImpl::class
     ]
 )
-@org.springframework.test.context.ActiveProfiles("test")
 abstract class RepositoryTestBase {
 
     companion object {
@@ -70,6 +70,8 @@ abstract class RepositoryTestBase {
             withDatabaseName("testdb")
             withUsername("test")
             withPassword("test")
+            withReuse(true)
+            waitingFor(Wait.forListeningPort())
         }
 
         @DynamicPropertySource
