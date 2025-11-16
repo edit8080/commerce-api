@@ -6,7 +6,6 @@ import com.beanbliss.domain.cart.service.CartService
 import com.beanbliss.domain.product.service.ProductOptionService
 import com.beanbliss.domain.user.service.UserService
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * [책임]: 장바구니 추가 기능의 오케스트레이션
@@ -23,6 +22,10 @@ import org.springframework.transaction.annotation.Transactional
  *
  * [DIP 준수]:
  * - Service에만 의존
+ *
+ * [트랜잭션 최적화]:
+ * - 검증 로직(Step 1-2)은 트랜잭션 외부에서 수행 → Connection 점유 시간 최소화
+ * - 쓰기 작업(Step 3)만 트랜잭션 내부에서 수행
  */
 @Component
 class AddToCartUseCase(
@@ -34,31 +37,32 @@ class AddToCartUseCase(
     /**
      * 장바구니에 상품 추가
      *
-     * [비즈니스 로직]:
+     * [트랜잭션 외부]:
      * 1. 사용자 검증
      * 2. PRODUCT 도메인: 상품 옵션 검증
+     *
+     * [트랜잭션 내부 (CartService)]:
      * 3. CART 도메인: 장바구니 추가
+     *
+     * [트랜잭션 외부]:
      * 4. 데이터 조합
      *
      * @param request 장바구니 추가 요청
      * @return 추가/수정된 장바구니 아이템 정보 및 신규 여부
      */
-    @Transactional
     fun addToCart(request: AddToCartRequest): AddToCartUseCaseResult {
-        // 1. 사용자 존재 여부 검증
+        // Step 1-2: 트랜잭션 외부 검증 (Connection 점유 안함)
         userService.validateUserExists(request.userId)
-
-        // 2. PRODUCT 도메인: 활성 상품 옵션 조회
         val productOption = productOptionService.getActiveOptionWithProduct(request.productOptionId)
 
-        // 3. CART 도메인: 장바구니 아이템 추가/수정
+        // Step 3: 트랜잭션 내부 쓰기 작업 (CartService의 @Transactional 적용)
         val result = cartService.addCartItem(
             userId = request.userId,
             productOptionId = request.productOptionId,
             quantity = request.quantity
         )
 
-        // 4. 데이터 조합
+        // Step 4: 트랜잭션 외부 데이터 조합 (Connection 점유 안함)
         val cartItemDetail = CartItemDetail(
             cartItemId = result.cartItem.id,
             productOptionId = result.cartItem.productOptionId,

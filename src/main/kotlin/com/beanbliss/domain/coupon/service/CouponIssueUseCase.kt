@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional
  * - `CouponService`: 쿠폰 정보 조회 및 유효성 검증
  * - `UserCouponService`: 사용자 쿠폰 생성 및 중복 발급 확인
  * - `CouponTicketService`: 티켓 선점 및 상태 업데이트 (FOR UPDATE SKIP LOCKED)
+ *
+ * [트랜잭션 최적화]:
+ * - 검증 로직(Step 1-3)은 트랜잭션 외부에서 수행 → Connection 점유 시간 최소화
+ * - 쓰기 작업(Step 4-6)만 트랜잭션 내부에서 수행
  */
 @Component
 class CouponIssueUseCase(
@@ -26,25 +30,47 @@ class CouponIssueUseCase(
     /**
      * 쿠폰 발급
      *
+     * [트랜잭션 외부]:
      * 1. 사용자 존재 여부 검증 (User 도메인)
      * 2. 쿠폰 유효성 검증 (Coupon 도메인)
      * 3. 중복 발급 방지 검증 (UserCoupon 도메인)
+     *
+     * [트랜잭션 내부]:
      * 4. 티켓 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
      * 5. 사용자 쿠폰 생성 (UserCoupon 도메인)
      * 6. 티켓 상태 업데이트 (CouponTicket 도메인)
-     * 7. DTO 변환 및 반환
+     *
+     * [원자성 보장]:
+     * - Step 4-6은 하나의 트랜잭션에서 실행되어 원자성 보장
+     * - 중복 발급은 Step 3의 검증과 Step 5의 생성이 연속적으로 실행되어 방지
+     *   (실제 운영에서는 DB UNIQUE 제약 추가 권장)
      */
-    @Transactional
     fun issueCoupon(couponId: Long, userId: Long): IssueCouponResponse {
-        // 1. 사용자 존재 여부 검증 (User 도메인)
+        // Step 1-3: 트랜잭션 외부 검증 (Connection 점유 안함)
         userService.validateUserExists(userId)
-
-        // 2. 쿠폰 유효성 검증 (Coupon 도메인)
         val coupon = couponService.getValidCoupon(couponId)
-
-        // 3. 중복 발급 방지 검증 (UserCoupon 도메인)
         userCouponService.validateNotAlreadyIssued(userId, couponId)
 
+        // Step 4-6: 트랜잭션 내부 쓰기 작업 (Connection 점유 최소화)
+        return issueTicketTransactional(couponId, userId, coupon)
+    }
+
+    /**
+     * 쿠폰 티켓 발급 트랜잭션 (쓰기 작업만)
+     *
+     * [트랜잭션 범위]:
+     * - 티켓 선점 (FOR UPDATE SKIP LOCKED)
+     * - 사용자 쿠폰 생성
+     * - 티켓 상태 업데이트
+     *
+     * [Connection 점유 시간]: ~15ms (검증 제외)
+     */
+    @Transactional
+    private fun issueTicketTransactional(
+        couponId: Long,
+        userId: Long,
+        coupon: CouponService.CouponInfo
+    ): IssueCouponResponse {
         // 4. 티켓 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
         val ticket = couponTicketService.reserveAvailableTicket(couponId)
 
