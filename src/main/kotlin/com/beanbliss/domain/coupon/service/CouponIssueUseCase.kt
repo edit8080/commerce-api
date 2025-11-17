@@ -2,6 +2,7 @@ package com.beanbliss.domain.coupon.service
 
 import com.beanbliss.domain.coupon.dto.IssueCouponResponse
 import com.beanbliss.domain.user.service.UserService
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -38,7 +39,7 @@ class CouponIssueUseCase(
      * [트랜잭션 내부]:
      * 4. 티켓 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
      * 5. 사용자 쿠폰 생성 (UserCoupon 도메인)
-     * 6. 티켓 상태 업데이트 (CouponTicket 도메인)
+     * 6. 티켓을 사용자에게 발급 (CouponTicket 도메인 - 상태 변경 + 사용자 정보 기록)
      *
      * [원자성 보장]:
      * - Step 4-6은 하나의 트랜잭션에서 실행되어 원자성 보장
@@ -52,35 +53,43 @@ class CouponIssueUseCase(
         userCouponService.validateNotAlreadyIssued(userId, couponId)
 
         // Step 4-6: 트랜잭션 내부 쓰기 작업 (Connection 점유 최소화)
-        return issueTicketTransactional(couponId, userId, coupon)
+        return issueTicketToUser(couponId, userId, coupon)
     }
 
     /**
      * 쿠폰 티켓 발급 트랜잭션 (쓰기 작업만)
      *
      * [트랜잭션 범위]:
-     * - 티켓 선점 (FOR UPDATE SKIP LOCKED)
-     * - 사용자 쿠폰 생성
-     * - 티켓 상태 업데이트
+     * - Step 4. 티켓 조회 및 선점: FOR UPDATE SKIP LOCKED
+     * - Step 5. 사용자 쿠폰 생성
+     * - Step 6. 티켓을 사용자에게 발급: 상태 변경 + 사용자 정보 기록
+     *
+     * [동시성 제어]:
+     * - findAvailableTicketWithLock(): FOR UPDATE SKIP LOCKED로 티켓 조회
+     *   (이미 락이 걸린 행은 자동으로 건너뜀 → Race Condition 방지)
+     * - 조회된 티켓은 즉시 락 상태로 다른 요청 차단
+     * - issueTicketToUser(): 단일 쿼리로 상태 변경 + 사용자 정보 매핑
      *
      * [Connection 점유 시간]: ~15ms (검증 제외)
      */
     @Transactional
-    private fun issueTicketTransactional(
+    fun issueTicketToUser(
         couponId: Long,
         userId: Long,
         coupon: CouponService.CouponInfo
     ): IssueCouponResponse {
-        // 4. 티켓 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
-        val ticket = couponTicketService.reserveAvailableTicket(couponId)
+        // Step 4. 티켓 조회 및 선점 (CouponTicket 도메인 - FOR UPDATE SKIP LOCKED)
+        // 이미 락이 걸린 행은 자동으로 건너뛰고 다음 티켓 조회
+        val ticket = couponTicketService.findAvailableTicketWithLock(couponId)
 
-        // 5. 사용자 쿠폰 생성 (UserCoupon 도메인)
+        // Step 5. 사용자 쿠폰 생성 (UserCoupon 도메인)
         val userCoupon = userCouponService.createUserCoupon(userId, couponId)
 
-        // 6. 티켓 상태 업데이트 (CouponTicket 도메인)
-        couponTicketService.markTicketAsIssued(ticket.id, userId, userCoupon.id)
+        // Step 6. 티켓을 사용자에게 발급 (CouponTicket 도메인)
+        // 단일 쿼리로 상태 변경(AVAILABLE → ISSUED)과 사용자 정보 기록(userId, userCouponId, issuedAt)
+        couponTicketService.issueTicketToUser(ticket.id, userId, userCoupon.id)
 
-        // 7. DTO 변환 및 반환
+        // Step 7. DTO 변환 및 반환
         return IssueCouponResponse(
             userCouponId = userCoupon.id,
             couponId = coupon.id,

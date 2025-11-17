@@ -9,8 +9,9 @@ import com.beanbliss.domain.coupon.entity.CouponTicketEntity
 interface CouponTicketRepository {
     /**
      * 발급 가능한 티켓 조회 및 락 설정 (FOR UPDATE SKIP LOCKED)
-     * - status가 'AVAILABLE'이고 userId가 null인 티켓 중 하나를 선점
-     * - 이미 락이 걸린 티켓은 건너뛰고 다음 티켓 조회
+     * - status = 'AVAILABLE'인 티켓 중 하나를 선점
+     * - 이미 락이 걸린 티켓은 건너뛰고 다음 티켓 자동 선택
+     * - 조회된 티켓은 즉시 락 상태가 되어 다른 요청의 조회 불가
      *
      * @param couponId 쿠폰 ID
      * @return 선점된 티켓 (없으면 null)
@@ -18,15 +19,15 @@ interface CouponTicketRepository {
     fun findAvailableTicketWithLock(couponId: Long): CouponTicketEntity?
 
     /**
-     * 티켓 상태를 'ISSUED'로 업데이트
+     * 티켓을 사용자에게 발급
+     * - status: 'AVAILABLE' → 'ISSUED'
      * - userId, userCouponId, issuedAt 설정
-     * - status를 'ISSUED'로 변경
      *
      * @param ticketId 티켓 ID
      * @param userId 사용자 ID
      * @param userCouponId 사용자 쿠폰 ID
      */
-    fun updateTicketAsIssued(ticketId: Long, userId: Long, userCouponId: Long)
+    fun issueTicketToUser(ticketId: Long, userId: Long, userCouponId: Long)
 
     /**
      * 특정 쿠폰의 AVAILABLE 상태 티켓 개수 조회
