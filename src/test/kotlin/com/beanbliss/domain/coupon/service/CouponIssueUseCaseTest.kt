@@ -27,7 +27,7 @@ import java.time.LocalDateTime
  * - UserService: 사용자 존재 여부 확인
  * - CouponService: 쿠폰 유효성 검증
  * - UserCouponService: 중복 발급 확인 및 사용자 쿠폰 생성
- * - CouponTicketService: 티켓 선점 및 상태 업데이트
+ * - CouponTicketService: 티켓 선점 (FOR UPDATE SKIP LOCKED) 및 발급 (상태 변경 + 사용자 정보 기록)
  */
 @DisplayName("쿠폰 발급 UseCase 테스트")
 class CouponIssueUseCaseTest {
@@ -93,9 +93,9 @@ class CouponIssueUseCaseTest {
         every { userService.validateUserExists(userId) } just Runs
         every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
-        every { couponTicketService.reserveAvailableTicket(couponId) } returns availableTicket
+        every { couponTicketService.findAvailableTicketWithLock(couponId) } returns availableTicket
         every { userCouponService.createUserCoupon(userId, couponId) } returns savedUserCoupon
-        every { couponTicketService.markTicketAsIssued(1L, userId, 1L) } just Runs
+        every { couponTicketService.issueTicketToUser(1L, userId, 1L) } just Runs
 
         // When
         val response = couponIssueUseCase.issueCoupon(couponId, userId)
@@ -104,9 +104,9 @@ class CouponIssueUseCaseTest {
         verify(exactly = 1) { userService.validateUserExists(userId) }
         verify(exactly = 1) { couponService.getValidCoupon(couponId) }
         verify(exactly = 1) { userCouponService.validateNotAlreadyIssued(userId, couponId) }
-        verify(exactly = 1) { couponTicketService.reserveAvailableTicket(couponId) }
+        verify(exactly = 1) { couponTicketService.findAvailableTicketWithLock(couponId) }
         verify(exactly = 1) { userCouponService.createUserCoupon(userId, couponId) }
-        verify(exactly = 1) { couponTicketService.markTicketAsIssued(1L, userId, 1L) }
+        verify(exactly = 1) { couponTicketService.issueTicketToUser(1L, userId, 1L) }
 
         // Then - 응답 데이터 검증
         assertNotNull(response)
@@ -135,7 +135,7 @@ class CouponIssueUseCaseTest {
         verify(exactly = 1) { userService.validateUserExists(userId) }
         verify(exactly = 0) { couponService.getValidCoupon(any()) }
         verify(exactly = 0) { userCouponService.validateNotAlreadyIssued(any(), any()) }
-        verify(exactly = 0) { couponTicketService.reserveAvailableTicket(any()) }
+        verify(exactly = 0) { couponTicketService.findAvailableTicketWithLock(any()) }
     }
 
     @Test
@@ -155,7 +155,7 @@ class CouponIssueUseCaseTest {
 
         verify(exactly = 1) { userService.validateUserExists(userId) }
         verify(exactly = 1) { couponService.getValidCoupon(couponId) }
-        verify(exactly = 0) { couponTicketService.reserveAvailableTicket(any()) }
+        verify(exactly = 0) { couponTicketService.findAvailableTicketWithLock(any()) }
     }
 
     @Test
@@ -174,7 +174,7 @@ class CouponIssueUseCaseTest {
         }
 
         assertTrue(exception.message?.contains("만료") == true || exception.message?.contains("유효기간") == true)
-        verify(exactly = 0) { couponTicketService.reserveAvailableTicket(any()) }
+        verify(exactly = 0) { couponTicketService.findAvailableTicketWithLock(any()) }
     }
 
     @Test
@@ -193,7 +193,7 @@ class CouponIssueUseCaseTest {
         }
 
         assertTrue(exception.message?.contains("아직") == true || exception.message?.contains("시작") == true)
-        verify(exactly = 0) { couponTicketService.reserveAvailableTicket(any()) }
+        verify(exactly = 0) { couponTicketService.findAvailableTicketWithLock(any()) }
     }
 
     @Test
@@ -227,7 +227,7 @@ class CouponIssueUseCaseTest {
         }
 
         assertTrue(exception.message?.contains("이미") == true)
-        verify(exactly = 0) { couponTicketService.reserveAvailableTicket(any()) }
+        verify(exactly = 0) { couponTicketService.findAvailableTicketWithLock(any()) }
         verify(exactly = 0) { userCouponService.createUserCoupon(any(), any()) }
     }
 
@@ -255,7 +255,7 @@ class CouponIssueUseCaseTest {
         every { userService.validateUserExists(userId) } just Runs
         every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
-        every { couponTicketService.reserveAvailableTicket(couponId) } throws CouponOutOfStockException("쿠폰 재고가 부족합니다.")
+        every { couponTicketService.findAvailableTicketWithLock(couponId) } throws CouponOutOfStockException("쿠폰 재고가 부족합니다.")
 
         // When & Then
         val exception = assertThrows<CouponOutOfStockException> {
@@ -311,9 +311,9 @@ class CouponIssueUseCaseTest {
         every { userService.validateUserExists(userId) } just Runs
         every { couponService.getValidCoupon(couponId) } returns mockCouponInfo
         every { userCouponService.validateNotAlreadyIssued(userId, couponId) } just Runs
-        every { couponTicketService.reserveAvailableTicket(couponId) } returns availableTicket
+        every { couponTicketService.findAvailableTicketWithLock(couponId) } returns availableTicket
         every { userCouponService.createUserCoupon(userId, couponId) } returns savedUserCoupon
-        every { couponTicketService.markTicketAsIssued(1L, userId, 1L) } just Runs
+        every { couponTicketService.issueTicketToUser(1L, userId, 1L) } just Runs
 
         // When
         couponIssueUseCase.issueCoupon(couponId, userId)
@@ -323,9 +323,9 @@ class CouponIssueUseCaseTest {
             userService.validateUserExists(userId)
             couponService.getValidCoupon(couponId)
             userCouponService.validateNotAlreadyIssued(userId, couponId)
-            couponTicketService.reserveAvailableTicket(couponId)
+            couponTicketService.findAvailableTicketWithLock(couponId)
             userCouponService.createUserCoupon(userId, couponId)
-            couponTicketService.markTicketAsIssued(1L, userId, 1L)
+            couponTicketService.issueTicketToUser(1L, userId, 1L)
         }
     }
 }
