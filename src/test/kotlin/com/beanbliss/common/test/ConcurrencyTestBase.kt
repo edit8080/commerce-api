@@ -2,6 +2,7 @@ package com.beanbliss.common.test
 
 import com.beanbliss.CommerceApplication
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.MySQLContainer
@@ -31,6 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
  */
 @SpringBootTest(classes = [CommerceApplication::class])
 @Testcontainers
+@ActiveProfiles("test")
 abstract class ConcurrencyTestBase {
 
     companion object {
