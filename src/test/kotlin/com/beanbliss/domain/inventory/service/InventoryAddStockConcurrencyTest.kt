@@ -11,7 +11,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
@@ -28,11 +29,13 @@ import kotlin.system.measureTimeMillis
  * [테스트 시나리오]:
  * - 시나리오 1: Lost Update - 두 관리자가 동시에 재고 추가
  * - 시나리오 2: 대량 동시 추가 - 여러 관리자가 동시에 재고 추가
+ *
+ * [TransactionTemplate 사용]:
+ * - @Transactional 대신 TransactionTemplate 사용
+ * - commit 시점을 명시적으로 제어
  */
 @DisplayName("재고 추가 동시성 테스트")
-@Transactional
 class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
-
     @Autowired
     private lateinit var inventoryService: InventoryService
 
@@ -42,11 +45,16 @@ class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private lateinit var testProduct: ProductEntity
     private lateinit var testOption: ProductOptionEntity
 
     @BeforeEach
     fun setUp() {
+        transactionTemplate = TransactionTemplate(transactionManager)
         cleanDatabase()
         createTestData()
     }
@@ -60,40 +68,42 @@ class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
     }
 
     private fun createTestData() {
-        // 테스트 상품 생성
-        testProduct = ProductEntity(
-            name = "테스트 원두",
-            description = "동시성 테스트용",
-            brand = "테스트 브랜드",
-            createdAt = LocalDateTime.now()
-        )
-        entityManager.persist(testProduct)
-        entityManager.flush()
+        transactionTemplate.execute {
+            // 테스트 상품 생성
+            testProduct = ProductEntity(
+                name = "테스트 원두",
+                description = "동시성 테스트용",
+                brand = "테스트 브랜드",
+                createdAt = LocalDateTime.now()
+            )
+            entityManager.persist(testProduct)
+            entityManager.flush()
 
-        // 상품 옵션 생성
-        testOption = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT001",
-            origin = "브라질",
-            grindType = "홀빈",
-            weightGrams = 200,
-            price = BigDecimal(15000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        entityManager.persist(testOption)
-        entityManager.flush()
+            // 상품 옵션 생성
+            testOption = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT001",
+                origin = "브라질",
+                grindType = "홀빈",
+                weightGrams = 200,
+                price = BigDecimal(15000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            entityManager.persist(testOption)
+            entityManager.flush()
 
-        // 초기 재고 10개
-        val inventory = InventoryEntity(
-            productOptionId = testOption.id,
-            stockQuantity = 10,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-        entityManager.persist(inventory)
-        entityManager.flush()
-        entityManager.clear()
+            // 초기 재고 10개
+            val inventory = InventoryEntity(
+                productOptionId = testOption.id,
+                stockQuantity = 10,
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+            entityManager.persist(inventory)
+            entityManager.flush()
+            entityManager.clear()
+        }
     }
 
     @Test
@@ -108,9 +118,11 @@ class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
         executor.submit {
             try {
                 Thread.sleep(10)
-                val result = inventoryService.addStock(testOption.id, 100)
-                synchronized(results) {
-                    results.add(result)
+                transactionTemplate.execute {
+                    val result = inventoryService.addStock(testOption.id, 100)
+                    synchronized(results) {
+                        results.add(result)
+                    }
                 }
             } finally {
                 latch.countDown()
@@ -121,9 +133,11 @@ class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
         executor.submit {
             try {
                 Thread.sleep(10)
-                val result = inventoryService.addStock(testOption.id, 50)
-                synchronized(results) {
-                    results.add(result)
+                transactionTemplate.execute {
+                    val result = inventoryService.addStock(testOption.id, 50)
+                    synchronized(results) {
+                        results.add(result)
+                    }
                 }
             } finally {
                 latch.countDown()
@@ -157,8 +171,10 @@ class InventoryAddStockConcurrencyTest : ConcurrencyTestBase() {
         repeat(concurrentManagers) {
             executor.submit {
                 try {
-                    inventoryService.addStock(testOption.id, addQuantity)
-                    successCount.incrementAndGet()
+                    transactionTemplate.execute {
+                        inventoryService.addStock(testOption.id, addQuantity)
+                        successCount.incrementAndGet()
+                    }
                 } finally {
                     latch.countDown()
                 }
