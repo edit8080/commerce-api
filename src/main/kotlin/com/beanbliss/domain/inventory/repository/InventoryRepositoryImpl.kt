@@ -3,10 +3,12 @@ package com.beanbliss.domain.inventory.repository
 import com.beanbliss.common.util.SortUtils
 import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.entity.InventoryEntity
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -22,9 +24,23 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
     fun findByProductOptionId(productOptionId: Long): InventoryEntity?
 
     /**
+     * 상품 옵션 ID로 재고 조회 (비관적 락)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryEntity i WHERE i.productOptionId = :productOptionId")
+    fun findByProductOptionIdWithLock(@Param("productOptionId") productOptionId: Long): InventoryEntity?
+
+    /**
      * 여러 상품 옵션 ID로 재고 일괄 조회 (Bulk 조회)
      */
     fun findByProductOptionIdIn(productOptionIds: List<Long>): List<InventoryEntity>
+
+    /**
+     * 여러 상품 옵션 ID로 재고 일괄 조회 (Bulk 조회 + 비관적 락 + ORDER BY로 Deadlock 방지)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM InventoryEntity i WHERE i.productOptionId IN :productOptionIds ORDER BY i.productOptionId")
+    fun findByProductOptionIdInWithLock(@Param("productOptionIds") productOptionIds: List<Long>): List<InventoryEntity>
 
     /**
      * 전체 재고 개수 조회
@@ -152,12 +168,33 @@ class InventoryRepositoryImpl(
         )
     }
 
+    override fun findByProductOptionIdWithLock(productOptionId: Long): Inventory? {
+        val entity = inventoryJpaRepository.findByProductOptionIdWithLock(productOptionId) ?: return null
+        return Inventory(
+            productOptionId = entity.productOptionId,
+            stockQuantity = entity.stockQuantity
+        )
+    }
+
     override fun findAllByProductOptionIds(productOptionIds: List<Long>): List<Inventory> {
         if (productOptionIds.isEmpty()) {
             return emptyList()
         }
 
         return inventoryJpaRepository.findByProductOptionIdIn(productOptionIds).map { entity ->
+            Inventory(
+                productOptionId = entity.productOptionId,
+                stockQuantity = entity.stockQuantity
+            )
+        }
+    }
+
+    override fun findAllByProductOptionIdsWithLock(productOptionIds: List<Long>): List<Inventory> {
+        if (productOptionIds.isEmpty()) {
+            return emptyList()
+        }
+
+        return inventoryJpaRepository.findByProductOptionIdInWithLock(productOptionIds).map { entity ->
             Inventory(
                 productOptionId = entity.productOptionId,
                 stockQuantity = entity.stockQuantity
