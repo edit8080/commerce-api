@@ -4,7 +4,7 @@ import com.beanbliss.common.exception.CommonExceptionHandler
 import com.beanbliss.domain.cart.usecase.AddToCartUseCase
 import com.beanbliss.domain.cart.usecase.AddToCartUseCaseResult
 import com.beanbliss.domain.cart.dto.AddToCartRequest
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItemDetail
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.common.exception.InvalidParameterException
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -59,7 +59,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        val mockCartItem = CartItemResponse(
+        val mockCartItem = CartItemDetail(
             cartItemId = 100L,
             productOptionId = 1L,
             productName = "에티오피아 예가체프 G1",
@@ -87,7 +87,7 @@ class CartAddControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isCreated) // 201 Created
+            .andExpect(status().isOk) // 200 OK (ApiResponse로 통일)
             .andExpect(jsonPath("$.data.cartItemId").value(100))
             .andExpect(jsonPath("$.data.productOptionId").value(1))
             .andExpect(jsonPath("$.data.productName").value("에티오피아 예가체프 G1"))
@@ -113,7 +113,7 @@ class CartAddControllerTest {
             quantity = 2
         )
 
-        val mockCartItem = CartItemResponse(
+        val mockCartItem = CartItemDetail(
             cartItemId = 100L,
             productOptionId = 1L,
             productName = "에티오피아 예가체프 G1",

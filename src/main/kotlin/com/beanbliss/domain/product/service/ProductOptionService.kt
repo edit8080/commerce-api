@@ -55,4 +55,27 @@ class ProductOptionService(
         return productOptionRepository.findActiveOptionWithProduct(productOptionId)
             ?: throw ResourceNotFoundException("상품 옵션 ID: ${productOptionId}를 찾을 수 없습니다.")
     }
+
+    /**
+     * 여러 상품 옵션 ID로 일괄 조회 (Batch 조회, PRODUCT와 JOIN)
+     *
+     * [성능 최적화]:
+     * - N+1 문제 방지: 단일 쿼리로 모든 옵션 조회
+     * - WHERE IN 절 사용
+     *
+     * [사용처]:
+     * - UseCase 계층에서 여러 도메인 데이터 조합 시 사용
+     * - 장바구니, 주문, 재고 등에서 상품 옵션 정보가 필요할 때
+     *
+     * @param optionIds 상품 옵션 ID 리스트
+     * @return Map<옵션ID, 상품 옵션 상세 정보> (존재하는 것만 반환)
+     */
+    fun getOptionsBatch(optionIds: List<Long>): Map<Long, ProductOptionDetail> {
+        if (optionIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        return productOptionRepository.findByIdsBatch(optionIds)
+            .associateBy { it.optionId }
+    }
 }

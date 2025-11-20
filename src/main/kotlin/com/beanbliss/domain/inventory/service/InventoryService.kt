@@ -1,8 +1,8 @@
 package com.beanbliss.domain.inventory.service
 
 import com.beanbliss.common.exception.ResourceNotFoundException
-import com.beanbliss.domain.cart.dto.CartItemResponse
-import com.beanbliss.domain.inventory.dto.InventoryResponse
+import com.beanbliss.domain.cart.domain.CartItemDetail
+import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository
@@ -34,10 +34,15 @@ class InventoryService(
 ) {
 
     /**
-     * 재고 목록 조회 결과 (도메인 데이터)
+     * 재고 목록 조회 결과 (INVENTORY 도메인만)
+     *
+     * [설계 변경]:
+     * - PRODUCT 정보 제거
+     * - INVENTORY 도메인만 반환
+     * - UseCase에서 PRODUCT 정보와 조합
      */
     data class InventoriesResult(
-        val inventories: List<InventoryResponse>,
+        val inventories: List<Inventory>,
         val totalElements: Long
     )
 
@@ -51,19 +56,31 @@ class InventoryService(
         val availableStockAfterReservation: Int
     )
 
+    /**
+     * 재고 목록 조회 (INVENTORY 도메인만)
+     *
+     * [비즈니스 로직]:
+     * 1. INVENTORY 테이블에서 재고 목록 조회
+     * 2. 전체 재고 개수 조회 (페이징용)
+     * 3. INVENTORY 도메인 데이터 반환
+     *
+     * @param page 페이지 번호
+     * @param size 페이지 크기
+     * @return 재고 목록 + 전체 개수
+     */
     fun getInventories(page: Int, size: Int): InventoriesResult {
-        // 1. 재고 목록 조회 (created_at DESC 정렬)
-        val inventories = inventoryRepository.findAllWithProductInfo(
+        // 1. 재고 목록 조회 (product_option_id DESC 정렬)
+        val inventories = inventoryRepository.findAll(
             page = page,
             size = size,
-            sortBy = "created_at",
+            sortBy = "product_option_id",
             sortDirection = "DESC"
         )
 
         // 2. 전체 재고 개수 조회
         val totalElements = inventoryRepository.count()
 
-        // 3. 도메인 데이터 반환
+        // 3. INVENTORY 도메인 데이터 반환
         return InventoriesResult(
             inventories = inventories,
             totalElements = totalElements
@@ -117,7 +134,7 @@ class InventoryService(
      * @throws InsufficientAvailableStockException 가용 재고가 부족한 경우
      */
     @Transactional
-    fun reserveInventory(userId: Long, cartItems: List<CartItemResponse>): List<ReservationItem> {
+    fun reserveInventory(userId: Long, cartItems: List<CartItemDetail>): List<ReservationItem> {
         // 1. 중복 예약 방지
         val activeReservationCount = inventoryReservationRepository.countActiveReservations(userId)
         if (activeReservationCount > 0) {
@@ -173,7 +190,7 @@ class InventoryService(
     }
 
     @Transactional
-    fun reduceStockForOrder(cartItems: List<CartItemResponse>) {
+    fun reduceStockForOrder(cartItems: List<CartItemDetail>) {
         // 1. 장바구니 아이템의 모든 상품 옵션 ID 추출
         val productOptionIds = cartItems.map { it.productOptionId }
 

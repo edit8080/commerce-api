@@ -9,6 +9,9 @@ import com.beanbliss.domain.coupon.dto.IssueCouponResponse
 import com.beanbliss.domain.coupon.service.CouponIssueUseCase
 import com.beanbliss.domain.coupon.service.CouponService
 import com.beanbliss.domain.coupon.usecase.CreateCouponUseCase
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.*
  */
 @RestController
 @RequestMapping("/api/coupons")
+@Tag(name = "쿠폰 관리", description = "쿠폰 생성, 조회, 발급 API")
 class CouponController(
     private val couponService: CouponService,
     private val couponIssueUseCase: CouponIssueUseCase,
@@ -49,6 +53,7 @@ class CouponController(
      *   - 정액 할인에 최대 할인 금액이 설정된 경우
      */
     @PostMapping
+    @Operation(summary = "쿠폰 생성", description = "선착순 쿠폰 생성 및 초기화")
     fun createCoupon(
         @Valid @RequestBody request: CreateCouponRequest
     ): ResponseEntity<CreateCouponResponse> {
@@ -82,8 +87,11 @@ class CouponController(
      * @throws InvalidParameterException 페이징 파라미터가 유효하지 않을 경우
      */
     @GetMapping
+    @Operation(summary = "쿠폰 목록 조회", description = "사용 가능한 쿠폰 목록 조회 (페이지네이션)")
     fun getCoupons(
+        @Parameter(description = "페이지 번호 (1부터 시작)", example = "1")
         @RequestParam(defaultValue = "1") page: Int,
+        @Parameter(description = "페이지 크기 (1-100)", example = "10")
         @RequestParam(defaultValue = "10") size: Int
     ): CouponListResponse {
         // 1. 파라미터 검증 (PageCalculator에 위임)
@@ -136,7 +144,9 @@ class CouponController(
      * @throws IllegalStateException 유효기간 만료, 재고 부족, 중복 발급 등의 경우
      */
     @PostMapping("/{couponId}/issue")
+    @Operation(summary = "쿠폰 발급", description = "사용자에게 쿠폰 발급")
     fun issueCoupon(
+        @Parameter(description = "쿠폰 ID", example = "1")
         @PathVariable couponId: Long,
         @Valid @RequestBody request: IssueCouponRequest
     ): IssueCouponResponse {

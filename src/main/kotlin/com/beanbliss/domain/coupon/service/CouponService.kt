@@ -89,12 +89,12 @@ class CouponService(
 
         // 4. Entity → Service DTO 변환
         return CouponInfo(
-            id = savedEntity.id!!,
+            id = savedEntity.id,
             name = savedEntity.name,
-            discountType = savedEntity.discountType,
-            discountValue = savedEntity.discountValue,
-            minOrderAmount = savedEntity.minOrderAmount,
-            maxDiscountAmount = savedEntity.maxDiscountAmount,
+            discountType = savedEntity.discountType.name,
+            discountValue = savedEntity.discountValue.toInt(),
+            minOrderAmount = savedEntity.minOrderAmount.toInt(),
+            maxDiscountAmount = savedEntity.maxDiscountAmount.toInt(),
             totalQuantity = savedEntity.totalQuantity,
             validFrom = savedEntity.validFrom,
             validUntil = savedEntity.validUntil,
@@ -123,12 +123,12 @@ class CouponService(
     private fun createCouponEntity(request: CreateCouponRequest): CouponEntity {
         val now = LocalDateTime.now()
         return CouponEntity(
-            id = null, // Auto-generated
+            id = 0L, // Auto-generated
             name = request.name,
-            discountType = request.discountType.name,
-            discountValue = request.discountValue,
-            minOrderAmount = request.minOrderAmount,
-            maxDiscountAmount = request.maxDiscountAmount ?: 0,
+            discountType = request.discountType,
+            discountValue = request.discountValue.toBigDecimal(),
+            minOrderAmount = request.minOrderAmount.toBigDecimal(),
+            maxDiscountAmount = (request.maxDiscountAmount ?: 0).toBigDecimal(),
             totalQuantity = request.totalQuantity,
             validFrom = request.validFrom,
             validUntil = request.validUntil,
@@ -178,12 +178,12 @@ class CouponService(
 
         // 3. Entity → Service DTO 변환
         return CouponInfo(
-            id = coupon.id!!,
+            id = coupon.id,
             name = coupon.name,
-            discountType = coupon.discountType,
-            discountValue = coupon.discountValue,
-            minOrderAmount = coupon.minOrderAmount,
-            maxDiscountAmount = coupon.maxDiscountAmount,
+            discountType = coupon.discountType.name,
+            discountValue = coupon.discountValue.toInt(),
+            minOrderAmount = coupon.minOrderAmount.toInt(),
+            maxDiscountAmount = coupon.maxDiscountAmount.toInt(),
             totalQuantity = coupon.totalQuantity,
             validFrom = coupon.validFrom,
             validUntil = coupon.validUntil,
@@ -218,12 +218,12 @@ class CouponService(
 
         // 6. Entity → Service DTO 변환
         val couponInfo = CouponInfo(
-            id = coupon.id!!,
+            id = coupon.id,
             name = coupon.name,
-            discountType = coupon.discountType,
-            discountValue = coupon.discountValue,
-            minOrderAmount = coupon.minOrderAmount,
-            maxDiscountAmount = coupon.maxDiscountAmount,
+            discountType = coupon.discountType.name,
+            discountValue = coupon.discountValue.toInt(),
+            minOrderAmount = coupon.minOrderAmount.toInt(),
+            maxDiscountAmount = coupon.maxDiscountAmount.toInt(),
             totalQuantity = coupon.totalQuantity,
             validFrom = coupon.validFrom,
             validUntil = coupon.validUntil,
@@ -241,15 +241,13 @@ class CouponService(
 
         // 2. 쿠폰 상태를 USED로 변경
         val now = LocalDateTime.now()
-        val updatedCoupon = userCoupon.copy(
-            status = UserCouponStatus.USED,
-            usedOrderId = orderId,
-            usedAt = now,
-            updatedAt = now
-        )
+        userCoupon.status = UserCouponStatus.USED
+        userCoupon.usedOrderId = orderId
+        userCoupon.usedAt = now
+        userCoupon.updatedAt = now
 
         // 3. 저장
-        userCouponRepository.save(updatedCoupon.userId, updatedCoupon.couponId)
+        userCouponRepository.save(userCoupon.userId, userCoupon.couponId)
     }
 
     fun calculateDiscount(coupon: CouponInfo, originalAmount: Int): Int {

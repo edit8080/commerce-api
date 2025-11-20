@@ -1,8 +1,8 @@
 package com.beanbliss.domain.product.usecase
 
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.domain.product.service.ProductService
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
@@ -294,9 +294,9 @@ class GetProductsUseCaseTest {
         productId: Long,
         name: String,
         optionIds: List<Long>
-    ): ProductResponse {
+    ): ProductWithOptions {
         val options = optionIds.map { optionId ->
-            ProductOptionResponse(
+            ProductOptionInfo(
                 optionId = optionId,
                 optionCode = "TEST-CODE-$optionId",
                 origin = "Test Origin",
@@ -307,7 +307,7 @@ class GetProductsUseCaseTest {
             )
         }
 
-        return ProductResponse(
+        return ProductWithOptions(
             productId = productId,
             name = name,
             description = "Test Description",

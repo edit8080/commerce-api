@@ -35,7 +35,7 @@ class BalanceService(
         // Entity → Service DTO 변환
         return BalanceInfo(
             userId = balanceEntity.userId,
-            amount = balanceEntity.amount,
+            amount = balanceEntity.amount.toInt(),
             updatedAt = balanceEntity.updatedAt
         )
     }
@@ -50,18 +50,15 @@ class BalanceService(
         // 2. UPSERT: 레코드 존재 여부에 따라 UPDATE 또는 INSERT
         val savedBalance = if (existingBalance != null) {
             // UPDATE: 기존 잔액에 충전 금액 추가
-            val newAmount = existingBalance.amount + chargeAmount
-            val updatedBalance = existingBalance.copy(
-                amount = newAmount,
-                updatedAt = now
-            )
-            balanceRepository.save(updatedBalance)
+            existingBalance.amount = existingBalance.amount.add(chargeAmount.toBigDecimal())
+            existingBalance.updatedAt = now
+            balanceRepository.save(existingBalance)
         } else {
             // INSERT: 새로운 잔액 레코드 생성 (0 + chargeAmount)
             val newBalance = BalanceEntity(
                 id = 0, // Auto-generated
                 userId = userId,
-                amount = chargeAmount,
+                amount = chargeAmount.toBigDecimal(),
                 createdAt = now,
                 updatedAt = now
             )
@@ -71,7 +68,7 @@ class BalanceService(
         // 3. Entity → Service DTO 변환 후 반환
         return BalanceInfo(
             userId = savedBalance.userId,
-            amount = savedBalance.amount,
+            amount = savedBalance.amount.toInt(),
             updatedAt = savedBalance.updatedAt
         )
     }
@@ -83,20 +80,19 @@ class BalanceService(
             ?: throw BalanceNotFoundException("사용자 ID: $userId 의 잔액 정보를 찾을 수 없습니다.")
 
         // 2. 잔액 충분성 검증
-        if (balance.amount < amount) {
+        val amountDecimal = amount.toBigDecimal()
+        if (balance.amount < amountDecimal) {
             throw InsufficientBalanceException(
-                "잔액이 부족합니다. 현재 잔액: ${balance.amount}원, 결제 금액: ${amount}원"
+                "잔액이 부족합니다. 현재 잔액: ${balance.amount.toInt()}원, 결제 금액: ${amount}원"
             )
         }
 
         // 3. 잔액 차감
         val now = LocalDateTime.now()
-        val updatedBalance = balance.copy(
-            amount = balance.amount - amount,
-            updatedAt = now
-        )
+        balance.amount = balance.amount.subtract(amountDecimal)
+        balance.updatedAt = now
 
         // 4. 변경 사항 저장
-        balanceRepository.save(updatedBalance)
+        balanceRepository.save(balance)
     }
 }

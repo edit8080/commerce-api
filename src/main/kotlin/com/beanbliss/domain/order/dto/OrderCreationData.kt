@@ -1,6 +1,6 @@
 package com.beanbliss.domain.order.dto
 
-import com.beanbliss.domain.cart.dto.CartItemResponse
+import com.beanbliss.domain.cart.domain.CartItemDetail
 
 /**
  * 주문 생성 데이터
@@ -15,7 +15,7 @@ import com.beanbliss.domain.cart.dto.CartItemResponse
  */
 data class OrderCreationData(
     val userId: Long,
-    val cartItems: List<CartItemResponse>,
+    val cartItems: List<CartItemDetail>,
     val originalAmount: Int,
     val discountAmount: Int,
     val finalAmount: Int,

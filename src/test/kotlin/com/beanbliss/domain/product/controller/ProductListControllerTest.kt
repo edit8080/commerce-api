@@ -2,8 +2,8 @@ package com.beanbliss.domain.product.controller
 
 import com.beanbliss.common.dto.PageableResponse
 import com.beanbliss.domain.product.dto.ProductListResponse
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
 import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
@@ -63,14 +63,14 @@ class ProductListControllerTest {
         val size = 10
         val mockUseCaseResult = GetProductsUseCase.ProductsResult(
             products = listOf(
-                ProductResponse(
+                ProductWithOptions(
                     productId = 1L,
                     name = "에티오피아 예가체프",
                     description = "Test Description",
                     brand = "Bean Bliss",
                     createdAt = LocalDateTime.of(2025, 1, 15, 10, 30),
                     options = listOf(
-                        ProductOptionResponse(
+                        ProductOptionInfo(
                             optionId = 1L,
                             optionCode = "ETH-WB-200",
                             origin = "Ethiopia",

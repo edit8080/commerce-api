@@ -2,8 +2,8 @@ package com.beanbliss.domain.product.service
 
 import com.beanbliss.domain.product.repository.ProductRepository
 import com.beanbliss.domain.product.repository.ProductOptionRepository
-import com.beanbliss.domain.product.dto.ProductResponse
-import com.beanbliss.domain.product.dto.ProductOptionResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.common.exception.ResourceNotFoundException
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
@@ -66,7 +66,7 @@ class ProductDetailServiceTest {
     fun `활성 옵션이 없는 상품 조회 시 ResourceNotFoundException이 발생해야 한다`() {
         // Given
         val productId = 1L
-        val productWithNoActiveOptions = ProductResponse(
+        val productWithNoActiveOptions = ProductWithOptions(
             productId = productId,
             name = "비활성 옵션만 있는 상품",
             description = "Test Description",

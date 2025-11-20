@@ -2,8 +2,8 @@ package com.beanbliss.domain.product.usecase
 
 import com.beanbliss.common.exception.ResourceNotFoundException
 import com.beanbliss.domain.inventory.service.InventoryService
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.domain.product.service.ProductService
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.*
@@ -218,7 +218,7 @@ class GetProductDetailUseCaseTest {
             createMockOption(4L, "ETH-WB-500", 500, "WHOLE_BEANS")     // 500g, 홀빈
         )
 
-        val mockProduct = ProductResponse(
+        val mockProduct = ProductWithOptions(
             productId = productId,
             name = "에티오피아 예가체프 G1",
             description = "Test Description",
@@ -314,9 +314,9 @@ class GetProductDetailUseCaseTest {
         productId: Long,
         name: String,
         optionIds: List<Long>
-    ): ProductResponse {
+    ): ProductWithOptions {
         val options = optionIds.map { optionId ->
-            ProductOptionResponse(
+            ProductOptionInfo(
                 optionId = optionId,
                 optionCode = "TEST-CODE-$optionId",
                 origin = "Ethiopia",
@@ -327,7 +327,7 @@ class GetProductDetailUseCaseTest {
             )
         }
 
-        return ProductResponse(
+        return ProductWithOptions(
             productId = productId,
             name = name,
             description = "플로럴한 향과 밝은 산미가 특징인 에티오피아 대표 원두",
@@ -345,8 +345,8 @@ class GetProductDetailUseCaseTest {
         optionCode: String,
         weightGrams: Int,
         grindType: String
-    ): ProductOptionResponse {
-        return ProductOptionResponse(
+    ): ProductOptionInfo {
+        return ProductOptionInfo(
             optionId = optionId,
             optionCode = optionCode,
             origin = "Ethiopia",

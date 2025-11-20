@@ -1,10 +1,12 @@
 package com.beanbliss.domain.order.controller
 
+import com.beanbliss.common.dto.ApiResponse
 import com.beanbliss.domain.order.dto.*
 import com.beanbliss.domain.order.usecase.CreateOrderUseCase
 import com.beanbliss.domain.order.usecase.ReserveOrderUseCase
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*
  */
 @RestController
 @RequestMapping("/api/order")
+@Tag(name = "주문 관리", description = "주문 예약 및 생성 API")
 class OrderController(
     private val reserveOrderUseCase: ReserveOrderUseCase,
     private val createOrderUseCase: CreateOrderUseCase
@@ -26,9 +29,10 @@ class OrderController(
      * @return 예약 결과 (data envelope 형태)
      */
     @PostMapping("/reserve")
+    @Operation(summary = "주문 예약", description = "사용자의 장바구니 상품 재고 예약")
     fun reserveOrder(
         @Valid @RequestBody request: ReserveOrderRequest
-    ): ResponseEntity<Map<String, ReserveOrderResponse>> {
+    ): ApiResponse<ReserveOrderResponse> {
         // UseCase에 위임 (도메인 데이터 반환)
         val reservationItems = reserveOrderUseCase.reserveOrder(request.userId)
 
@@ -49,8 +53,8 @@ class OrderController(
 
         val response = ReserveOrderResponse(reservations = reservationResponses)
 
-        // data envelope 형태로 응답 반환
-        return ResponseEntity.ok(mapOf("data" to response))
+        // ApiResponse 형태로 응답 반환
+        return ApiResponse(data = response)
     }
 
     /**
@@ -60,9 +64,10 @@ class OrderController(
      * @return 주문 생성 결과 (data envelope 형태)
      */
     @PostMapping("/create")
+    @Operation(summary = "주문 생성", description = "예약된 재고로 주문 생성 및 결제 처리")
     fun createOrder(
         @Valid @RequestBody request: CreateOrderRequest
-    ): ResponseEntity<Map<String, CreateOrderResponse>> {
+    ): ApiResponse<CreateOrderResponse> {
         // UseCase에 위임 (도메인 데이터 반환)
         val result = createOrderUseCase.createOrder(
             userId = request.userId,
@@ -82,8 +87,8 @@ class OrderController(
                 productName = cartItem.productName,
                 optionCode = cartItem.optionCode,
                 quantity = orderItem.quantity,
-                unitPrice = orderItem.unitPrice,
-                totalPrice = orderItem.totalPrice
+                unitPrice = orderItem.unitPrice.toInt(),
+                totalPrice = orderItem.totalPrice.toInt()
             )
         }
 
@@ -109,15 +114,15 @@ class OrderController(
         // 4. CreateOrderResponse 조립
         val response = CreateOrderResponse(
             orderId = result.orderEntity.id,
-            orderStatus = result.orderEntity.orderStatus,
+            orderStatus = result.orderEntity.status,
             orderItems = orderItemResponses,
             appliedCoupon = appliedCouponInfo,
             priceInfo = priceInfo,
             shippingAddress = result.shippingAddress,
-            orderedAt = result.orderEntity.orderedAt
+            orderedAt = result.orderEntity.createdAt
         )
 
-        // data envelope 형태로 응답 반환
-        return ResponseEntity.ok(mapOf("data" to response))
+        // ApiResponse 형태로 응답 반환
+        return ApiResponse(data = response)
     }
 }

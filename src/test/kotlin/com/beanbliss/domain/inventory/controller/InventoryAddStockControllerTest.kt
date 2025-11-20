@@ -47,6 +47,9 @@ class InventoryAddStockControllerTest {
     @MockkBean
     private lateinit var inventoryAddStockUseCase: InventoryAddStockUseCase
 
+    @MockkBean
+    private lateinit var getInventoriesUseCase: com.beanbliss.domain.inventory.usecase.GetInventoriesUseCase
+
     @Test
     @DisplayName("POST /api/inventories/{productOptionId}/add - 재고 추가 성공 시 200 OK와 현재 재고를 반환해야 한다")
     fun `재고 추가 성공 시 200 OK와 현재 재고를 반환해야 한다`() {

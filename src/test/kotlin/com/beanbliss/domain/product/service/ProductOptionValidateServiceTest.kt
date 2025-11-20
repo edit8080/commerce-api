@@ -47,9 +47,11 @@ class ProductOptionValidateServiceTest {
         val activeOption2 = createMockProductOption(2L, true)
         val activeOption3 = createMockProductOption(3L, true)
 
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns activeOption1
-        every { productOptionRepository.findActiveOptionWithProduct(2L) } returns activeOption2
-        every { productOptionRepository.findActiveOptionWithProduct(3L) } returns activeOption3
+        every { productOptionRepository.findByIdsBatch(optionIds) } returns listOf(
+            activeOption1,
+            activeOption2,
+            activeOption3
+        )
 
         // When & Then
         // [비즈니스 로직 검증]: 모든 옵션이 활성 상태이므로 예외가 발생하지 않아야 함
@@ -57,10 +59,8 @@ class ProductOptionValidateServiceTest {
             productService.validateProductOptionsActive(optionIds)
         }
 
-        // [Repository 호출 검증]: 모든 옵션에 대해 findActiveOptionWithProduct가 호출되어야 함
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(1L) }
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(2L) }
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(3L) }
+        // [Repository 호출 검증]: Batch 조회가 정확히 1번 호출되어야 함 (N+1 문제 해결)
+        verify(exactly = 1) { productOptionRepository.findByIdsBatch(optionIds) }
     }
 
     @Test
@@ -70,10 +70,12 @@ class ProductOptionValidateServiceTest {
         val optionIds = listOf(1L, 2L)
 
         val activeOption = createMockProductOption(1L, true)
-        val inactiveOption = createMockProductOption(2L, false) // 비활성
+        // Batch 조회에서 2L은 반환되지 않음 (비활성 또는 미존재로 간주)
 
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns activeOption
-        every { productOptionRepository.findActiveOptionWithProduct(2L) } returns inactiveOption
+        every { productOptionRepository.findByIdsBatch(optionIds) } returns listOf(
+            activeOption
+            // 2L은 활성 상태의 옵션에 포함되지 않음 → 검증 실패
+        )
 
         // When & Then
         // [핵심 비즈니스 규칙 검증]: 비활성 옵션이 포함되어 있으면 예외 발생
@@ -84,9 +86,8 @@ class ProductOptionValidateServiceTest {
         assertTrue(exception.message!!.contains("비활성화된 상품 옵션이 포함되어 있습니다"))
         assertTrue(exception.message!!.contains("2"))
 
-        // [Repository 호출 검증]: 비활성 옵션을 발견할 때까지만 호출됨
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(1L) }
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(2L) }
+        // [Repository 호출 검증]: Batch 조회가 정확히 1번 호출됨 (N+1 문제 해결)
+        verify(exactly = 1) { productOptionRepository.findByIdsBatch(optionIds) }
     }
 
     @Test
@@ -95,7 +96,7 @@ class ProductOptionValidateServiceTest {
         // Given
         val optionIds = listOf(999L) // 존재하지 않는 ID
 
-        every { productOptionRepository.findActiveOptionWithProduct(999L) } returns null
+        every { productOptionRepository.findByIdsBatch(optionIds) } returns emptyList()
 
         // When & Then
         // [비즈니스 로직 검증]: 존재하지 않는 옵션 ID는 비활성 옵션과 동일하게 예외 발생
@@ -106,32 +107,36 @@ class ProductOptionValidateServiceTest {
         assertTrue(exception.message!!.contains("비활성화된 상품 옵션이 포함되어 있습니다"))
         assertTrue(exception.message!!.contains("999"))
 
-        // [Repository 호출 검증]: findActiveOptionWithProduct가 호출되어야 함
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(999L) }
+        // [Repository 호출 검증]: Batch 조회가 정확히 1번 호출됨
+        verify(exactly = 1) { productOptionRepository.findByIdsBatch(optionIds) }
     }
 
     @Test
-    @DisplayName("여러 옵션 중 첫 번째가 비활성일 때 즉시 예외가 발생하고 나머지 옵션은 검증하지 않아야 한다")
-    fun `여러 옵션 중 첫 번째가 비활성일 때_즉시 예외가 발생하고_나머지 옵션은 검증하지 않아야 한다`() {
+    @DisplayName("여러 옵션 중 첫 번째가 비활성일 때 즉시 예외가 발생해야 한다")
+    fun `여러 옵션 중 첫 번째가 비활성일 때_즉시 예외가_발생해야_한다`() {
         // Given
         val optionIds = listOf(1L, 2L, 3L)
 
-        val inactiveOption = createMockProductOption(1L, false) // 첫 번째가 비활성
+        // Batch 조회에서 1L은 반환되지 않음 (비활성 또는 미존재)
+        val activeOption2 = createMockProductOption(2L, true)
+        val activeOption3 = createMockProductOption(3L, true)
 
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns inactiveOption
+        every { productOptionRepository.findByIdsBatch(optionIds) } returns listOf(
+            activeOption2,
+            activeOption3
+            // 1L은 활성 상태의 옵션에 포함되지 않음 → 검증 실패
+        )
 
         // When & Then
-        // [비즈니스 로직 검증]: 첫 번째 옵션에서 예외가 발생하므로 나머지는 검증 안함
+        // [비즈니스 로직 검증]: 첫 번째 옵션이 비활성이므로 예외 발생
         val exception = assertThrows<ProductOptionInactiveException> {
             productService.validateProductOptionsActive(optionIds)
         }
 
         assertTrue(exception.message!!.contains("1"))
 
-        // [Repository 호출 검증]: 첫 번째 옵션만 조회되고, 나머지는 호출되지 않아야 함
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(1L) }
-        verify(exactly = 0) { productOptionRepository.findActiveOptionWithProduct(2L) }
-        verify(exactly = 0) { productOptionRepository.findActiveOptionWithProduct(3L) }
+        // [Repository 호출 검증]: Batch 조회가 정확히 1번 호출됨 (N+1 문제 해결)
+        verify(exactly = 1) { productOptionRepository.findByIdsBatch(optionIds) }
     }
 
     @Test
@@ -146,8 +151,8 @@ class ProductOptionValidateServiceTest {
             productService.validateProductOptionsActive(optionIds)
         }
 
-        // [Repository 호출 검증]: 빈 리스트이므로 Repository는 호출되지 않아야 함
-        verify(exactly = 0) { productOptionRepository.findActiveOptionWithProduct(any()) }
+        // [Repository 호출 검증]: 빈 리스트이므로 조기 반환되어 Repository는 호출되지 않아야 함
+        verify(exactly = 0) { productOptionRepository.findByIdsBatch(any()) }
     }
 
     @Test
@@ -157,7 +162,7 @@ class ProductOptionValidateServiceTest {
         val optionIds = listOf(1L)
         val activeOption = createMockProductOption(1L, true)
 
-        every { productOptionRepository.findActiveOptionWithProduct(1L) } returns activeOption
+        every { productOptionRepository.findByIdsBatch(optionIds) } returns listOf(activeOption)
 
         // When & Then
         // [경계값 검증]: 단일 옵션도 정상 처리되어야 함
@@ -165,7 +170,7 @@ class ProductOptionValidateServiceTest {
             productService.validateProductOptionsActive(optionIds)
         }
 
-        verify(exactly = 1) { productOptionRepository.findActiveOptionWithProduct(1L) }
+        verify(exactly = 1) { productOptionRepository.findByIdsBatch(optionIds) }
     }
 
     // === Helper Method ===

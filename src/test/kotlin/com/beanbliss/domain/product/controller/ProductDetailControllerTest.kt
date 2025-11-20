@@ -1,7 +1,7 @@
 package com.beanbliss.domain.product.controller
 
-import com.beanbliss.domain.product.dto.ProductOptionResponse
-import com.beanbliss.domain.product.dto.ProductResponse
+import com.beanbliss.domain.product.repository.ProductWithOptions
+import com.beanbliss.domain.product.repository.ProductOptionInfo
 import com.beanbliss.domain.product.service.ProductService
 import com.beanbliss.domain.product.usecase.GetPopularProductsUseCase
 import com.beanbliss.domain.product.usecase.GetProductDetailUseCase
@@ -56,14 +56,14 @@ class ProductDetailControllerTest {
     fun `정상 조회 시 200 OK와 상품 상세 정보를 반환해야 한다`() {
         // Given
         val productId = 1L
-        val mockResponse = ProductResponse(
+        val mockResponse = ProductWithOptions(
             productId = productId,
             name = "에티오피아 예가체프 G1",
             description = "플로럴한 향과 밝은 산미가 특징인 에티오피아 대표 원두",
             brand = "Bean Bliss",
             createdAt = LocalDateTime.of(2025, 1, 15, 10, 30),
             options = listOf(
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 1L,
                     optionCode = "ETH-WB-200",
                     origin = "Ethiopia",
@@ -72,7 +72,7 @@ class ProductDetailControllerTest {
                     price = 18000,
                     availableStock = 50
                 ),
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 2L,
                     optionCode = "ETH-HD-200",
                     origin = "Ethiopia",
@@ -167,7 +167,7 @@ class ProductDetailControllerTest {
     fun `옵션이 정렬되어 반환되어야 한다`() {
         // Given
         val productId = 1L
-        val mockResponse = ProductResponse(
+        val mockResponse = ProductWithOptions(
             productId = productId,
             name = "에티오피아 예가체프 G1",
             description = "Test Description",
@@ -175,7 +175,7 @@ class ProductDetailControllerTest {
             createdAt = LocalDateTime.of(2025, 1, 15, 10, 30),
             options = listOf(
                 // 정렬된 순서: 200g 핸드드립, 200g 홀빈, 500g 핸드드립, 500g 홀빈
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 3L,
                     optionCode = "ETH-HD-200",
                     origin = "Ethiopia",
@@ -184,7 +184,7 @@ class ProductDetailControllerTest {
                     price = 21000,
                     availableStock = 8
                 ),
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 2L,
                     optionCode = "ETH-WB-200",
                     origin = "Ethiopia",
@@ -193,7 +193,7 @@ class ProductDetailControllerTest {
                     price = 18000,
                     availableStock = 50
                 ),
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 1L,
                     optionCode = "ETH-HD-500",
                     origin = "Ethiopia",
@@ -202,7 +202,7 @@ class ProductDetailControllerTest {
                     price = 48000,
                     availableStock = 15
                 ),
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 4L,
                     optionCode = "ETH-WB-500",
                     origin = "Ethiopia",
@@ -242,14 +242,14 @@ class ProductDetailControllerTest {
     fun `품절 옵션도 응답에 포함되어야 한다`() {
         // Given
         val productId = 1L
-        val mockResponse = ProductResponse(
+        val mockResponse = ProductWithOptions(
             productId = productId,
             name = "에티오피아 예가체프 G1",
             description = "Test Description",
             brand = "Bean Bliss",
             createdAt = LocalDateTime.of(2025, 1, 15, 10, 30),
             options = listOf(
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 1L,
                     optionCode = "ETH-WB-200",
                     origin = "Ethiopia",
@@ -258,7 +258,7 @@ class ProductDetailControllerTest {
                     price = 18000,
                     availableStock = 0  // 품절
                 ),
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 2L,
                     optionCode = "ETH-HD-200",
                     origin = "Ethiopia",
@@ -288,14 +288,14 @@ class ProductDetailControllerTest {
     fun `Service를 정확한 파라미터로 호출해야 한다`() {
         // Given
         val productId = 123L
-        val mockResponse = ProductResponse(
+        val mockResponse = ProductWithOptions(
             productId = productId,
             name = "Test Product",
             description = "Test Description",
             brand = "Test Brand",
             createdAt = LocalDateTime.now(),
             options = listOf(
-                ProductOptionResponse(
+                ProductOptionInfo(
                     optionId = 1L,
                     optionCode = "TEST-CODE",
                     origin = "Test",
