@@ -2,7 +2,9 @@ package com.beanbliss.domain.cart.repository
 
 import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.entity.CartItemEntity
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -16,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional
  * [설계 변경]:
  * - 도메인 간 JOIN 제거: CART_ITEM 테이블만 조회
  * - PRODUCT_OPTION, PRODUCT와의 JOIN 제거
+ *
+ * [동시성 제어]:
+ * - findByUserIdAndProductOptionIdWithLock: 비관적 락 사용 (PESSIMISTIC_WRITE)
  */
 interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
     /**
@@ -36,11 +41,37 @@ interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
     fun findByUserIdAndProductOptionId(userId: Long, productOptionId: Long): CartItemEntity?
 
     /**
+     * 사용자 ID와 상품 옵션 ID로 장바구니 아이템 조회 (비관적 락)
+     *
+     * [동시성 제어]:
+     * - PESSIMISTIC_WRITE 락 사용
+     * - SELECT ... FOR UPDATE
+     * - Lost Update 방지
+     *
+     * @param userId 사용자 ID
+     * @param productOptionId 상품 옵션 ID
+     * @return CartItemEntity (없으면 null)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM CartItemEntity c WHERE c.userId = :userId AND c.productOptionId = :productOptionId")
+    fun findByUserIdAndProductOptionIdWithLock(
+        @Param("userId") userId: Long,
+        @Param("productOptionId") productOptionId: Long
+    ): CartItemEntity?
+
+    /**
      * 사용자의 모든 장바구니 아이템 삭제
      */
     @Modifying
     @Query("DELETE FROM CartItemEntity c WHERE c.userId = :userId")
     fun deleteByUserId(@Param("userId") userId: Long)
+
+    /**
+     * 장바구니 아이템 수량 직접 업데이트
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CartItemEntity c SET c.quantity = :newQuantity WHERE c.id = :cartItemId")
+    fun updateQuantity(@Param("cartItemId") cartItemId: Long, @Param("newQuantity") newQuantity: Int)
 }
 
 /**
@@ -67,6 +98,13 @@ class CartItemRepositoryImpl(
         return entity.toDomain()
     }
 
+    override fun findByUserIdAndProductOptionIdWithLock(userId: Long, productOptionId: Long): CartItem? {
+        // CART_ITEM만 조회 (비관적 락)
+        val entity = cartItemJpaRepository.findByUserIdAndProductOptionIdWithLock(userId, productOptionId)
+            ?: return null
+        return entity.toDomain()
+    }
+
     override fun findById(cartItemId: Long): CartItem? {
         val entity = cartItemJpaRepository.findById(cartItemId).orElse(null)
             ?: return null
@@ -77,6 +115,13 @@ class CartItemRepositoryImpl(
         val entity = cartItem.toEntity()
         val savedEntity = cartItemJpaRepository.save(entity)
         return savedEntity.toDomain()
+    }
+
+    @Transactional
+    override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItem {
+        cartItemJpaRepository.updateQuantity(cartItemId, newQuantity)
+        return findById(cartItemId)
+            ?: throw IllegalStateException("Cart item not found after update: $cartItemId")
     }
 
     @Transactional
