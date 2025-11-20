@@ -4,6 +4,7 @@ import com.beanbliss.domain.coupon.entity.UserCouponEntity
 import com.beanbliss.domain.coupon.exception.CouponAlreadyIssuedException
 import com.beanbliss.domain.coupon.repository.UserCouponRepository
 import com.beanbliss.domain.coupon.repository.UserCouponWithCoupon
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -57,6 +58,11 @@ class UserCouponService(
 
     @Transactional
     fun createUserCoupon(userId: Long, couponId: Long): UserCouponEntity {
-        return userCouponRepository.save(userId, couponId)
+        try {
+            return userCouponRepository.save(userId, couponId)
+        } catch (e: DataIntegrityViolationException) {
+            // UNIQUE 제약조건 위반 시 비즈니스 예외로 변환
+            throw CouponAlreadyIssuedException("이미 발급받은 쿠폰입니다.")
+        }
     }
 }

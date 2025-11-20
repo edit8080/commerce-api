@@ -3,10 +3,12 @@ package com.beanbliss.domain.coupon.repository
 import com.beanbliss.domain.coupon.entity.CouponTicketEntity
 import com.beanbliss.domain.coupon.entity.CouponTicketStatus
 import jakarta.persistence.LockModeType
+import jakarta.persistence.QueryHint
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.jpa.repository.QueryHints
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -18,39 +20,42 @@ import org.springframework.transaction.annotation.Transactional
 interface CouponTicketJpaRepository : JpaRepository<CouponTicketEntity, Long> {
     /**
      * 발급 가능한 티켓 조회 및 락 설정 (FOR UPDATE SKIP LOCKED)
-     * - status = 'AVAILABLE'
-     * - userId IS NULL
-     * - PESSIMISTIC_WRITE 락 사용
+     * - status = 'AVAILABLE'인 티켓 중 하나를 선점
+     * - PESSIMISTIC_WRITE 락으로 동시 접근 제어
+     * - 이미 락이 걸린 티켓은 SKIP LOCKED(value='-2')로 다음 티켓 자동 조회
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(value = [
+        QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2")
+    ])
     @Query("""
         SELECT ct
         FROM CouponTicketEntity ct
         WHERE ct.couponId = :couponId
         AND ct.status = 'AVAILABLE'
-        AND ct.userId IS NULL
         ORDER BY ct.id ASC
         LIMIT 1
     """)
     fun findAvailableTicketWithLock(@Param("couponId") couponId: Long): CouponTicketEntity?
 
     /**
-     * 티켓 상태 업데이트
+     * 티켓을 사용자에게 발급
+     * - status: 'AVAILABLE' → 'ISSUED'
+     * - userId, userCouponId, issuedAt 설정
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE CouponTicketEntity ct
-        SET ct.status = :status,
+        SET ct.status = 'ISSUED',
             ct.userId = :userId,
             ct.userCouponId = :userCouponId,
             ct.issuedAt = :issuedAt
         WHERE ct.id = :ticketId
     """)
-    fun updateTicketAsIssued(
+    fun issueTicketToUser(
         @Param("ticketId") ticketId: Long,
         @Param("userId") userId: Long,
         @Param("userCouponId") userCouponId: Long,
-        @Param("status") status: CouponTicketStatus,
         @Param("issuedAt") issuedAt: java.time.LocalDateTime
     )
 
@@ -92,24 +97,17 @@ class CouponTicketRepositoryImpl(
     private val couponTicketJpaRepository: CouponTicketJpaRepository
 ) : CouponTicketRepository {
 
-    @Transactional
     override fun findAvailableTicketWithLock(couponId: Long): CouponTicketEntity? {
         return couponTicketJpaRepository.findAvailableTicketWithLock(couponId)
     }
 
-    @Transactional
-    override fun updateTicketAsIssued(ticketId: Long, userId: Long, userCouponId: Long) {
-        // getReferenceById를 사용하여 프록시 대신 실제 엔티티 가져오기
-        val ticket = couponTicketJpaRepository.getReferenceById(ticketId)
-
-        // 엔티티 필드 직접 수정 (JPA dirty checking)
-        ticket.userId = userId
-        ticket.userCouponId = userCouponId
-        ticket.status = CouponTicketStatus.ISSUED
-        ticket.issuedAt = java.time.LocalDateTime.now()
-
-        // save() 호출 불필요 - JPA가 자동으로 UPDATE 수행
-        couponTicketJpaRepository.flush()  // 명시적 flush로 즉시 DB 반영
+    override fun issueTicketToUser(ticketId: Long, userId: Long, userCouponId: Long) {
+        couponTicketJpaRepository.issueTicketToUser(
+            ticketId = ticketId,
+            userId = userId,
+            userCouponId = userCouponId,
+            issuedAt = java.time.LocalDateTime.now()
+        )
     }
 
     override fun countAvailableTickets(couponId: Long): Int {

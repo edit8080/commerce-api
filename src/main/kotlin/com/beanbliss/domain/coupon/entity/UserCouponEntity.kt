@@ -34,6 +34,12 @@ import java.time.LocalDateTime
         Index(name = "idx_user_status", columnList = "user_id, status"),
         Index(name = "idx_user_coupon_id", columnList = "user_id, coupon_id"),
         Index(name = "idx_created_at", columnList = "created_at")
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_user_coupon_user_id_coupon_id",
+            columnNames = ["user_id", "coupon_id"]
+        )
     ]
 )
 class UserCouponEntity(

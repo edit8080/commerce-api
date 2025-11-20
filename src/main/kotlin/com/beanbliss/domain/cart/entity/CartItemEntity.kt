@@ -27,6 +27,12 @@ import java.time.LocalDateTime
     indexes = [
         Index(name = "idx_user_id", columnList = "user_id"),
         Index(name = "idx_user_product", columnList = "user_id, product_option_id")
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_user_product_option",
+            columnNames = ["user_id", "product_option_id"]
+        )
     ]
 )
 class CartItemEntity(

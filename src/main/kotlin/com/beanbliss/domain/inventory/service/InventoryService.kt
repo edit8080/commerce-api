@@ -89,8 +89,8 @@ class InventoryService(
 
     @Transactional
     fun addStock(productOptionId: Long, quantity: Int): Int {
-        // 1. 재고 조회 (비관적 락 - TODO: Repository 구현 시 적용)
-        val inventory = inventoryRepository.findByProductOptionId(productOptionId)
+        // 1. 재고 조회 (비관적 락 적용)
+        val inventory = inventoryRepository.findByProductOptionIdWithLock(productOptionId)
             ?: throw ResourceNotFoundException("상품 옵션 ID: $productOptionId 의 재고 정보를 찾을 수 없습니다.")
 
         // 2. 도메인 모델에 비즈니스 로직 위임 (최대 재고 수량 검증 포함)
@@ -194,10 +194,10 @@ class InventoryService(
         // 1. 장바구니 아이템의 모든 상품 옵션 ID 추출
         val productOptionIds = cartItems.map { it.productOptionId }
 
-        // 2. 재고 일괄 조회 (Bulk 조회 - 단일 쿼리)
+        // 2. 재고 일괄 조회 (Bulk 조회 + 비관적 락 - 단일 쿼리)
         // [성능 최적화]: WHERE product_option_id IN (...) 사용으로 N+1 문제 방지
-        // TODO: Repository에서 비관적 락(FOR UPDATE) 지원 필요
-        val inventories = inventoryRepository.findAllByProductOptionIds(productOptionIds)
+        // [동시성 제어]: FOR UPDATE + ORDER BY로 Deadlock 방지
+        val inventories = inventoryRepository.findAllByProductOptionIdsWithLock(productOptionIds)
 
         // 2-1. 조회된 재고가 모든 상품 옵션에 대해 존재하는지 확인
         if (inventories.size != productOptionIds.size) {

@@ -16,6 +16,17 @@ interface InventoryRepository {
     fun findByProductOptionId(productOptionId: Long): Inventory?
 
     /**
+     * 상품 옵션 ID로 재고 조회 (비관적 락)
+     *
+     * [동시성 제어]: FOR UPDATE 쿼리 사용
+     * - addStock() 시 Lost Update 방지
+     *
+     * @param productOptionId 상품 옵션 ID
+     * @return 재고 도메인 모델 (없으면 null)
+     */
+    fun findByProductOptionIdWithLock(productOptionId: Long): Inventory?
+
+    /**
      * 여러 상품 옵션 ID로 재고 일괄 조회 (Bulk 조회)
      *
      * [성능 최적화]:
@@ -26,6 +37,23 @@ interface InventoryRepository {
      * @return 재고 도메인 모델 리스트
      */
     fun findAllByProductOptionIds(productOptionIds: List<Long>): List<Inventory>
+
+    /**
+     * 여러 상품 옵션 ID로 재고 일괄 조회 (Bulk 조회 + 비관적 락)
+     *
+     * [성능 최적화]:
+     * - N+1 문제 방지: WHERE product_option_id IN (...) 사용
+     * - 단일 쿼리로 모든 재고 조회
+     *
+     * [동시성 제어]:
+     * - FOR UPDATE 쿼리 사용
+     * - ORDER BY product_option_id로 Deadlock 방지
+     * - reduceStockForOrder() 시 Lost Update 방지
+     *
+     * @param productOptionIds 상품 옵션 ID 리스트
+     * @return 재고 도메인 모델 리스트
+     */
+    fun findAllByProductOptionIdsWithLock(productOptionIds: List<Long>): List<Inventory>
 
     /**
      * 재고 저장 (생성 또는 수정)
