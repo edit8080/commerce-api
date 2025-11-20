@@ -15,6 +15,7 @@ import com.beanbliss.domain.order.exception.CartEmptyException
 import com.beanbliss.domain.order.service.OrderService
 import com.beanbliss.domain.user.service.UserService
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * [책임]: 주문 생성 UseCase 구현
@@ -26,8 +27,9 @@ import org.springframework.stereotype.Component
  * - UserService, CartService, ProductOptionService, CouponService, InventoryReservationService, InventoryService, OrderService, BalanceService에만 의존
  *
  * [트랜잭션]:
- * - 각 Service의 메서드에 @Transactional 적용
- * - UseCase는 트랜잭션 조율만 담당
+ * - UseCase 레벨에서 전체 주문 프로세스를 하나의 트랜잭션으로 관리
+ * - 각 Service의 @Transactional은 REQUIRED(기본값)로 부모 트랜잭션에 참여
+ * - 중간 단계 실패 시 전체 롤백하여 데이터 일관성 보장
  */
 @Component
 class CreateOrderUseCase(
@@ -59,15 +61,25 @@ class CreateOrderUseCase(
     /**
      * 주문 생성 및 결제 처리 실행
      *
+     * [트랜잭션 전략]:
+     * - 전체 주문 프로세스를 하나의 트랜잭션으로 관리
+     * - 중간 단계 실패 시 모든 작업 롤백하여 데이터 일관성 보장
+     * - 각 Service는 부모 트랜잭션에 참여 (Propagation.REQUIRED)
+     *
+     * [동시성 제어]:
+     * - 재고 차감: 비관적 락 (FOR UPDATE)
+     * - 잔액 차감: 비관적 락 (FOR UPDATE)
+     * - 전체 트랜잭션으로 동일 사용자의 동시 주문 방지
+     *
      * [주요 단계]:
      * 1. 사용자 존재 여부 검증
      * 2. 장바구니 조회 및 검증
      * 3. 쿠폰 검증 (유효성, 만료, 사용 여부, 최소 주문 금액)
      * 4. 금액 계산 (원금, 할인, 최종)
      * 5. 재고 예약 확인 (하이브리드 재고 관리)
-     * 6. 재고 확인 및 차감 (비관적 락)
-     * 7. 주문 생성 및 주문 아이템 생성
-     * 8. 잔액 차감 (비관적 락)
+     * 6. 잔액 차감 (비관적 락)
+     * 7. 재고 확인 및 차감 (비관적 락)
+     * 8. 주문 생성 및 주문 아이템 생성
      * 9. 재고 예약 상태 변경 (RESERVED → CONFIRMED)
      * 10. 쿠폰 사용 처리 (쿠폰이 제공된 경우만)
      * 11. 장바구니 비우기
@@ -91,7 +103,7 @@ class CreateOrderUseCase(
         userCouponId: Long?,
         shippingAddress: String
     ): OrderCreationResult {
-        // === Step 1-4: 사전 검증 및 금액 계산 (트랜잭션 외부) ===
+        // === Step 1-4: 사전 검증 및 금액 계산 ===
 
         // Step 1: 사용자 존재 여부 검증
         userService.validateUserExists(userId)
@@ -144,15 +156,18 @@ class CreateOrderUseCase(
 
         val finalAmount = originalAmount - discountAmount
 
-        // === Step 5-11: 각 Service의 독립적인 트랜잭션 처리 ===
+        // === Step 5-11: 트랜잭션 내 주문 처리 (각 Service는 부모 트랜잭션에 참여) ===
 
         // Step 5: 재고 예약 확인 (하이브리드 재고 관리)
         inventoryReservationService.validateReservations(userId, cartItemDetails)
 
-        // Step 6: 재고 확인 및 차감 (비관적 락)
+        // Step 6: 잔액 차감 (비관적 락)
+        balanceService.deductBalance(userId, finalAmount)
+
+        // Step 7: 재고 확인 및 차감 (비관적 락)
         inventoryService.reduceStockForOrder(cartItemDetails)
 
-        // Step 7: 주문 생성 및 주문 아이템 생성
+        // Step 8: 주문 생성 및 주문 아이템 생성
         val orderCreationData = OrderCreationData(
             userId = userId,
             cartItems = cartItemDetails,
@@ -163,9 +178,6 @@ class CreateOrderUseCase(
             userCouponId = userCouponId
         )
         val orderResult = orderService.createOrderWithItems(orderCreationData)
-
-        // Step 8: 잔액 차감 (비관적 락)
-        balanceService.deductBalance(userId, finalAmount)
 
         // Step 9: 재고 예약 상태 변경 (RESERVED → CONFIRMED)
         inventoryReservationService.confirmReservations(userId, cartItemDetails)
