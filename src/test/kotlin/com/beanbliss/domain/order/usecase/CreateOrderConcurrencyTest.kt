@@ -23,7 +23,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
@@ -81,11 +81,13 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
 
+    @Autowired
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private lateinit var testProduct: ProductEntity
     private lateinit var testOption: ProductOptionEntity
 
     @BeforeEach
-    @Transactional
     fun setUp() {
         cleanDatabase()
         createTestData()
@@ -93,63 +95,66 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
 
     private fun cleanDatabase() {
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0")
-        jdbcTemplate.execute("DELETE FROM order_item")
-        jdbcTemplate.execute("DELETE FROM `order`")
-        jdbcTemplate.execute("DELETE FROM inventory_reservation")
-        jdbcTemplate.execute("DELETE FROM cart_item")
-        jdbcTemplate.execute("DELETE FROM balance")
-        jdbcTemplate.execute("DELETE FROM user_coupon")
-        jdbcTemplate.execute("DELETE FROM coupon")
-        jdbcTemplate.execute("DELETE FROM inventory")
-        jdbcTemplate.execute("DELETE FROM product_option")
-        jdbcTemplate.execute("DELETE FROM product")
-        jdbcTemplate.execute("DELETE FROM `user`")
+        jdbcTemplate.execute("TRUNCATE TABLE order_item")
+        jdbcTemplate.execute("TRUNCATE TABLE `order`")
+        jdbcTemplate.execute("TRUNCATE TABLE inventory_reservation")
+        jdbcTemplate.execute("TRUNCATE TABLE cart_item")
+        jdbcTemplate.execute("TRUNCATE TABLE balance")
+        jdbcTemplate.execute("TRUNCATE TABLE user_coupon")
+        jdbcTemplate.execute("TRUNCATE TABLE coupon")
+        jdbcTemplate.execute("TRUNCATE TABLE inventory")
+        jdbcTemplate.execute("TRUNCATE TABLE product_option")
+        jdbcTemplate.execute("TRUNCATE TABLE product")
+        jdbcTemplate.execute("TRUNCATE TABLE `user`")
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1")
     }
 
     private fun createTestData() {
-        // 테스트 사용자 생성 (user_id 1-3)
-        val users = (1..3).map { userId ->
-            UserEntity(
-                email = "testuser$userId@example.com",
-                password = "password",
-                name = "TestUser$userId",
+        // TransactionTemplate을 사용하여 명시적으로 커밋
+        transactionTemplate.execute {
+            // 테스트 사용자 생성 (user_id 1-3)
+            val users = (1..3).map { userId ->
+                UserEntity(
+                    email = "testuser$userId@example.com",
+                    password = "password",
+                    name = "TestUser$userId",
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = LocalDateTime.now()
+                )
+            }
+            userJpaRepository.saveAll(users)
+
+            // 테스트 상품 생성
+            testProduct = ProductEntity(
+                name = "테스트 원두",
+                description = "동시성 테스트용",
+                brand = "테스트 브랜드",
+                createdAt = LocalDateTime.now()
+            )
+            productJpaRepository.save(testProduct)
+
+            // 상품 옵션 생성
+            testOption = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT001",
+                origin = "브라질",
+                grindType = "홀빈",
+                weightGrams = 200,
+                price = BigDecimal(10000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            productOptionJpaRepository.save(testOption)
+
+            // 재고 생성 (재고: 20개)
+            val inventory = InventoryEntity(
+                productOptionId = testOption.id,
+                stockQuantity = 20,
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now()
             )
+            inventoryJpaRepository.save(inventory)
         }
-        userJpaRepository.saveAll(users)
-
-        // 테스트 상품 생성
-        testProduct = ProductEntity(
-            name = "테스트 원두",
-            description = "동시성 테스트용",
-            brand = "테스트 브랜드",
-            createdAt = LocalDateTime.now()
-        )
-        productJpaRepository.save(testProduct)
-
-        // 상품 옵션 생성
-        testOption = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT001",
-            origin = "브라질",
-            grindType = "홀빈",
-            weightGrams = 200,
-            price = BigDecimal(10000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        productOptionJpaRepository.save(testOption)
-
-        // 재고 생성 (재고: 20개)
-        val inventory = InventoryEntity(
-            productOptionId = testOption.id,
-            stockQuantity = 20,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-        inventoryJpaRepository.save(inventory)
     }
 
     @Test
@@ -161,35 +166,37 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
         val orderAmount = 10000 // 주문당 10,000원 (1개 × 10,000원)
         val quantity = 1
 
-        // 사용자 잔액 설정
-        val balance = BalanceEntity(
-            userId = userId,
-            amount = BigDecimal(initialBalance),
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-        balanceJpaRepository.save(balance)
+        // 사용자 잔액 설정 (TransactionTemplate으로 명시적 커밋)
+        transactionTemplate.execute {
+            val balance = BalanceEntity(
+                userId = userId,
+                amount = BigDecimal(initialBalance),
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+            balanceJpaRepository.save(balance)
 
-        // 장바구니와 재고 예약을 미리 생성
-        val now = LocalDateTime.now()
-        val cartItem = CartItemEntity(
-            userId = userId,
-            productOptionId = testOption.id,
-            quantity = quantity,
-            createdAt = now
-        )
-        cartItemJpaRepository.save(cartItem)
+            // 장바구니와 재고 예약을 미리 생성
+            val now = LocalDateTime.now()
+            val cartItem = CartItemEntity(
+                userId = userId,
+                productOptionId = testOption.id,
+                quantity = quantity,
+                createdAt = now
+            )
+            cartItemJpaRepository.save(cartItem)
 
-        val reservation = InventoryReservationEntity(
-            productOptionId = testOption.id,
-            userId = userId,
-            quantity = quantity,
-            status = InventoryReservationStatus.RESERVED,
-            reservedAt = now,
-            expiresAt = now.plusMinutes(30),
-            updatedAt = now
-        )
-        inventoryReservationJpaRepository.save(reservation)
+            val reservation = InventoryReservationEntity(
+                productOptionId = testOption.id,
+                userId = userId,
+                quantity = quantity,
+                status = InventoryReservationStatus.RESERVED,
+                reservedAt = now,
+                expiresAt = now.plusMinutes(30),
+                updatedAt = now
+            )
+            inventoryReservationJpaRepository.save(reservation)
+        }
 
         val concurrentRequests = 2
         val executor = Executors.newFixedThreadPool(concurrentRequests)
@@ -240,16 +247,18 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
         val user2Id = 2L
         val quantity = 15 // 각각 15개씩 주문 시도 (재고 20개)
 
-        // 사용자 잔액 설정
+        // 사용자 잔액 설정 (TransactionTemplate으로 명시적 커밋)
         val users = listOf(user1Id, user2Id)
         users.forEach { userId ->
-            val balance = BalanceEntity(
-                userId = userId,
-                amount = BigDecimal(200000),
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
-            )
-            balanceJpaRepository.save(balance)
+            transactionTemplate.execute {
+                val balance = BalanceEntity(
+                    userId = userId,
+                    amount = BigDecimal(200000),
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = LocalDateTime.now()
+                )
+                balanceJpaRepository.save(balance)
+            }
 
             // 각 사용자에 대한 장바구니 및 재고 예약 생성
             createCartAndReservation(userId, testOption.id, quantity)
@@ -303,16 +312,18 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
         val user2Id = 2L
         val quantity = 5 // 각각 5개씩 주문 (재고 20개면 충분)
 
-        // 사용자 잔액 설정
+        // 사용자 잔액 설정 (TransactionTemplate으로 명시적 커밋)
         val users = listOf(user1Id, user2Id)
         users.forEach { userId ->
-            val balance = BalanceEntity(
-                userId = userId,
-                amount = BigDecimal(100000),
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
-            )
-            balanceJpaRepository.save(balance)
+            transactionTemplate.execute {
+                val balance = BalanceEntity(
+                    userId = userId,
+                    amount = BigDecimal(100000),
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = LocalDateTime.now()
+                )
+                balanceJpaRepository.save(balance)
+            }
 
             // 각 사용자에 대한 장바구니 및 재고 예약 생성
             createCartAndReservation(userId, testOption.id, quantity)
@@ -361,30 +372,32 @@ class CreateOrderConcurrencyTest : ConcurrencyTestBase() {
     /**
      * 장바구니와 재고 예약 생성 헬퍼 메서드
      * - 각 스레드에서 독립적으로 호출
+     * - TransactionTemplate 사용: 명시적으로 트랜잭션을 커밋하여 다른 스레드에서 볼 수 있도록 함
      */
-    @Transactional
     private fun createCartAndReservation(userId: Long, productOptionId: Long, quantity: Int) {
-        val now = LocalDateTime.now()
+        transactionTemplate.execute {
+            val now = LocalDateTime.now()
 
-        // 장바구니 아이템 생성
-        val cartItem = CartItemEntity(
-            userId = userId,
-            productOptionId = productOptionId,
-            quantity = quantity,
-            createdAt = now
-        )
-        cartItemJpaRepository.save(cartItem)
+            // 장바구니 아이템 생성
+            val cartItem = CartItemEntity(
+                userId = userId,
+                productOptionId = productOptionId,
+                quantity = quantity,
+                createdAt = now
+            )
+            cartItemJpaRepository.save(cartItem)
 
-        // 재고 예약 생성
-        val reservation = InventoryReservationEntity(
-            productOptionId = productOptionId,
-            userId = userId,
-            quantity = quantity,
-            status = InventoryReservationStatus.RESERVED,
-            reservedAt = now,
-            expiresAt = now.plusMinutes(30),
-            updatedAt = now
-        )
-        inventoryReservationJpaRepository.save(reservation)
+            // 재고 예약 생성
+            val reservation = InventoryReservationEntity(
+                productOptionId = productOptionId,
+                userId = userId,
+                quantity = quantity,
+                status = InventoryReservationStatus.RESERVED,
+                reservedAt = now,
+                expiresAt = now.plusMinutes(30),
+                updatedAt = now
+            )
+            inventoryReservationJpaRepository.save(reservation)
+        }
     }
 }
