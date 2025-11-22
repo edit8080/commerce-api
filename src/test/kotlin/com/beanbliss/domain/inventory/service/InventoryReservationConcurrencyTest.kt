@@ -8,6 +8,7 @@ import com.beanbliss.domain.inventory.repository.InventoryReservationRepository
 import com.beanbliss.domain.order.exception.InsufficientAvailableStockException
 import com.beanbliss.domain.product.entity.ProductEntity
 import com.beanbliss.domain.product.entity.ProductOptionEntity
+import com.beanbliss.domain.user.entity.UserEntity
 import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
@@ -35,7 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger
  * - 시나리오 3: 중복 예약 방지 - 동일 사용자의 중복 예약 시도
  */
 @DisplayName("재고 예약 동시성 테스트")
-@Transactional
 class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
 
     @Autowired
@@ -49,6 +49,9 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var transactionTemplate: TransactionTemplate
 
     private lateinit var testProduct: ProductEntity
     private lateinit var testOption: ProductOptionEntity
@@ -65,44 +68,57 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
         jdbcTemplate.execute("TRUNCATE TABLE inventory")
         jdbcTemplate.execute("TRUNCATE TABLE product_option")
         jdbcTemplate.execute("TRUNCATE TABLE product")
+        jdbcTemplate.execute("TRUNCATE TABLE user")
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1")
     }
 
     private fun createTestData() {
-        // 테스트 상품 생성
-        testProduct = ProductEntity(
-            name = "테스트 원두",
-            description = "동시성 테스트용",
-            brand = "테스트 브랜드",
-            createdAt = LocalDateTime.now()
-        )
-        entityManager.persist(testProduct)
-        entityManager.flush()
+        transactionTemplate.execute {
+            // 테스트 사용자 20명 생성
+            for (i in 1..20) {
+                val user = UserEntity(
+                    email = "testuser$i@example.com",
+                    password = "password",
+                    name = "Test User $i"
+                )
+                entityManager.persist(user)
+            }
+            entityManager.flush()
 
-        // 상품 옵션 생성
-        testOption = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT001",
-            origin = "브라질",
-            grindType = "홀빈",
-            weightGrams = 200,
-            price = BigDecimal(15000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        entityManager.persist(testOption)
-        entityManager.flush()
+            // 테스트 상품 생성
+            testProduct = ProductEntity(
+                name = "테스트 원두",
+                description = "동시성 테스트용",
+                brand = "테스트 브랜드",
+                createdAt = LocalDateTime.now()
+            )
+            entityManager.persist(testProduct)
+            entityManager.flush()
 
-        // 초기 재고 50개
-        val inventory = InventoryEntity(
-            productOptionId = testOption.id,
-            stockQuantity = 50,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-        entityManager.persist(inventory)
-        entityManager.flush()
-        entityManager.clear()
+            // 상품 옵션 생성
+            testOption = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT001",
+                origin = "브라질",
+                grindType = "홀빈",
+                weightGrams = 200,
+                price = BigDecimal(15000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            entityManager.persist(testOption)
+            entityManager.flush()
+
+            // 초기 재고 50개
+            val inventory = InventoryEntity(
+                productOptionId = testOption.id,
+                stockQuantity = 50,
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+            entityManager.persist(inventory)
+            entityManager.flush()
+        }
     }
 
     @Test
@@ -204,10 +220,13 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
 
                     inventoryService.reserveInventory(userId.toLong() + 1, cartItems)
                     successCount.incrementAndGet()
+                    println("Thread ${Thread.currentThread().id}: Scenario 2 Success. successCount=${successCount.get()}")
                 } catch (e: InsufficientAvailableStockException) {
                     failCount.incrementAndGet()
+                    println("Thread ${Thread.currentThread().id}: Scenario 2 InsufficientAvailableStockException. failCount=${failCount.get()}")
                 } catch (e: Exception) {
                     failCount.incrementAndGet()
+                    println("Thread ${Thread.currentThread().id}: Scenario 2 Other Exception: ${e.javaClass.simpleName}: ${e.message}. failCount=${failCount.get()}")
                 } finally {
                     latch.countDown()
                 }
@@ -248,7 +267,6 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
         repeat(2) { attempt ->
             executor.submit {
                 try {
-                    Thread.sleep(10) // 동시성 보장
                     val price = testOption.price.toInt()
                     val quantity = 10
                     val cartItems = listOf(
@@ -270,10 +288,13 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
 
                     inventoryService.reserveInventory(userId, cartItems)
                     successCount.incrementAndGet()
+                    println("Thread ${Thread.currentThread().id}: Success. successCount=${successCount.get()}")
                 } catch (e: com.beanbliss.domain.order.exception.DuplicateReservationException) {
                     duplicateCount.incrementAndGet()
+                    println("Thread ${Thread.currentThread().id}: DuplicateReservationException. duplicateCount=${duplicateCount.get()}")
                 } catch (e: Exception) {
-                    // Ignore other exceptions
+                    println("Thread ${Thread.currentThread().id}: Other Exception: ${e.javaClass.simpleName}: ${e.message}")
+                    e.printStackTrace() // Print full stack trace
                 } finally {
                     latch.countDown()
                 }
@@ -304,28 +325,30 @@ class InventoryReservationConcurrencyTest : ConcurrencyTestBase() {
     @DisplayName("시나리오 4: 복합 Race Condition - 여러 상품 옵션에 대한 동시 예약")
     fun `복합 Race Condition_여러 상품 옵션 동시 예약`() {
         // Given - 추가 상품 옵션 생성
-        val testOption2 = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT002",
-            origin = "콜롬비아",
-            grindType = "분쇄",
-            weightGrams = 100,
-            price = BigDecimal(12000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        entityManager.persist(testOption2)
-        entityManager.flush()
+        val testOption2 = transactionTemplate.execute {
+            val option2 = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT002",
+                origin = "콜롬비아",
+                grindType = "분쇄",
+                weightGrams = 100,
+                price = BigDecimal(12000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            entityManager.persist(option2)
+            entityManager.flush()
 
-        val inventory2 = InventoryEntity(
-            productOptionId = testOption2.id,
-            stockQuantity = 30,
-            createdAt = LocalDateTime.now(),
-            updatedAt = LocalDateTime.now()
-        )
-        entityManager.persist(inventory2)
-        entityManager.flush()
-        entityManager.clear()
+            val inventory2 = InventoryEntity(
+                productOptionId = option2.id,
+                stockQuantity = 30,
+                createdAt = LocalDateTime.now(),
+                updatedAt = LocalDateTime.now()
+            )
+            entityManager.persist(inventory2)
+            entityManager.flush()
+            option2
+        }!!
 
         val concurrentUsers = 10
         val executor = Executors.newFixedThreadPool(concurrentUsers)

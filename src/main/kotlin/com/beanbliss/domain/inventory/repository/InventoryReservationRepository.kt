@@ -60,4 +60,16 @@ interface InventoryReservationRepository {
      * @return 활성 예약 목록
      */
     fun findActiveReservationsByUserId(userId: Long): List<InventoryReservationEntity>
+
+    /**
+     * 사용자 ID로 활성 예약 목록 조회 (비관적 락)
+     *
+     * [동시성 제어]:
+     * - FOR UPDATE 락으로 중복 예약 방지
+     * - reserveInventory() 시 Race Condition 방지
+     *
+     * @param userId 사용자 ID
+     * @return 활성 예약 목록
+     */
+    fun findActiveReservationsByUserIdWithLock(userId: Long): List<InventoryReservationEntity>
 }

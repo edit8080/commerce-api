@@ -2,7 +2,9 @@ package com.beanbliss.domain.inventory.repository
 
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -62,6 +64,28 @@ interface InventoryReservationJpaRepository : JpaRepository<InventoryReservation
         @Param("statuses") statuses: List<InventoryReservationStatus>,
         @Param("now") now: LocalDateTime
     ): List<InventoryReservationEntity>
+
+    /**
+     * 사용자 ID로 활성 예약 목록 조회 (비관적 락)
+     *
+     * [동시성 제어]:
+     * - FOR UPDATE 락으로 중복 예약 방지
+     * - ORDER BY로 Deadlock 방지
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT ir
+        FROM InventoryReservationEntity ir
+        WHERE ir.userId = :userId
+        AND ir.status IN :statuses
+        AND ir.expiresAt > :now
+        ORDER BY ir.id
+    """)
+    fun findActiveReservationsByUserIdWithLock(
+        @Param("userId") userId: Long,
+        @Param("statuses") statuses: List<InventoryReservationStatus>,
+        @Param("now") now: LocalDateTime
+    ): List<InventoryReservationEntity>
 }
 
 /**
@@ -103,6 +127,15 @@ class InventoryReservationRepositoryImpl(
     override fun findActiveReservationsByUserId(userId: Long): List<InventoryReservationEntity> {
         val now = LocalDateTime.now()
         return inventoryReservationJpaRepository.findActiveReservationsByUserId(
+            userId,
+            InventoryReservationStatus.activeStatuses(),
+            now
+        )
+    }
+
+    override fun findActiveReservationsByUserIdWithLock(userId: Long): List<InventoryReservationEntity> {
+        val now = LocalDateTime.now()
+        return inventoryReservationJpaRepository.findActiveReservationsByUserIdWithLock(
             userId,
             InventoryReservationStatus.activeStatuses(),
             now

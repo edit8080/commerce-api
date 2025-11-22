@@ -85,6 +85,21 @@ interface InventoryRepository {
     fun calculateAvailableStockBatch(productOptionIds: List<Long>): Map<Long, Int>
 
     /**
+     * 여러 상품 옵션의 가용 재고를 한 번에 계산 (Batch 조회 + 비관적 락)
+     *
+     * [동시성 제어]:
+     * - 재고 조회 시 FOR UPDATE 적용
+     * - reserveInventory() 시 Race Condition 방지
+     * - ORDER BY로 Deadlock 방지
+     *
+     * 계산식: INVENTORY.stock_quantity - SUM(INVENTORY_RESERVATION.quantity WHERE status IN ('RESERVED', 'CONFIRMED'))
+     *
+     * @param productOptionIds 상품 옵션 ID 리스트
+     * @return Map<옵션ID, 가용 재고 수량>
+     */
+    fun calculateAvailableStockBatchWithLock(productOptionIds: List<Long>): Map<Long, Int>
+
+    /**
      * 재고 목록 조회 (INVENTORY 도메인만)
      *
      * [설계 변경]:

@@ -84,6 +84,29 @@ interface InventoryJpaRepository : JpaRepository<InventoryEntity, Long> {
         GROUP BY i.productOptionId
     """)
     fun calculateAvailableStockBatchForOptions(@Param("productOptionIds") productOptionIds: List<Long>): List<Array<Any>>
+
+    /**
+     * 여러 상품 옵션의 가용 재고를 한 번에 계산 (Batch 조회 + 비관적 락)
+     *
+     * [동시성 제어]:
+     * - INVENTORY에 FOR UPDATE 락 적용
+     * - ORDER BY로 Deadlock 방지
+     * - reserveInventory() 시 Race Condition 방지
+     *
+     * @param productOptionIds 상품 옵션 ID 리스트
+     * @return List<Array<Any>> = [[productOptionId: Long, stockQuantity: Int, reservedQuantity: Long], ...]
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT i.productOptionId, i.stockQuantity, COALESCE(SUM(ir.quantity), 0)
+        FROM InventoryEntity i
+        LEFT JOIN InventoryReservationEntity ir ON ir.productOptionId = i.productOptionId
+            AND ir.status IN ('RESERVED', 'CONFIRMED')
+        WHERE i.productOptionId IN :productOptionIds
+        GROUP BY i.productOptionId
+        ORDER BY i.productOptionId
+    """)
+    fun calculateAvailableStockBatchForOptionsWithLock(@Param("productOptionIds") productOptionIds: List<Long>): List<Array<Any>>
 }
 
 /**
@@ -121,6 +144,27 @@ class InventoryRepositoryImpl(
 
         // INVENTORY와 INVENTORY_RESERVATION을 LEFT JOIN하여 단일 쿼리로 Batch 조회
         val results = inventoryJpaRepository.calculateAvailableStockBatchForOptions(productOptionIds)
+
+        // Map<productOptionId, availableStock> 변환
+        return results.associate { row ->
+            // row = [productOptionId: Long, stockQuantity: Int, reservedQuantity: Number]
+            val productOptionId = row[0] as Long
+            val stockQuantity = row[1] as Int
+            val reservedQuantity = (row[2] as Number).toInt()
+            val availableStock = stockQuantity - reservedQuantity
+
+            productOptionId to availableStock
+        }
+    }
+
+    override fun calculateAvailableStockBatchWithLock(productOptionIds: List<Long>): Map<Long, Int> {
+        if (productOptionIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        // INVENTORY와 INVENTORY_RESERVATION을 LEFT JOIN하여 단일 쿼리로 Batch 조회 (비관적 락)
+        // FOR UPDATE 락으로 재고 조회부터 예약 생성까지 원자성 보장
+        val results = inventoryJpaRepository.calculateAvailableStockBatchForOptionsWithLock(productOptionIds)
 
         // Map<productOptionId, availableStock> 변환
         return results.associate { row ->

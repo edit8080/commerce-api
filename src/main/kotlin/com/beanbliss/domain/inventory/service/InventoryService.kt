@@ -135,27 +135,47 @@ class InventoryService(
      */
     @Transactional
     fun reserveInventory(userId: Long, cartItems: List<CartItemDetail>): List<ReservationItem> {
-        // 1. 중복 예약 방지
+        // 1. 재고 일괄 조회 (Bulk 조회 + 비관적 락)
+        // [동시성 제어]: FOR UPDATE 락으로 재고 조회부터 예약 생성까지 원자성 보장
+        val productOptionIds = cartItems.map { it.productOptionId }
+        val inventories = inventoryRepository.findAllByProductOptionIdsWithLock(productOptionIds)
+
+        // 1-1. 재고가 모든 상품에 대해 존재하는지 확인
+        if (inventories.size != productOptionIds.size) {
+            val foundIds = inventories.map { it.productOptionId }.toSet()
+            val missingIds = productOptionIds.filterNot { it in foundIds }
+            throw ResourceNotFoundException("재고 정보를 찾을 수 없습니다. 상품 옵션 ID: ${missingIds.joinToString()}")
+        }
+
+        // 2. 중복 예약 방지 (재고 락 범위 내에서 확인)
+        // [중요]: 재고 락이 걸린 상태에서 예약 확인 → 동시 예약 방지
         val activeReservationCount = inventoryReservationRepository.countActiveReservations(userId)
         if (activeReservationCount > 0) {
             throw DuplicateReservationException("이미 진행 중인 주문 예약이 있습니다.")
         }
 
-        // 2. 가용 재고 일괄 조회 (Bulk 조회 - 단일 쿼리)
-        val productOptionIds = cartItems.map { it.productOptionId }
-        val availableStocks = inventoryRepository.calculateAvailableStockBatch(productOptionIds)
+        // 3. 가용 재고 계산 (재고 락 범위 내)
+        val inventoryMap = inventories.associateBy { it.productOptionId }
+        val availableStocks = productOptionIds.associateWith { optionId ->
+            val inventory = inventoryMap[optionId]!!
+            val reservedQuantity = inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(
+                optionId,
+                listOf(InventoryReservationStatus.RESERVED, InventoryReservationStatus.CONFIRMED)
+            )
+            inventory.stockQuantity - reservedQuantity
+        }
 
-        // 3. 재고 충분성 검증
+        // 4. 재고 충분성 검증
         cartItems.forEach { cartItem ->
             val availableStock = availableStocks[cartItem.productOptionId] ?: 0
             if (availableStock < cartItem.quantity) {
                 throw InsufficientAvailableStockException(
-                    "가용 재고가 부족합니다. 상품 옵션 ID: ${cartItem.productOptionId}"
+                    "가용 재고가 부족합니다. 상품 옵션 ID: ${cartItem.productOptionId}, 가용 재고: $availableStock, 요청 수량: ${cartItem.quantity}"
                 )
             }
         }
 
-        // 4. 예약 엔티티 생성 (Bulk Insert 준비)
+        // 5. 예약 엔티티 생성 (Bulk Insert 준비)
         val now = LocalDateTime.now()
         val expiresAt = now.plusMinutes(30)
         val reservationEntities = cartItems.map { cartItem ->
@@ -171,11 +191,11 @@ class InventoryService(
             )
         }
 
-        // 5. 예약 일괄 저장 (Batch Insert - 단일 트랜잭션)
+        // 6. 예약 일괄 저장 (Batch Insert - 단일 트랜잭션)
         // [성능 최적화]: N번의 INSERT를 단일 Batch INSERT로 처리
         val savedReservations = inventoryReservationRepository.saveAll(reservationEntities)
 
-        // 6. 도메인 데이터 반환
+        // 7. 도메인 데이터 반환
         return savedReservations.mapIndexed { index, savedReservation ->
             val cartItem = cartItems[index]
             val availableStock = availableStocks[cartItem.productOptionId]!!
