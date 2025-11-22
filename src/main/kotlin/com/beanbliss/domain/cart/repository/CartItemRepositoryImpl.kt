@@ -2,6 +2,7 @@ package com.beanbliss.domain.cart.repository
 
 import com.beanbliss.domain.cart.domain.CartItem
 import com.beanbliss.domain.cart.entity.CartItemEntity
+import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
@@ -72,6 +73,61 @@ interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE CartItemEntity c SET c.quantity = :newQuantity WHERE c.id = :cartItemId")
     fun updateQuantity(@Param("cartItemId") cartItemId: Long, @Param("newQuantity") newQuantity: Int)
+
+    /**
+     * 장바구니 아이템 수량 원자적 증가 (최대 수량 제한 포함)
+     *
+     * [동시성 제어]:
+     * - Native UPDATE 쿼리 사용
+     * - UPDATE ... SET quantity = quantity + ? WHERE ... AND quantity + ? <= maxQuantity
+     * - 최대 수량 검증을 UPDATE 쿼리에 포함하여 원자성 보장
+     * - 비관적 락과 함께 사용하여 Lost Update 방지
+     *
+     * @return 업데이트된 행 수 (1: 성공, 0: 최대 수량 초과)
+     */
+    @Modifying(clearAutomatically = false)
+    @Query(
+        value = "UPDATE cart_item SET quantity = quantity + :incrementBy, updated_at = NOW() WHERE id = :cartItemId AND quantity + :incrementBy <= :maxQuantity",
+        nativeQuery = true
+    )
+    fun incrementQuantityByIdWithLimit(
+        @Param("cartItemId") cartItemId: Long,
+        @Param("incrementBy") incrementBy: Int,
+        @Param("maxQuantity") maxQuantity: Int
+    ): Int
+
+    /**
+     * 장바구니 아이템 UPSERT (INSERT OR UPDATE)
+     *
+     * [동시성 제어]:
+     * - INSERT ... ON DUPLICATE KEY UPDATE (MySQL)
+     * - 원자적으로 INSERT 또는 UPDATE 수행
+     * - UNIQUE 제약 (user_id, product_option_id) 활용
+     *
+     * [반환값]:
+     * - 1: INSERT 성공
+     * - 2: UPDATE 성공 (값 변경됨)
+     *
+     * [최대 수량 검증]:
+     * - Service 계층에서 조회 후 검증
+     * - 초과 시 트랜잭션 롤백
+     */
+    @Modifying(clearAutomatically = false)
+    @Query(
+        value = """
+            INSERT INTO cart_item (user_id, product_option_id, quantity, created_at, updated_at)
+            VALUES (:userId, :productOptionId, :quantity, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+                quantity = quantity + VALUES(quantity),
+                updated_at = NOW()
+        """,
+        nativeQuery = true
+    )
+    fun upsertCartItem(
+        @Param("userId") userId: Long,
+        @Param("productOptionId") productOptionId: Long,
+        @Param("quantity") quantity: Int
+    ): Int
 }
 
 /**
@@ -82,7 +138,8 @@ interface CartItemJpaRepository : JpaRepository<CartItemEntity, Long> {
  */
 @Repository
 class CartItemRepositoryImpl(
-    private val cartItemJpaRepository: CartItemJpaRepository
+    private val cartItemJpaRepository: CartItemJpaRepository,
+    private val entityManager: EntityManager
 ) : CartItemRepository {
 
     override fun findByUserId(userId: Long): List<CartItem> {
@@ -117,16 +174,26 @@ class CartItemRepositoryImpl(
         return savedEntity.toDomain()
     }
 
-    @Transactional
     override fun updateQuantity(cartItemId: Long, newQuantity: Int): CartItem {
         cartItemJpaRepository.updateQuantity(cartItemId, newQuantity)
         return findById(cartItemId)
             ?: throw IllegalStateException("Cart item not found after update: $cartItemId")
     }
 
-    @Transactional
     override fun deleteByUserId(userId: Long) {
         cartItemJpaRepository.deleteByUserId(userId)
+    }
+
+    override fun incrementQuantityWithLimit(cartItemId: Long, incrementBy: Int, maxQuantity: Int): Int {
+        // Native UPDATE 쿼리 실행
+        // 비관적 락이 유지된 상태에서 원자적으로 수량 증가 및 최대 수량 검증
+        return cartItemJpaRepository.incrementQuantityByIdWithLimit(cartItemId, incrementBy, maxQuantity)
+    }
+
+    override fun upsertCartItem(userId: Long, productOptionId: Long, quantity: Int): Int {
+        // INSERT ... ON DUPLICATE KEY UPDATE 실행
+        // 원자적으로 INSERT 또는 UPDATE 수행, 동시성 안전
+        return cartItemJpaRepository.upsertCartItem(userId, productOptionId, quantity)
     }
 }
 

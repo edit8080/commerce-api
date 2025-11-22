@@ -15,7 +15,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.CountDownLatch
@@ -56,48 +56,66 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
     @Autowired
     private lateinit var cartItemJpaRepository: CartItemJpaRepository
 
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var transactionTemplate: TransactionTemplate
+
     private lateinit var testProduct: ProductEntity
     private lateinit var testOption: ProductOptionEntity
 
     @BeforeEach
     fun setUp() {
+        cleanDatabase()
         createTestData()
     }
 
+    private fun cleanDatabase() {
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0")
+        jdbcTemplate.execute("TRUNCATE TABLE cart_item")
+        jdbcTemplate.execute("TRUNCATE TABLE product_option")
+        jdbcTemplate.execute("TRUNCATE TABLE product")
+        jdbcTemplate.execute("TRUNCATE TABLE user")
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1")
+    }
+
     private fun createTestData() {
-        // 테스트 사용자 생성 (user_id 1-30)
-        val users = (1..30).map { userId ->
-            UserEntity(
-                email = "testuser$userId@example.com",
-                password = "password",
-                name = "TestUser$userId",
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now()
+        transactionTemplate.execute {
+            // 테스트 사용자 생성 (user_id 1-30)
+            val users = (1..30).map { userId ->
+                UserEntity(
+                    email = "testuser$userId@example.com",
+                    password = "password",
+                    name = "TestUser$userId",
+                    createdAt = LocalDateTime.now(),
+                    updatedAt = LocalDateTime.now()
+                )
+            }
+            userJpaRepository.saveAll(users)
+
+            // 테스트 상품 생성
+            testProduct = ProductEntity(
+                name = "테스트 원두",
+                description = "동시성 테스트용",
+                brand = "테스트 브랜드",
+                createdAt = LocalDateTime.now()
             )
+            productJpaRepository.save(testProduct)
+
+            // 상품 옵션 생성
+            testOption = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT001",
+                origin = "브라질",
+                grindType = "홀빈",
+                weightGrams = 200,
+                price = BigDecimal(15000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            productOptionJpaRepository.save(testOption)
         }
-        userJpaRepository.saveAll(users)
-
-        // 테스트 상품 생성
-        testProduct = ProductEntity(
-            name = "테스트 원두",
-            description = "동시성 테스트용",
-            brand = "테스트 브랜드",
-            createdAt = LocalDateTime.now()
-        )
-        productJpaRepository.save(testProduct)
-
-        // 상품 옵션 생성
-        testOption = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT001",
-            origin = "브라질",
-            grindType = "홀빈",
-            weightGrams = 200,
-            price = BigDecimal(15000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        productOptionJpaRepository.save(testOption)
     }
 
     @Test
@@ -112,14 +130,16 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
         val successCount = AtomicInteger(0)
 
         // 초기 장바구니 아이템 생성 (수량: 10)
-        val initialCartItem = CartItemEntity(
-            id = 0L,
-            userId = userId,
-            productOptionId = testOption.id,
-            quantity = 10,
-            createdAt = LocalDateTime.now()
-        )
-        cartItemJpaRepository.save(initialCartItem)
+        transactionTemplate.execute {
+            val initialCartItem = CartItemEntity(
+                id = 0L,
+                userId = userId,
+                productOptionId = testOption.id,
+                quantity = 10,
+                createdAt = LocalDateTime.now()
+            )
+            cartItemJpaRepository.save(initialCartItem)
+        }
 
         // When - 10번 동시에 5개씩 추가
         repeat(concurrentRequests) { _ ->
@@ -128,7 +148,7 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
                     cartService.addCartItem(userId, testOption.id, quantityPerRequest)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    println("[시나리오 1 실패] ${e.javaClass.simpleName}: ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -148,7 +168,6 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
 
     @Test
     @DisplayName("시나리오 2: 대량 동시 추가 - 20명이 동시에 신규 아이템 추가")
-    @Transactional
     fun `대량 동시 추가_신규 아이템`() {
         // Given
         val concurrentUsers = 20
@@ -164,7 +183,7 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
                     cartService.addCartItem(userId.toLong() + 1, testOption.id, quantityPerUser)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    // Exception during concurrent add
+                    println("[시나리오 2 실패] ${e.javaClass.simpleName}: ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -185,7 +204,6 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
 
     @Test
     @DisplayName("시나리오 3: 최대 수량 제한 - 동시 추가 시 999개 초과 방지")
-    @Transactional
     fun `최대 수량 제한_동시 추가 제한`() {
         // Given
         val userId = 1L
@@ -197,14 +215,16 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
         val failCount = AtomicInteger(0)
 
         // 초기 장바구니 아이템 생성 (수량: 500)
-        val initialCartItem = CartItemEntity(
-            id = 0L,
-            userId = userId,
-            productOptionId = testOption.id,
-            quantity = 500,
-            createdAt = LocalDateTime.now()
-        )
-        cartItemJpaRepository.save(initialCartItem)
+        transactionTemplate.execute {
+            val initialCartItem = CartItemEntity(
+                id = 0L,
+                userId = userId,
+                productOptionId = testOption.id,
+                quantity = 500,
+                createdAt = LocalDateTime.now()
+            )
+            cartItemJpaRepository.save(initialCartItem)
+        }
 
         // When - 5번 동시에 300개씩 추가 시도
         repeat(concurrentRequests) { _ ->
@@ -237,20 +257,22 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
 
     @Test
     @DisplayName("시나리오 4: 동일 사용자 다른 상품 옵션 동시 추가")
-    @Transactional
     fun `동일 사용자_다른 상품 옵션_동시 추가`() {
         // Given - 추가 상품 옵션 생성
-        val testOption2 = ProductOptionEntity(
-            productId = testProduct.id,
-            optionCode = "OPT002",
-            origin = "콜롬비아",
-            grindType = "분쇄",
-            weightGrams = 100,
-            price = BigDecimal(12000),
-            isActive = true,
-            createdAt = LocalDateTime.now()
-        )
-        productOptionJpaRepository.save(testOption2)
+        val testOption2 = transactionTemplate.execute {
+            val option2 = ProductOptionEntity(
+                productId = testProduct.id,
+                optionCode = "OPT002",
+                origin = "콜롬비아",
+                grindType = "분쇄",
+                weightGrams = 100,
+                price = BigDecimal(12000),
+                isActive = true,
+                createdAt = LocalDateTime.now()
+            )
+            productOptionJpaRepository.save(option2)
+            option2
+        }!!
 
         val userId = 1L
         val concurrentRequests = 10
@@ -265,7 +287,7 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
                     cartService.addCartItem(userId, testOption.id, 3)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    // Exception during concurrent add
+                    println("[시나리오 4-옵션1 실패] ${e.javaClass.simpleName}: ${e.message}")
                 } finally {
                     latch.countDown()
                 }
@@ -278,7 +300,7 @@ class CartAddItemConcurrencyTest : ConcurrencyTestBase() {
                     cartService.addCartItem(userId, testOption2.id, 2)
                     successCount.incrementAndGet()
                 } catch (e: Exception) {
-                    // Exception during concurrent add
+                    println("[시나리오 4-옵션2 실패] ${e.javaClass.simpleName}: ${e.message}")
                 } finally {
                     latch.countDown()
                 }

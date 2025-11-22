@@ -95,4 +95,34 @@ interface CartItemRepository {
      * @param userId 사용자 ID
      */
     fun deleteByUserId(userId: Long)
+
+    /**
+     * 장바구니 아이템 수량 원자적 증가 (최대 수량 제한 포함)
+     *
+     * [동시성 제어]:
+     * - 비관적 락과 함께 사용하여 Lost Update 방지
+     * - UPDATE cart_item SET quantity = quantity + ? WHERE id = ? AND quantity + ? <= 999
+     * - 최대 수량 검증을 UPDATE 쿼리에 포함하여 원자성 보장
+     *
+     * @param cartItemId 장바구니 아이템 ID
+     * @param incrementBy 증가할 수량
+     * @param maxQuantity 최대 허용 수량 (기본값: 999)
+     * @return 업데이트된 행 수 (1: 성공, 0: 최대 수량 초과로 실패)
+     */
+    fun incrementQuantityWithLimit(cartItemId: Long, incrementBy: Int, maxQuantity: Int = 999): Int
+
+    /**
+     * 장바구니 아이템 UPSERT (INSERT OR UPDATE)
+     *
+     * [동시성 제어]:
+     * - INSERT ... ON DUPLICATE KEY UPDATE 사용
+     * - 원자적으로 INSERT 또는 UPDATE 수행
+     * - 비관적 락 없이도 동시성 보장
+     *
+     * @param userId 사용자 ID
+     * @param productOptionId 상품 옵션 ID
+     * @param quantity 추가할 수량
+     * @return 영향받은 행 수 (1: INSERT, 2: UPDATE 성공)
+     */
+    fun upsertCartItem(userId: Long, productOptionId: Long, quantity: Int): Int
 }
