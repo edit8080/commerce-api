@@ -27,6 +27,7 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
     private lateinit var testUser: UserEntity
     private lateinit var testProduct: ProductEntity
     private lateinit var testProductOption: ProductOptionEntity
+    private lateinit var testProductOption2: ProductOptionEntity
 
     @BeforeEach
     fun setUpTestData() {
@@ -57,6 +58,18 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
             isActive = true
         )
         entityManager.persist(testProductOption)
+
+        // 두 번째 테스트 상품 옵션 생성
+        testProductOption2 = ProductOptionEntity(
+            optionCode = "ETH-002",
+            productId = testProduct.id,
+            origin = "Ethiopia",
+            grindType = "Ground",
+            weightGrams = 500,
+            price = BigDecimal("30000"),
+            isActive = true
+        )
+        entityManager.persist(testProductOption2)
 
         entityManager.flush()
         entityManager.clear()
@@ -191,7 +204,7 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
     @Test
     @DisplayName("사용자의 모든 장바구니 아이템 삭제 - 성공")
     fun `deleteByUserId should delete all cart items for user`() {
-        // Given: 여러 장바구니 아이템 생성
+        // Given: 여러 장바구니 아이템 생성 (다른 상품 옵션 사용)
         val cartItem1 = CartItemEntity(
             userId = testUser.id,
             productOptionId = testProductOption.id,
@@ -199,7 +212,7 @@ class CartItemRepositoryImplTest : RepositoryTestBase() {
         )
         val cartItem2 = CartItemEntity(
             userId = testUser.id,
-            productOptionId = testProductOption.id,
+            productOptionId = testProductOption2.id,  // 다른 상품 옵션 사용
             quantity = 3
         )
         entityManager.persist(cartItem1)

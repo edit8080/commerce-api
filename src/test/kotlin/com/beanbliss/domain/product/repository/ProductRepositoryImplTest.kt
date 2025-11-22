@@ -28,6 +28,12 @@ class ProductRepositoryImplTest : RepositoryTestBase() {
 
     @BeforeEach
     fun setUpTestData() {
+        // 기존 데이터 정리 (다른 테스트의 영향 제거)
+        entityManager.createQuery("DELETE FROM ProductOptionEntity").executeUpdate()
+        entityManager.createQuery("DELETE FROM ProductEntity").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+
         // 테스트 상품 1 생성 (활성 옵션 2개)
         testProduct1 = ProductEntity(
             name = "에티오피아 예가체프",

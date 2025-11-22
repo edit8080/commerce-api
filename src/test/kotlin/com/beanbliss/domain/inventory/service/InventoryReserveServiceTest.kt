@@ -1,6 +1,7 @@
 package com.beanbliss.domain.inventory.service
 
 import com.beanbliss.domain.cart.domain.CartItemDetail
+import com.beanbliss.domain.inventory.domain.Inventory
 import com.beanbliss.domain.inventory.entity.InventoryReservationEntity
 import com.beanbliss.domain.inventory.entity.InventoryReservationStatus
 import com.beanbliss.domain.inventory.repository.InventoryRepository
@@ -54,6 +55,7 @@ class InventoryReserveServiceTest {
             createCartItem(1L, 10L, "에티오피아 예가체프 G1", "ETH-HD-200", 2)
         )
 
+        val inventory = Inventory(productOptionId = 10L, stockQuantity = 100)
         val savedReservation = InventoryReservationEntity(
             id = 1001L,
             productOptionId = 10L,
@@ -66,8 +68,9 @@ class InventoryReserveServiceTest {
         )
 
         // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) } returns listOf(inventory)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 0
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) } returns mapOf(10L to 10)
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) } returns 90
         every { inventoryReservationRepository.saveAll(any()) } returns listOf(savedReservation)
 
         // When
@@ -76,13 +79,15 @@ class InventoryReserveServiceTest {
         // Then
         // [검증 1]: Repository 호출 순서 검증
         verifyOrder {
+            inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L))
             inventoryReservationRepository.countActiveReservations(userId)
-            inventoryRepository.calculateAvailableStockBatch(listOf(10L))
+            inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any())
             inventoryReservationRepository.saveAll(any())
         }
 
+        verify(exactly = 1) { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) }
         verify(exactly = 1) { inventoryReservationRepository.countActiveReservations(userId) }
-        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) }
+        verify(exactly = 1) { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) }
         verify(exactly = 1) { inventoryReservationRepository.saveAll(any()) }
 
         // [검증 2]: 응답 DTO 변환 검증
@@ -93,7 +98,7 @@ class InventoryReserveServiceTest {
         assertEquals("ETH-HD-200", result[0].optionCode)
         assertEquals(2, result[0].reservationEntity.quantity)
         assertEquals(InventoryReservationStatus.RESERVED, result[0].reservationEntity.status)
-        assertEquals(8, result[0].availableStockAfterReservation) // 10 - 2 = 8
+        assertEquals(8, result[0].availableStockAfterReservation) // 100 - 90 - 2 = 8
     }
 
     @Test
@@ -105,7 +110,10 @@ class InventoryReserveServiceTest {
             createCartItem(1L, 10L, "에티오피아 예가체프 G1", "ETH-HD-200", 2)
         )
 
-        // 활성 예약이 이미 존재
+        val inventory = Inventory(productOptionId = 10L, stockQuantity = 100)
+
+        // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) } returns listOf(inventory)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 1
 
         // When & Then
@@ -117,8 +125,9 @@ class InventoryReserveServiceTest {
         assertEquals("이미 진행 중인 주문 예약이 있습니다.", exception.message)
 
         // [검증]: 예외 발생 시 재고 조회 및 saveAll은 호출되지 않아야 함
+        verify(exactly = 1) { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) }
         verify(exactly = 1) { inventoryReservationRepository.countActiveReservations(userId) }
-        verify(exactly = 0) { inventoryRepository.calculateAvailableStockBatch(any()) }
+        verify(exactly = 0) { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(any(), any()) }
         verify(exactly = 0) { inventoryReservationRepository.saveAll(any()) }
     }
 
@@ -131,8 +140,12 @@ class InventoryReserveServiceTest {
             createCartItem(1L, 10L, "에티오피아 예가체프 G1", "ETH-HD-200", 5) // 요청 5개
         )
 
+        val inventory = Inventory(productOptionId = 10L, stockQuantity = 100)
+
+        // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) } returns listOf(inventory)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 0
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) } returns mapOf(10L to 3) // 가용 재고 3개 (부족)
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) } returns 97 // 가용 재고 3개 (100 - 97 = 3)
 
         // When & Then
         // [핵심 비즈니스 규칙 검증]: 재고 부족 시 예외 발생
@@ -144,8 +157,9 @@ class InventoryReserveServiceTest {
         assertTrue(exception.message!!.contains("10"))
 
         // [검증]: 예외 발생 시 saveAll은 호출되지 않아야 함
+        verify(exactly = 1) { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) }
         verify(exactly = 1) { inventoryReservationRepository.countActiveReservations(userId) }
-        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) }
+        verify(exactly = 1) { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) }
         verify(exactly = 0) { inventoryReservationRepository.saveAll(any()) }
     }
 
@@ -158,6 +172,9 @@ class InventoryReserveServiceTest {
             createCartItem(1L, 10L, "에티오피아 예가체프 G1", "ETH-HD-200", 2),
             createCartItem(2L, 20L, "콜롬비아 수프리모", "COL-WB-500", 1)
         )
+
+        val inventory1 = Inventory(productOptionId = 10L, stockQuantity = 100)
+        val inventory2 = Inventory(productOptionId = 20L, stockQuantity = 200)
 
         val savedReservation1 = InventoryReservationEntity(
             id = 1001L,
@@ -181,8 +198,11 @@ class InventoryReserveServiceTest {
             updatedAt = now
         )
 
+        // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L, 20L)) } returns listOf(inventory1, inventory2)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 0
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(10L, 20L)) } returns mapOf(10L to 10, 20L to 15)
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) } returns 90
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(20L, any()) } returns 185
         every { inventoryReservationRepository.saveAll(any()) } returns listOf(savedReservation1, savedReservation2)
 
         // When
@@ -190,8 +210,10 @@ class InventoryReserveServiceTest {
 
         // Then
         // [검증]: 모든 상품에 대해 재고 조회(bulk) 및 예약 생성(bulk)이 호출되어야 함
+        verify(exactly = 1) { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L, 20L)) }
         verify(exactly = 1) { inventoryReservationRepository.countActiveReservations(userId) }
-        verify(exactly = 1) { inventoryRepository.calculateAvailableStockBatch(listOf(10L, 20L)) }
+        verify(exactly = 1) { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) }
+        verify(exactly = 1) { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(20L, any()) }
         verify(exactly = 1) { inventoryReservationRepository.saveAll(any()) }
 
         // [검증]: 2개의 예약 결과가 반환되어야 함
@@ -214,6 +236,7 @@ class InventoryReserveServiceTest {
         val reservedAt = LocalDateTime.of(2025, 11, 4, 15, 30, 0)
         val expiresAt = reservedAt.plusMinutes(30) // 30분 후
 
+        val inventory = Inventory(productOptionId = 10L, stockQuantity = 100)
         val savedReservation = InventoryReservationEntity(
             id = 1001L,
             productOptionId = 10L,
@@ -225,8 +248,10 @@ class InventoryReserveServiceTest {
             updatedAt = reservedAt
         )
 
+        // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) } returns listOf(inventory)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 0
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) } returns mapOf(10L to 10)
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) } returns 90
         every { inventoryReservationRepository.saveAll(any()) } returns listOf(savedReservation)
 
         // When
@@ -248,6 +273,7 @@ class InventoryReserveServiceTest {
             createCartItem(1L, 10L, "콜롬비아 수프리모", "COL-ESP-500", 3)
         )
 
+        val inventory = Inventory(productOptionId = 10L, stockQuantity = 100)
         val savedReservation = InventoryReservationEntity(
             id = 1001L,
             productOptionId = 10L,
@@ -259,8 +285,10 @@ class InventoryReserveServiceTest {
             updatedAt = now
         )
 
+        // Mocking
+        every { inventoryRepository.findAllByProductOptionIdsWithLock(listOf(10L)) } returns listOf(inventory)
         every { inventoryReservationRepository.countActiveReservations(userId) } returns 0
-        every { inventoryRepository.calculateAvailableStockBatch(listOf(10L)) } returns mapOf(10L to 20)
+        every { inventoryReservationRepository.sumQuantityByProductOptionIdAndStatus(10L, any()) } returns 80
         every { inventoryReservationRepository.saveAll(any()) } returns listOf(savedReservation)
 
         // When
@@ -271,7 +299,7 @@ class InventoryReserveServiceTest {
         assertEquals("콜롬비아 수프리모", result[0].productName)
         assertEquals("COL-ESP-500", result[0].optionCode)
         assertEquals(3, result[0].reservationEntity.quantity)
-        assertEquals(17, result[0].availableStockAfterReservation) // 20 - 3 = 17
+        assertEquals(17, result[0].availableStockAfterReservation) // 100 - 80 - 3 = 17
     }
 
     // === Helper Method ===
